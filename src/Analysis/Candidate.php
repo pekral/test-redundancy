@@ -15,7 +15,7 @@ final readonly class Candidate implements JsonSerializable
     /**
      * @param list<string> $coveredBy
      * @param list<string>|null $differsBy
-     * @param list<string>|null $coveringDiffersBy the tokens the covering tests have and this test lacks
+     * @param list<string>|null $coveringDiffersBy
      */
     public function __construct(public string $testKey, public array $coveredBy, public ?array $differsBy, public ?array $coveringDiffersBy)
     {
@@ -41,9 +41,11 @@ final readonly class Candidate implements JsonSerializable
         return match (true) {
             $this->differsBy === null => Action::Review,
             $this->differsBy === [] => Action::Delete,
-            !$this->differsOnlyInData() => Action::Review,
+            !$this->isDataOnly($this->differsBy) => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
-            !$this->isDatasetRow() && $this->isCoveredByOneTestOfTheSameFile() => Action::MergeIntoDataset,
+            !$this->isDatasetRow()
+                && $this->isCoveredByOneTestOfTheSameFile()
+                && $this->isDataOnly($this->coveringDiffersBy ?? []) => Action::MergeIntoDataset,
             default => Action::Review,
         };
     }
@@ -75,9 +77,12 @@ final readonly class Candidate implements JsonSerializable
             : $steps;
     }
 
-    private function differsOnlyInData(): bool
+    /**
+     * @param list<string> $tokens
+     */
+    private function isDataOnly(array $tokens): bool
     {
-        foreach ([...$this->differsBy ?? [], ...$this->coveringDiffersBy ?? []] as $token) {
+        foreach ($tokens as $token) {
             if (preg_match(self::DATA_TOKEN_PATTERN, $token) !== 1) {
                 return false;
             }
