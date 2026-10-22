@@ -11,7 +11,8 @@ final readonly class Verification implements JsonSerializable
 
     private const string RESTORE = 'Coverage dropped. Restore the test that covered each line in "lostLines", then run verify again.';
 
-    private const string UNSTABLE = 'No test file that covered the lines in "unstableLines" changed, but their coverage differs from the baseline. '
+    private const string UNSTABLE = 'No test file that covered the lines in "unstableLines" changed, '
+        . 'but their coverage differs from the baseline. '
         . 'Do not restore a test. The coverage of an unchanged test depends on state outside the test run, such as a cache or a database. '
         . 'Make that test independent of the state, or run analyse again for a new baseline.';
 
