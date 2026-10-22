@@ -10,6 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `vendor/bin/test-redundancy [paths]` — finds PHPUnit and Pest test cases whose covered lines other test cases
   already cover, from one run with per-test coverage. A folder runs in parallel.
+- A logo: one coverage circle with a check mark in a frame, also used in the social preview.
 - JSON output for AI agents with an `action` per candidate (`delete`, `merge-into-dataset`, `review-dataset-row`,
   `review`), the smallest covering set, and what the candidate asserts beyond it. `--format=text` for people.
 - `map` and `--across` — a per-test coverage map of the whole suite, to compare tests across files.
