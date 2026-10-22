@@ -1,22 +1,17 @@
-<div align="center">
-  <img src="assets/logo.svg" alt="pekral/test-redundancy" width="480">
+<div align="left">
+    <img alt="pekral/test-redundancy — two overlapping test coverage circles, one kept, one removed" src="assets/logo.svg" width="480">
 
-  <p><strong>Fewer tests. Same coverage.</strong></p>
+<h1>Fewer tests, the same coverage</h1>
 
-  <a href="https://packagist.org/packages/pekral/test-redundancy"><img src="https://img.shields.io/packagist/v/pekral/test-redundancy" alt="Packagist Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen.svg" alt="MIT Licensed"></a>
-  <a href="https://github.com/pekral/test-redundancy/actions/workflows/pr.yml"><img src="https://github.com/pekral/test-redundancy/actions/workflows/pr.yml/badge.svg" alt="Checks"></a>
-  <a href="https://packagist.org/packages/pekral/test-redundancy"><img src="https://img.shields.io/packagist/dt/pekral/test-redundancy" alt="Total Downloads"></a>
+[![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
+![Checks](https://github.com/pekral/test-redundancy/workflows/Checks/badge.svg)
+
 </div>
 
----
-
-Test suites grow, and nobody removes tests. AI agents make it worse: they add a test for every change, often one
-that runs exactly the lines another test already runs.
-
-`test-redundancy` finds those tests in a **PHPUnit** or **Pest** suite. It runs a test file or folder once with
-per-test coverage, finds the test cases whose covered lines other test cases already cover, and tells you — or an AI
-agent — what each one asserts beyond them. The goal is **100% coverage with the fewest and simplest tests**.
+`test-redundancy` finds the test cases in a **PHPUnit** or **Pest** suite whose covered lines other test cases
+already cover, and tells you — or an AI agent — what each of them asserts beyond those tests. Point it at a test folder
+or file. It runs the tests once with per-test coverage and returns a JSON list of candidates to delete, merge into a
+dataset, or review, so the suite keeps 100% coverage with fewer and simpler tests.
 
 ---
 
@@ -25,11 +20,11 @@ agent — what each one asserts beyond them. The goal is **100% coverage with th
 | | Version |
 | --- | --- |
 | PHP | `^8.2` |
-| Test runner | Pest 3–5 or PHPUnit 10–13 (`phpunit/php-code-coverage` 10.1–14) |
-| Coverage driver | `pcov` (recommended) or `xdebug` |
+| `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
+| Coverage driver | `pcov` or `xdebug` |
+| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` (and `vendor/bin/paratest` for parallel runs) |
 
-Contributing to this repository needs **PHP 8.4+**, because the quality tooling requires it. Using the package
-needs 8.2.
+Contributing to this repository needs PHP 8.4+, because the development dependencies require it.
 
 ---
 
@@ -41,157 +36,170 @@ composer require --dev pekral/test-redundancy
 
 ---
 
-## Usage
-
-```bash
-# A folder or a single test file
-vendor/bin/test-redundancy tests/Unit/Billing
-vendor/bin/test-redundancy tests/Unit/Billing/InvoiceTest.php
-
-# Without a path: the test files the branch changes against origin/HEAD (or --base=<ref>)
-vendor/bin/test-redundancy
-
-# Human-readable output instead of JSON
-vendor/bin/test-redundancy tests/Unit --format=text
-```
-
-A folder runs **once**, in parallel (`pest --parallel`, or `paratest` for PHPUnit). A single file takes seconds;
-a folder of 300 test files takes about as long as running it with coverage.
-
-### Output for AI agents
-
-The default output is JSON. It carries the rules an agent applies, a summary, and one entry per candidate:
-
-```json
-{
-  "tool": "pekral/test-redundancy",
-  "instructions": ["Goal: keep 100% line coverage with the fewest and simplest tests.", "…"],
-  "summary": { "testFiles": 2, "testCases": 7, "candidates": 3, "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 } },
-  "files": [
-    {
-      "file": "tests/CalculatorTest.php",
-      "candidates": [
-        {
-          "test": "it adds zero",
-          "action": "merge-into-dataset",
-          "reason": "Differs from the covering test only in data. Merge both into one test with a dataset row per case.",
-          "coveredBy": ["it adds two numbers › negative numbers"],
-          "differsBy": ["value:0", "value:5"]
-        }
-      ]
-    }
-  ]
-}
-```
-
-| Field | Meaning |
-| --- | --- |
-| `coveredBy` | The smallest set of kept tests that covers every line the candidate covers. A test from another file carries its path. |
-| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when a test or a dataset row cannot be parsed. |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a sibling row runs the same lines; `review` — asserts something the others do not. |
-
-### How to read a candidate
-
-**A candidate is a test that covers no line the other tests do not cover. It is not proof that the test is useless.**
-Coverage shows which lines a test runs, never what it asserts. Two tests can run the same lines with different input
-and expect different results. So:
-
-1. **Delete** a candidate only when a test under `coveredBy` asserts the same input and the same result.
-2. **Merge into a dataset** when the two differ only in data — nothing is lost, the file gets shorter.
-3. **Keep** a test that asserts a different result, a different input class (empty, boundary, another tenant,
-   invalid), an ordering, or a rejection. **When in doubt, keep it.**
-
-Candidates of one file can be removed together without losing a covered line. Re-run the tool after each change.
-
-### Comparing across files
-
-```bash
-# Once, or on a schedule: per-test coverage of the whole suite
-vendor/bin/test-redundancy map tests
-
-# Then compare any file or folder with every mapped test
-vendor/bin/test-redundancy tests/Unit/Billing --across
-```
-
-`--across` reads unchanged test files straight from the map and re-runs only the changed ones. It warns when source
-files changed since the map was built. Of two tests that cover each other, it never proposes both.
-
----
-
 ## Configuration
 
-Optional. Put a `test-redundancy.json` in the project root:
+Optional. Without a file the tool reads `src/` and `app/`, runs 4 parallel processes, and picks `vendor/bin/pest`
+when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redundancy.json` to the project root:
 
 ```json
 {
-  "source": ["app"],
-  "ignore": "#^app/Providers/#",
-  "env": { "TEST_TOKEN": "7" },
-  "parallelEnv": {},
-  "processes": 6,
-  "map": "storage/test-redundancy/coverage-map.json.gz",
-  "runner": "vendor/bin/pest"
+    "source": ["app"],
+    "ignore": "#^app/Providers/#",
+    "env": { "TEST_TOKEN": "7" },
+    "parallelEnv": {},
+    "processes": 6,
+    "map": "storage/test-redundancy/coverage-map.json.gz",
+    "runner": "vendor/bin/pest"
 }
 ```
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `source` | `["src", "app"]` | Directories whose lines count. |
-| `ignore` | none | A regex of source paths to leave out, e.g. service providers every test boots. |
-| `env` | `{}` | Environment variables for a single-file run, e.g. a spare database token. |
+| `ignore` | none | A regex of source paths to leave out, e.g. code every test boots. |
+| `env` | `{}` | Environment variables for a sequential run. |
 | `parallelEnv` | `{}` | Environment variables for a parallel run. |
-| `processes` | `4` | Parallel processes for a folder. `1` runs sequentially. |
-| `map` | `.test-redundancy/coverage-map.json.gz` | Where `map` stores the coverage map. |
-| `runner` | auto | Path to `pest` or `phpunit`, when not in `vendor/bin`. |
+| `processes` | `4` | Parallel processes. `1` runs sequentially. |
+| `map` | `.test-redundancy/coverage-map.json.gz` | Where the `map` command stores the coverage map. |
+| `runner` | auto | Path to `pest` or `phpunit`, relative to the project root or absolute. |
+
+---
+
+## Usage
+
+```bash
+# A test folder or a single test file
+vendor/bin/test-redundancy tests/Unit/Billing
+vendor/bin/test-redundancy tests/Unit/Billing/InvoiceTest.php
+
+# No path: the test files the branch changes against origin/HEAD, or against --base
+vendor/bin/test-redundancy
+vendor/bin/test-redundancy --base=master
+
+# A report for people instead of JSON
+vendor/bin/test-redundancy tests/Unit --format=text
+```
+
+A single folder or file runs once, in parallel — `pest --parallel`, or `paratest` for PHPUnit. Several paths run
+once, sequentially. `vendor/bin/test-redundancy analyse --help` lists every option.
+
+### The JSON report
+
+This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixtures/pest), shortened to one candidate:
+
+```json
+{
+  "files": [
+    {
+      "candidates": [
+        {
+          "action": "merge-into-dataset",
+          "coveredBy": ["it adds two numbers › negative numbers"],
+          "differsBy": ["value:0", "value:5"],
+          "reason": "Differs from the covering test only in data. Merge both into one test with a dataset row per case.",
+          "test": "it adds zero"
+        }
+      ],
+      "coveredLines": 4,
+      "file": "tests/CalculatorTest.php",
+      "testCases": 6
+    }
+  ],
+  "instructions": ["Goal: keep 100% line coverage with the fewest and simplest tests.", "…"],
+  "summary": {
+    "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 },
+    "candidates": 3,
+    "seconds": 0,
+    "testCases": 7,
+    "testFiles": 2
+  },
+  "tool": "pekral/test-redundancy"
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `coveredBy` | The smallest set of kept tests that covers every line of the candidate. A test from another file carries its path. |
+| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not. |
+
+### How to read a candidate
+
+A candidate runs no line the other tests do not run. Coverage cannot see what a test asserts, so a candidate is not
+proof that a test is useless:
+
+1. **Delete** it only when a test under `coveredBy` asserts the same input and the same result.
+2. **Merge it into a dataset** when the two differ only in data.
+3. **Keep** a test that asserts a different result, a different input class (empty, boundary, another tenant,
+   invalid), an ordering, or a rejection. When in doubt, keep it.
+
+The candidates of one file can be removed together without losing a covered line. Re-run the tool after each change.
+
+### Comparing across files
+
+```bash
+# Per-test coverage of the given tests (default: tests)
+vendor/bin/test-redundancy map tests
+
+# Compare a folder or a file with every mapped test
+vendor/bin/test-redundancy tests/Unit/Billing --across
+```
+
+`--across` reads unchanged test files from the map and re-runs only the changed ones. It warns when source files changed
+since the map was built. Of two tests that cover each other, it proposes at most one.
 
 ---
 
 ## How it works
 
 1. One test run with `--coverage-php` and `--log-junit` records which test case — every dataset row separately —
-   covers which source line. Real test descriptions come from the JUnit log, so they match the test file.
+   covers which source line. Test descriptions come from the JUnit log.
 2. A greedy pass removes test cases whose lines the remaining test cases still cover. On a tie it removes standalone
-   tests before dataset rows, because one parametrised test is simpler than several copies.
-3. For every candidate it computes the smallest covering set and parses the test files with `nikic/php-parser` to
-   build a contract fingerprint per test case — Pest `it()`/`test()` with `->with()` datasets and chained modifiers
-   such as `->throws()`, and PHPUnit `test*` / `#[Test]` methods with `#[DataProvider]` / `@dataProvider` rows.
-
-There is no mutation testing: it took minutes per file and still could not see contracts its mutators cannot break.
+   tests before dataset rows.
+3. For each candidate it computes the smallest covering set and compares contract fingerprints built with
+   `nikic/php-parser`: Pest `it()` / `test()` with `->with()` datasets and chained modifiers such as `->throws()`, and
+   PHPUnit `test*` / `#[Test]` / `@test` methods with `#[DataProvider]` / `@dataProvider` rows.
 
 ---
 
-## Development
+## Testing
 
 ```bash
 composer install
+composer test
 ```
 
 | Command | What it does |
 | --- | --- |
-| `composer check` | Composer normalize, PHPCS, Pint, Rector, PHPStan (max level), audit, tests with 100% coverage |
-| `composer fix` | Apply Rector, Pint and PHPCS fixes |
-| `composer test` | Tests without coverage |
-| `php bin/test-redundancy tests` | Run the tool on its own tests |
+| `composer check` | Composer normalize, PHPCS, Pint, Rector, PHPStan, security audit, and the tests with 100% coverage |
+| `composer fix` | Composer normalize, Rector, Pint and PHPCS fixes |
+| `composer test` | The tests without coverage |
+| `composer test:coverage` | The tests with a 100% coverage minimum |
 | `composer ai-olympus:install` | Reinstall the [pekral/ai-olympus](https://github.com/pekral/ai-olympus) agent rules and skills |
+
+PHPCS, PHPStan and Rector use [pekral/phpcs-rules](https://github.com/pekral/phpcs-rules),
+[pekral/phpstan-rules](https://github.com/pekral/phpstan-rules) and [pekral/rector-rules](https://github.com/pekral/rector-rules).
 
 ### CI
 
-Pull requests and pushes to `master` run `composer check` on PHP 8.5 and the tool on its own tests. A matrix runs the
-tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies. Dependabot proposes dependency updates
-weekly, and a security audit runs every Monday.
+Pull requests and pushes to `master` run `composer check` on PHP 8.5, then the tool on its own tests. A matrix runs
+the tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies. A security audit runs every
+Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---
 
-## Links
+## Changelog
 
-* [Packagist](https://packagist.org/packages/pekral/test-redundancy)
-* [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
-* [Discussions](https://github.com/pekral/test-redundancy/discussions)
+See [CHANGELOG](CHANGELOG.md).
 
----
+## Contributing
+
+See [CONTRIBUTING](CONTRIBUTING.md).
+
+## Security
+
+See [the security policy](SECURITY.md).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-Maintained by [Petr Král](https://github.com/pekral).
