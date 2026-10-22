@@ -32,16 +32,16 @@ jobs:
       - name: Composer normalize
         run: composer composer-normalize-check
 
-      - name: PHP CodeSniffer
+      - name: PHP CodeSniffer (pekral/phpcs-rules)
         run: composer phpcs-check
 
       - name: Laravel Pint
         run: composer pint-check
 
-      - name: Rector
+      - name: Rector (pekral/rector-rules)
         run: composer rector-check
 
-      - name: PHPStan
+      - name: PHPStan max level (pekral/phpstan-rules)
         run: composer analyse
 
       - name: Security audit
