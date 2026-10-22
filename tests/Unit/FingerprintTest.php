@@ -48,6 +48,10 @@ it('collects the Pest negation as part of the call it negates', function (): voi
         'function:expect',
         'not:call:toBeEmpty',
         'call:toBeArray',
+    ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not()->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
+        'function:expect',
+        'not:call:toBeEmpty',
+        'call:toBeArray',
     ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->toBeEmpty();'))))->toEqualCanonicalizing([
         'function:expect',
         'call:toBeEmpty',

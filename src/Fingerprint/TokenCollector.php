@@ -70,7 +70,7 @@ final class TokenCollector
             || $node instanceof UnaryMinus
             || $node instanceof ConstFetch
             || $node instanceof ClassConstFetch
-            || $node instanceof MethodCall
+            || ($node instanceof MethodCall && !self::isNegation($node))
             || $node instanceof StaticCall
             || $node instanceof FuncCall
             || $node instanceof New_;
@@ -99,9 +99,14 @@ final class TokenCollector
 
     private static function negation(Expr $receiver): string
     {
-        return $receiver instanceof PropertyFetch && $receiver->name instanceof Identifier && $receiver->name->toString() === 'not'
-            ? 'not:'
-            : '';
+        return self::isNegation($receiver) ? 'not:' : '';
+    }
+
+    private static function isNegation(Expr $node): bool
+    {
+        return ($node instanceof PropertyFetch || $node instanceof MethodCall)
+            && $node->name instanceof Identifier
+            && $node->name->toString() === 'not';
     }
 
     private static function scalar(Scalar $scalar, string $sign): ?string
