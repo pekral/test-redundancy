@@ -37,6 +37,7 @@ final readonly class RedundancyAnalyzer
                     $testKey,
                     array_map(static fn (string $covering): string => self::display($covering, $testFile), $coveredBy),
                     $this->fingerprints->difference($testKey, $coveredBy),
+                    $this->fingerprints->coveringDifference($testKey, $coveredBy),
                 );
             }
 

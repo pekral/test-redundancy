@@ -21,6 +21,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - An array key now carries a `key:` prefix in the contract fingerprint (`key:value:'x'`),
   so a dataset row whose input equals only an array key of the covering row is reported with `differsBy: ["value:'x'"]`
   instead of `differsBy: []` and the action `delete` (#11).
+- A candidate whose covering test makes a call, function call or `new` expression the candidate lacks is reported
+  with the action `review` instead of `merge-into-dataset`. `merge-into-dataset` now requires that the two tests differ
+  only in data in both directions, so a dataset can express them as rows of one test (#12).
 
 ## [0.1] - 2026-10-22
 

@@ -22,6 +22,28 @@ final class FingerprintCache
      */
     public function difference(string $testKey, array $coveringTestKeys): ?array
     {
+        $tokens = $this->tokens($testKey, $coveringTestKeys);
+
+        return $tokens === null ? null : array_keys(array_diff_key($tokens[0], $tokens[1]));
+    }
+
+    /**
+     * @param list<string> $coveringTestKeys
+     * @return list<string>|null
+     */
+    public function coveringDifference(string $testKey, array $coveringTestKeys): ?array
+    {
+        $tokens = $this->tokens($testKey, $coveringTestKeys);
+
+        return $tokens === null ? null : array_keys(array_diff_key($tokens[1], $tokens[0]));
+    }
+
+    /**
+     * @param list<string> $coveringTestKeys
+     * @return array{array<string, true>, array<string, true>}|null the tokens of the test and of its covering tests together
+     */
+    private function tokens(string $testKey, array $coveringTestKeys): ?array
+    {
         $own = $this->of($testKey);
 
         if ($own === null) {
@@ -40,7 +62,7 @@ final class FingerprintCache
             $coveringTokens += $tokens;
         }
 
-        return array_keys(array_diff_key($own, $coveringTokens));
+        return [$own, $coveringTokens];
     }
 
     /**
