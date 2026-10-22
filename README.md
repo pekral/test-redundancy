@@ -160,10 +160,13 @@ the tests change, `verify` runs the same test files again and compares:
 It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
 mapped test file still covers does not count as lost.
 
-`analyse` also stores a hash of every analysed test file. When a line is no longer covered but none of the test files that
-covered it changed, `verify` lists it in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to
-restore a test. The coverage of such a test depends on state outside the test run, such as a cache or a database. A line
-that a changed or deleted test file also covered stays in `lostLines`.
+`analyse` also stores a hash of every analysed test file and of every covered source file. When a line is no longer
+covered, none of the test files that covered it changed and its source file did not change, `verify` lists it in
+`unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such a
+test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
+also covered, or a line of a source file that changed since `analyse`, stays in `lostLines` and `verify` exits with `1`.
+A baseline written before source file hashes existed reports every lost line in `lostLines`; run `analyse` again to
+restore the distinction.
 
 ### How to read a candidate
 
