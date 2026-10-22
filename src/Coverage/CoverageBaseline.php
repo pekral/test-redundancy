@@ -13,25 +13,32 @@ final readonly class CoverageBaseline
     /**
      * @param list<string> $testFiles
      * @param list<string> $lines
+     * @param array<string, array{hash: string, lines: list<string>}> $files
      */
-    public function __construct(public array $testFiles, public array $lines, public bool $across)
+    public function __construct(public array $testFiles, public array $lines, public bool $across, public array $files)
     {
     }
 
     /**
      * @param array<string, array<string, array<string, true>>> $testsByFile
      */
-    public static function fromTestsByFile(array $testsByFile, bool $across): self
+    public static function fromTestsByFile(array $testsByFile, bool $across, string $projectRoot): self
     {
         $lines = [];
+        $files = [];
 
-        foreach ($testsByFile as $tests) {
+        foreach ($testsByFile as $testFile => $tests) {
+            $fileLines = [];
+
             foreach ($tests as $testLines) {
-                $lines += $testLines;
+                $fileLines += $testLines;
             }
+
+            $lines += $fileLines;
+            $files[$testFile] = ['hash' => self::hashOf($projectRoot, $testFile), 'lines' => array_keys($fileLines)];
         }
 
-        return new self(array_keys($testsByFile), array_keys($lines), $across);
+        return new self(array_keys($testsByFile), array_keys($lines), $across, $files);
     }
 
     /**
@@ -54,7 +61,32 @@ final readonly class CoverageBaseline
         /** @var list<string> $lines */
         $lines = $baseline['lines'];
 
-        return new self($testFiles, $lines, ($baseline['across'] ?? false) === true);
+        /** @var array<string, array{hash: string, lines: list<string>}> $files */
+        $files = is_array($baseline['files'] ?? null) ? $baseline['files'] : [];
+
+        return new self($testFiles, $lines, ($baseline['across'] ?? false) === true, $files);
+    }
+
+    /**
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    public function unstableAmong(array $lines, string $projectRoot): array
+    {
+        $unchanged = [];
+        $changed = [];
+
+        foreach ($this->files as $testFile => $file) {
+            if (self::hashOf($projectRoot, $testFile) === $file['hash']) {
+                $unchanged += array_flip($file['lines']);
+
+                continue;
+            }
+
+            $changed += array_flip($file['lines']);
+        }
+
+        return array_values(array_filter($lines, static fn (string $line): bool => isset($unchanged[$line]) && !isset($changed[$line])));
     }
 
     /**
@@ -66,8 +98,15 @@ final readonly class CoverageBaseline
             mkdir(dirname($path), recursive: true);
         }
 
-        $baseline = ['across' => $this->across, 'lines' => $this->lines, 'testFiles' => $this->testFiles];
+        $baseline = ['across' => $this->across, 'files' => $this->files, 'lines' => $this->lines, 'testFiles' => $this->testFiles];
         file_put_contents($path, json_encode($baseline, JSON_THROW_ON_ERROR));
+    }
+
+    private static function hashOf(string $projectRoot, string $testFile): string
+    {
+        $path = $projectRoot . DIRECTORY_SEPARATOR . $testFile;
+
+        return is_file($path) ? hash('sha256', (string) file_get_contents($path)) : '';
     }
 
 }

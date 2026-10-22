@@ -27,6 +27,33 @@ function pestProject(): string
     return $project;
 }
 
+function warmCacheProject(): string
+{
+    $project = pestProject();
+    file_put_contents($project . '/tests/WarmCacheTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        require_once __DIR__ . '/../src/Calculator.php';
+
+        use Fixture\Pest\Calculator;
+
+        it('reads a warm cache', function (): void {
+            $cacheMarker = __DIR__ . '/../warm-cache';
+
+            if (!is_file($cacheMarker)) {
+                touch($cacheMarker);
+                expect(fn (): float => (new Calculator())->divide(1, 0))->toThrow(InvalidArgumentException::class);
+            }
+
+            expect(is_file($cacheMarker))->toBeTrue();
+        });
+        PHP);
+
+    return $project;
+}
+
 it('prints the JSON report for an agent by default', function (): void {
     $tester = command(fixturePath('pest'), 'analyse');
 
@@ -156,6 +183,102 @@ it('verifies that no covered source line was lost', function (): void {
         ->and($lost->getStatusCode())->toBe(1)
         ->and(valueAt(decodedJson($lost->getDisplay()), 'lostLines'))->toBe(['src/Calculator.php:18'])
         ->and(valueAt(decodedJson($missing->getDisplay()), 'missingTestFiles'))->toBe(['tests/OtherCalculatorTest.php']);
+
+    removeDirectory($project);
+});
+
+it('reports unstable coverage instead of lost lines when no covering test file changed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(0)
+        ->and(valueAt($report, 'ok'))->toBeTrue()
+        ->and(valueAt($report, 'lostLines'))->toBe([])
+        ->and(valueAt($report, 'unstableLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'instruction'))->toBe(
+            'No test changed, but the coverage of "unstableLines" differs from the baseline. Do not restore a test. '
+            . 'The coverage of an unchanged test depends on state outside the test run, such as a cache or a database. '
+            . 'Make that test independent of the state, or run analyse again for a new baseline.',
+        );
+
+    removeDirectory($project);
+});
+
+it('keeps reporting a lost line when a covering test file changed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    file_put_contents($project . '/tests/WarmCacheTest.php', "\nit('is another test', fn () => expect(true)->toBeTrue());\n", FILE_APPEND);
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([])
+        ->and(valueAt($report, 'instruction'))->toContain('Restore the test');
+
+    removeDirectory($project);
+});
+
+it('keeps reporting a lost line when a changed test file covered it beside an unchanged one', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests']]);
+    $calculatorTest = $project . '/tests/CalculatorTest.php';
+    file_put_contents(
+        $calculatorTest,
+        (string) preg_replace("/it\\('rejects a division by zero'.*?'Division by zero\\.'\\);\n/s", '', (string) file_get_contents($calculatorTest)),
+    );
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([]);
+
+    removeDirectory($project);
+});
+
+it('keeps reporting a lost line when a covering test file was deleted', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests']]);
+    unlink($project . '/tests/CalculatorTest.php');
+    unlink($project . '/tests/OtherCalculatorTest.php');
+    unlink($project . '/tests/WarmCacheTest.php');
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toContain('src/Calculator.php:18')
+        ->and(valueAt($report, 'unstableLines'))->toBe([]);
+
+    removeDirectory($project);
+});
+
+it('reports every lost line of a baseline written before test file hashes existed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $baselinePath = $project . '/build/baseline.json';
+    file_put_contents(
+        $baselinePath,
+        (string) json_encode(['across' => false, 'lines' => ['src/Calculator.php:18'], 'testFiles' => ['tests/WarmCacheTest.php']]),
+    );
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([]);
 
     removeDirectory($project);
 });

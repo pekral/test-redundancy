@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `verify` no longer lists a line in `lostLines` and says to restore a test when no covering test file changed. `analyse`
+  stores a hash of each analysed test file in the baseline. A lost line whose covering test files are all unchanged is
+  reported in the new `unstableLines`, with an instruction not to restore a test, and `verify` exits with `0`. A baseline
+  written by an earlier version reports every lost line as before.
+
 ## [0.1] - 2026-10-22
 
 ### Added
