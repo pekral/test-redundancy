@@ -21,7 +21,7 @@ function fingerprintsOf(string $code): array
 }
 
 it('collects every node that carries a contract', function (): void {
-    $statements = (new ParserFactory())->createForHostVersion()->parse(
+    $statements = new ParserFactory()->createForHostVersion()->parse(
         '<?php expect(abs(-5))->toBe(true); Foo::create(new Bar(), Baz::VALUE, null, 1.5, "text", $dynamic(), '
         . '$object->$method(), (new $class)(), $class::$method(), $class::CONSTANT, -$value);',
     );

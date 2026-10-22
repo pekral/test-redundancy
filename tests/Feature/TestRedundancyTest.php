@@ -49,7 +49,7 @@ it('analyses a single PHPUnit test file in parallel', function (): void {
 
 it('compares test files with each other through the coverage map', function (): void {
     $project = gitRepository();
-    (new Filesystem())->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
@@ -98,7 +98,7 @@ it('takes the changed test files from git', function (): void {
 
 it('ignores lines outside the configured source paths', function (): void {
     $project = temporaryDirectory();
-    (new Filesystem())->mirror(fixturePath('pest'), $project);
+    new Filesystem()->mirror(fixturePath('pest'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['lib'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
@@ -122,7 +122,7 @@ it('ignores lines outside the configured source paths', function (): void {
 
 it('runs several test files as concurrent groups and one path in the runner\'s parallel mode', function (): void {
     $project = temporaryDirectory();
-    (new Filesystem())->mirror(fixturePath('pest'), $project);
+    new Filesystem()->mirror(fixturePath('pest'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
@@ -140,7 +140,7 @@ it('runs several test files as concurrent groups and one path in the runner\'s p
 
 it('fails when the analysed tests fail', function (): void {
     $project = temporaryDirectory();
-    (new Filesystem())->mirror(fixturePath('phpunit'), $project);
+    new Filesystem()->mirror(fixturePath('phpunit'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
