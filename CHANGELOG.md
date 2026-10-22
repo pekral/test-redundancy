@@ -25,6 +25,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The Composer keywords name Pest, paratest, code and test coverage, duplicate tests and AI agents, so Packagist search
+  finds the package.
 - The package requires PHP 8.4 or newer; the quality checks run on PHP 8.4 and 8.5.
 - The tests run only in parallel: `processes` must be at least 2, PHPUnit needs `paratest`, and the one `env` map
   replaces `env` and `parallelEnv`.
