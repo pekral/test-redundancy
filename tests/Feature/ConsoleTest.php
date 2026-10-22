@@ -30,6 +30,7 @@ function pestProject(): string
 function warmCacheProject(): string
 {
     $project = pestProject();
+    file_put_contents($project . '/tests/Pest.php', "<?php\n\ndeclare(strict_types = 1);\n");
     file_put_contents($project . '/tests/WarmCacheTest.php', <<<'PHP'
         <?php
 
@@ -296,6 +297,50 @@ it('reports every lost line of a baseline written before source file hashes exis
     $baselinePath = $project . '/build/baseline.json';
     $baseline = decodedJson((string) file_get_contents($baselinePath));
     unset($baseline['sources']);
+    file_put_contents($baselinePath, (string) json_encode($baseline));
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([]);
+
+    removeDirectory($project);
+});
+
+it('reports a lost line as lost when a test support file changed since analyse', function (Closure $change): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $change($project);
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([])
+        ->and(valueAt($report, 'instruction'))->toContain('Restore the test');
+
+    removeDirectory($project);
+})->with([
+    'added' => static fn (string $project): int|bool => file_put_contents($project . '/tests/Datasets.php', "<?php\n"),
+    'deleted' => static fn (string $project): bool => unlink($project . '/tests/Pest.php'),
+    'edited' => static fn (string $project): int|bool => file_put_contents(
+        $project . '/tests/Pest.php',
+        "\n// the shared setup changed after analyse\n",
+        FILE_APPEND,
+    ),
+]);
+
+it('reports every lost line of a baseline written before test support file hashes existed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $baselinePath = $project . '/build/baseline.json';
+    $baseline = decodedJson((string) file_get_contents($baselinePath));
+    unset($baseline['support']);
     file_put_contents($baselinePath, (string) json_encode($baseline));
     $verify = command($project, 'verify');
 

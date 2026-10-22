@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Coverage;
 
 use JsonException;
+use Pekral\TestRedundancy\Support\TestFiles;
 use RuntimeException;
 
 final readonly class CoverageBaseline
@@ -15,6 +16,7 @@ final readonly class CoverageBaseline
      * @param list<string> $lines
      * @param array<string, array{hash: string, lines: list<string>}> $files
      * @param array<string, string> $hashesBySourceFilePath
+     * @param string $supportHash a digest of the test support files; empty in a baseline written before it existed
      */
     public function __construct(
         public array $testFiles,
@@ -22,6 +24,7 @@ final readonly class CoverageBaseline
         public bool $across,
         public array $files,
         public array $hashesBySourceFilePath,
+        public string $supportHash,
     ) {
     }
 
@@ -51,7 +54,9 @@ final readonly class CoverageBaseline
             $sources[$source] ??= self::hashOf($projectRoot, $source);
         }
 
-        return new self(array_keys($testsByFile), array_keys($lines), $across, $files, $sources);
+        $testFiles = array_keys($testsByFile);
+
+        return new self($testFiles, array_keys($lines), $across, $files, $sources, self::supportHashOf($projectRoot, $testFiles));
     }
 
     /**
@@ -80,7 +85,9 @@ final readonly class CoverageBaseline
         /** @var array<string, string> $sources */
         $sources = is_array($baseline['sources'] ?? null) ? $baseline['sources'] : [];
 
-        return new self($testFiles, $lines, ($baseline['across'] ?? false) === true, $files, $sources);
+        $support = is_string($baseline['support'] ?? null) ? $baseline['support'] : '';
+
+        return new self($testFiles, $lines, ($baseline['across'] ?? false) === true, $files, $sources, $support);
     }
 
     /**
@@ -89,6 +96,10 @@ final readonly class CoverageBaseline
      */
     public function unstableAmong(array $lines, string $projectRoot): array
     {
+        if (self::supportHashOf($projectRoot, $this->testFiles) !== $this->supportHash) {
+            return [];
+        }
+
         $unchanged = [];
         $changed = [];
 
@@ -128,9 +139,24 @@ final readonly class CoverageBaseline
             'files' => $this->files,
             'lines' => $this->lines,
             'sources' => $this->hashesBySourceFilePath,
+            'support' => $this->supportHash,
             'testFiles' => $this->testFiles,
         ];
         file_put_contents($path, json_encode($baseline, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param list<string> $testFiles
+     */
+    private static function supportHashOf(string $projectRoot, array $testFiles): string
+    {
+        $hashes = [];
+
+        foreach (TestFiles::supportFiles($testFiles, $projectRoot) as $supportFile) {
+            $hashes[$supportFile] = self::hashOf($projectRoot, $supportFile);
+        }
+
+        return hash('sha256', json_encode($hashes, JSON_THROW_ON_ERROR));
     }
 
     private static function sourceOf(string $line): string

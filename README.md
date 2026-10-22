@@ -160,13 +160,15 @@ the tests change, `verify` runs the same test files again and compares:
 It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
 mapped test file still covers does not count as lost.
 
-`analyse` also stores a hash of every analysed test file and of every covered source file. When a line is no longer
-covered, none of the test files that covered it changed and its source file did not change, `verify` lists it in
-`unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such a
-test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
-also covered, or a line of a source file that changed since `analyse`, stays in `lostLines` and `verify` exits with `1`.
-A baseline written before source file hashes existed reports every lost line in `lostLines`; run `analyse` again to
-restore the distinction.
+`analyse` also stores a hash of every analysed test file, of every covered source file and of the test support files.
+The support files are the other files, not named `*Test.php`, in the top-level directory of a test file, such as
+`tests/`: Pest datasets, `tests/Pest.php`, base test cases, traits and fixtures. When a line is no longer covered, none
+of the test files that covered it changed, its source file did not change and no support file changed, `verify` lists it
+in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such
+a test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
+also covered, a line of a source file that changed since `analyse`, and every lost line after a support file was
+changed, added or deleted stay in `lostLines`, and `verify` exits with `1`. A baseline written before source file hashes
+or support file hashes existed reports every lost line in `lostLines`; run `analyse` again to restore the distinction.
 
 ### How to read a candidate
 

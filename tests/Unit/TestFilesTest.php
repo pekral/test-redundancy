@@ -47,3 +47,17 @@ it('splits large directories into runs of limited size', function (): void {
 
     removeDirectory($root);
 });
+
+it('lists the files beside the test files that the tests may depend on', function (): void {
+    $root = testTree();
+    mkdir($root . '/tests/Datasets');
+    touch($root . '/tests/Pest.php');
+    touch($root . '/tests/Datasets/numbers.php');
+    touch($root . '/tests/Unit/loose.php');
+    touch($root . '/OutsideTest.php');
+
+    expect(TestFiles::supportFiles(['tests/Unit/A/OneTest.php', 'tests/Unit/loose.php', 'OutsideTest.php', 'gone/GoneTest.php'], $root))
+        ->toBe(['tests/Datasets/numbers.php', 'tests/Pest.php', 'tests/Unit/helper.php']);
+
+    removeDirectory($root);
+});
