@@ -7,7 +7,7 @@ namespace Pekral\TestRedundancy\Support;
 final class PestName
 {
 
-    public const EVALUABLE_PREFIX = '__pest_evaluable_';
+    public const string EVALUABLE_PREFIX = '__pest_evaluable_';
 
     public static function evaluable(string $description): string
     {

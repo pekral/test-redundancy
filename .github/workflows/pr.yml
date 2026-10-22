@@ -8,8 +8,13 @@ on:
 
 jobs:
   quality-checks:
-    name: "Quality checks (PHP 8.5)"
+    name: "Quality checks (PHP ${{ matrix.php }})"
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
 
     steps:
       - name: Checkout code
@@ -18,7 +23,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.5'
+          php-version: ${{ matrix.php }}
           coverage: pcov
 
       - name: Configure git for the git-based tests
@@ -27,7 +32,10 @@ jobs:
           git config --global user.name "CI"
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: Show the resolved quality tooling
+        run: composer show --direct | grep -E '^(pekral/(phpcs|phpstan|rector)-rules|laravel/pint|pestphp/pest) '
 
       - name: Composer normalize
         run: composer composer-normalize-check
@@ -62,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.4', '8.5']
         dependencies: ['lowest', 'highest']
 
     steps:
@@ -80,7 +88,7 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
 
-      # The quality tooling needs PHP 8.4+. Drop it, so the matrix resolves exactly what a consumer installs.
+      # Drop the quality tooling, so the matrix resolves exactly what a consumer installs.
       - name: Remove the quality tooling
         run: >
           composer remove --dev --no-update --no-interaction
@@ -104,9 +112,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { php: '8.2', phpunit: '10.5.*' }
-          - { php: '8.2', phpunit: '11.5.*' }
-          - { php: '8.3', phpunit: '12.5.*' }
+          - { php: '8.4', phpunit: '10.5.*' }
+          - { php: '8.4', phpunit: '11.5.*' }
+          - { php: '8.4', phpunit: '12.5.*' }
           - { php: '8.4', phpunit: '13.4.*' }
 
     steps:

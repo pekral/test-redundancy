@@ -7,9 +7,9 @@ namespace Pekral\TestRedundancy\Support;
 final class TestKey
 {
 
-    public const DATASET_SEPARATOR = ' › ';
+    public const string DATASET_SEPARATOR = ' › ';
 
-    private const FILE_SEPARATOR = ' :: ';
+    private const string FILE_SEPARATOR = ' :: ';
 
     public static function make(string $testFile, string $testCase): string
     {

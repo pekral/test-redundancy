@@ -4,7 +4,7 @@ Thanks for helping. Issues and pull requests are welcome.
 
 ## Setup
 
-Contributing needs PHP 8.4+ with `pcov`, because the quality tooling requires it.
+Contributing needs PHP 8.4+ with `pcov`. CI runs the quality checks and the tests on PHP 8.4 and 8.5.
 
 ```bash
 composer install
@@ -20,7 +20,7 @@ composer install
 
 ## Rules
 
-- The package supports PHP 8.2. Do not use syntax or functions newer than 8.2 in `src/` (typed class constants,
-  `new Foo()->bar()`, `#[\Override]`, `array_find()` …). The CI matrix runs the tests on PHP 8.2–8.5.
+- The package supports PHP 8.4. Do not use syntax or functions newer than 8.4 in `src/` (for example the pipe
+  operator `|>` or `array_first()` from PHP 8.5). The CI matrix runs the quality checks and the tests on PHP 8.4 and 8.5.
 - Commit subjects follow Conventional Commits, in English, without AI attribution trailers.
 - Test fixtures live in `tests/Fixtures` and are excluded from the tooling.

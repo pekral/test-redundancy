@@ -12,16 +12,16 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final readonly class ReportPrinter
 {
 
-    private const NO_NEW_VALUE_OR_CALL = 'No new value or call (same lines; check how inputs pair with results before deleting)';
+    private const string NO_NEW_VALUE_OR_CALL = 'No new value or call (same lines; check how inputs pair with results before deleting)';
 
-    private const TESTS = 'Tests to review';
+    private const string TESTS = 'Tests to review';
 
-    private const REVIEW_RULE = 'Coverage cannot see what a test asserts. '
+    private const string REVIEW_RULE = 'Coverage cannot see what a test asserts. '
         . 'Delete a candidate only when a covering test asserts the same input and result.';
 
-    private const UNPARSED = 'unknown (the test or a dataset row could not be parsed)';
+    private const string UNPARSED = 'unknown (the test or a dataset row could not be parsed)';
 
-    private const DATASET_ROWS = 'Dataset rows to review (same lines, different data — check the input class)';
+    private const string DATASET_ROWS = 'Dataset rows to review (same lines, different data — check the input class)';
 
     public function __construct(private SymfonyStyle $io)
     {

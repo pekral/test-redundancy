@@ -11,9 +11,9 @@ use Symfony\Component\Process\Process;
 final readonly class CoverageRun
 {
 
-    private const TIMEOUT_SECONDS = 7_200;
+    private const int TIMEOUT_SECONDS = 7_200;
 
-    private const INHERITED_PARALLEL_ENVIRONMENT = ['PARATEST' => false, 'TEST_TOKEN' => false, 'UNIQUE_TEST_TOKEN' => false];
+    private const array INHERITED_PARALLEL_ENVIRONMENT = ['PARATEST' => false, 'TEST_TOKEN' => false, 'UNIQUE_TEST_TOKEN' => false];
 
     public function __construct(private Configuration $configuration, private TestRunner $runner)
     {
@@ -111,7 +111,7 @@ final readonly class CoverageRun
     {
         $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
 
-        return (new CoverageReader($this->configuration))->linesByTest($coverageFile, $junit);
+        return new CoverageReader($this->configuration)->linesByTest($coverageFile, $junit);
     }
 
 }

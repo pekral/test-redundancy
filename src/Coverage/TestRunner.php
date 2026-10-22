@@ -11,15 +11,15 @@ use Symfony\Component\Filesystem\Path;
 final readonly class TestRunner
 {
 
-    private const PEST = 'vendor/bin/pest';
+    private const string PEST = 'vendor/bin/pest';
 
-    private const PHPUNIT = 'vendor/bin/phpunit';
+    private const string PHPUNIT = 'vendor/bin/phpunit';
 
-    private const PARATEST = 'paratest';
+    private const string PARATEST = 'paratest';
 
-    private const CACHE_DIRECTORY = '.test-redundancy/cache';
+    private const string CACHE_DIRECTORY = '.test-redundancy/cache';
 
-    private const CONFIGURATION_FILES = ['phpunit.xml', 'phpunit.xml.dist'];
+    private const array CONFIGURATION_FILES = ['phpunit.xml', 'phpunit.xml.dist'];
 
     private function __construct(private string $projectRoot, private string $binary, private bool $isPest)
     {
