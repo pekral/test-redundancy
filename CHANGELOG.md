@@ -19,6 +19,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `verify` — fails and lists every source line the last `analyse` covered that no test covers any more.
 - `steps` per candidate and a `workflow` for AI agents; compact JSON by default, `--pretty` to indent it.
 - `--processes` for `analyse` and `map`; several paths run as concurrent groups, each with its own `TEST_TOKEN`.
+- Pest tests in a namespace, inside `describe()` blocks and with shared `dataset()` rows get a contract fingerprint.
+- `pekral/ai-olympus` as a development dependency, with its Claude Code and Codex rules, skills and agents.
 
 ### Changed
 
@@ -30,5 +32,3 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
-- Pest tests in a namespace, inside `describe()` blocks and with shared `dataset()` rows get a contract fingerprint.
-- `pekral/ai-olympus` as a development dependency, with its Claude Code and Codex rules, skills and agents.
