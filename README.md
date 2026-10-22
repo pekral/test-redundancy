@@ -22,7 +22,7 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | PHP | `^8.2` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
 | Coverage driver | `pcov` (the tool sets `pcov.directory` to the project root) or `xdebug` |
-| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` (and `vendor/bin/paratest` for parallel runs) |
+| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel |
 
 Contributing to this repository needs PHP 8.4+, because the development dependencies require it.
 
@@ -45,8 +45,7 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 {
     "source": ["app"],
     "ignore": "#^app/Providers/#",
-    "env": { "TEST_TOKEN": "7" },
-    "parallelEnv": {},
+    "env": { "TELESCOPE_ENABLED": "false" },
     "processes": 6,
     "map": "storage/test-redundancy/coverage-map.json.gz",
     "runner": "vendor/bin/pest"
@@ -57,9 +56,8 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 | --- | --- | --- |
 | `source` | `["src", "app"]` | Directories whose lines count. |
 | `ignore` | none | A regex of source paths to leave out, e.g. code every test boots. |
-| `env` | `{}` | Environment variables for a sequential run: `processes: 1`, or one path with PHPUnit and no `paratest`. |
-| `parallelEnv` | `{}` | Environment variables for a parallel run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do. |
-| `processes` | `4` | Parallel processes; `--processes` overrides it. `1` runs sequentially. |
+| `env` | `{}` | Environment variables for every test run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do. |
+| `processes` | `4` | Parallel processes, at least `2`; `--processes` overrides it. The tool never runs the tests sequentially. |
 | `map` | `.test-redundancy/coverage-map.json.gz` | Where the `map` command stores the coverage map. |
 | `runner` | auto | Path to `pest` or `phpunit`, relative to the project root or absolute. |
 
@@ -88,7 +86,10 @@ vendor/bin/test-redundancy verify
 
 The JSON is compact; `--pretty` indents it.
 
-One folder or file runs in the runner's own parallel mode — `pest --parallel`, or `paratest` next to `phpunit`.
+The tests always run in parallel, on the test tokens 1…`processes`, so never start the tool next to another run of the
+same suite. One folder or file runs in the runner's own parallel mode — `pest --parallel`, or `paratest` next to
+`phpunit` — with the coverage settings passed to every worker through `--passthru-php` and the project's
+`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`.
 Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
 each with its own `TEST_TOKEN`. Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
 between runs. `vendor/bin/test-redundancy analyse --help` lists every option.

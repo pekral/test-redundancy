@@ -2,7 +2,7 @@
     "source": [
         "src"
     ],
-    "processes": 1,
+    "processes": 2,
     "map": "build/coverage-map.json.gz",
     "runner": "../../../vendor/bin/pest"
 }
