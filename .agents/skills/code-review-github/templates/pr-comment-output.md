@@ -1,0 +1,184 @@
+# Code Review
+
+> **One comment, and on a converged run a TL;DR rather than a systematic report.** A review run publishes exactly one comment per destination, in the `cr-comment` namespace. When the run converged, its body is the header block, `## TL;DR`, `## Functional Review`, and the conditional `## Affected behaviour outside the diff` / `## Deferred to sub-issues` / `## Pre-existing fixes` / `## Answers to reviewer questions` sections — nothing else: no `## Technical Review` heading over an empty body, no per-walk confirmation, no restatement of a finding the loop already fixed.
+> The sections below describe the other shape — a run that still carries an outstanding finding, which is a standalone review a person invoked directly. Canonical contract: `@rules/code-review/general.md` *One published comment per review run — a TL;DR, not a systematic report*.
+>
+> **Section visibility — render only sections that have content.** Always render the header block (Status / Counts / Last updated / tracker-mirror field) and the final `Summary` line. The `Coverage:` header line, the `## Coverage` section, and the `coverage …` slot in the summary line are conditional — render them **only** when the coverage gate produced something to report (uncovered changed lines or unavailable / non-runnable tooling, both Critical findings per `@skills/code-review/SKILL.md` Coverage gate). When every changed line is at 100% coverage and the tool ran successfully, drop all three coverage surfaces; the Counts line is the clean signal. The `## Architecture` section follows the same conditional rule (issue #530):
+> on Laravel projects the walk runs on every CR run, but the heading is rendered **only when the walk produces at least one finding** — when the walk is clean, omit the heading entirely (no "walked, 0 findings" line, no "clean" placeholder, no confirmation that the check ran). On non-Laravel projects (`laravel/framework` not in `composer.json` `require`), omit the `## Architecture` section entirely. Every section is conditional: omit its heading and body entirely when it has no items. Never emit `None.` / `Not applicable.` / `n/a` / `100%` / `walked, 0 findings` placeholders for empty sections or omitted coverage surfaces — drop them entirely. The Counts line in the header is the single source of "zero" signal;
+> the goal is a clean, scannable PR comment a human can read at a glance — only items that still need action remain in the body.
+>
+> **Incremental review scope (rounds after the first).** A round with a resolved baseline reviews the **delta since the last reviewed revision** (`git diff <baseline>..HEAD`), not the whole PR: new findings come from the delta, every unsettled finding from an earlier round is carried over at its original severity, and the Coverage / Assignment Conformance / Reviewer Comment Fulfillment gates still read the whole PR. Render both header lines below on every run, and a `Provenance` field on every finding. Canonical contract: `@rules/code-review/general.md` *Incremental Review Scope — Diff Since the Last Reviewed Revision*.
+>
+> **Minor findings are not detected.** The review raises Critical and Moderate findings only (`@rules/code-review/general.md` *Minor findings are not detected*). There is no exception: a security lens publishes its `Critical` as Critical and its `High` / `Medium` / `Low` as Moderate, and does not publish `Info`. No severity sub-heading and no `Counts:` or `Summary:` slot exists for any other tier.
+
+**Status:** clean / needs-fix  *(`clean` when the run converged — no Critical, no unfulfilled reviewer comment, and every remaining Moderate carrying a `Deferred:` field. A Moderate without that field is outstanding, so the status is `needs-fix`.)*
+**Counts:** Critical {n} · Moderate {n}  *(always the real detected counts)*
+**Merge verdict:** {yes | no} — assignment met: {yes | no | no linked issue} · open Critical: {n} · {when no: every blocker in one short clause each — the open Critical findings, the unmet criteria, an unfulfilled reviewer comment, an undeferred Moderate, or a missing green quality gate}  *(always rendered — the one-line answer to "can we merge, and is the assignment met with no Critical finding?". `yes` only when all of `@rules/code-review/general.md` *Merge verdict* holds. It never replaces the merge gate.)*
+**Input consistency:** {yes | no | not applicable — the diff writes no persisted data} — {when no: every entry point that bypasses the change, with its `file:line`}  *(always rendered — answers "is the data stored consistently whatever input in the application writes it?" per `@rules/code-review/general.md` *Input consistency and reuse*)*
+**Reuse (DRY):** {no duplication found | every existing implementation the diff should reuse, with its `file:line`}  *(always rendered — answers "can existing code in the codebase be used instead of repeating it?" per `@rules/code-review/general.md` *Input consistency and reuse*)*
+**Mode:** HOTFIX — coverage waived, review scoped to assignment + bug fix (declared by {account})  *(render this line only on a declared HOTFIX run; it is the merge gate's only trusted evidence of the mode — `@rules/code-review/general.md` *HOTFIX runs*. Omit it entirely on every ordinary run.)*
+**Reviewed revision:** {full head SHA this round reviewed}  *(always rendered — the next round resolves its baseline from this line)*
+**Reviewed diff fingerprint:** {patch-id of the effective PR diff}  *(always rendered — preserves the verdict across a content-identical history rewrite)*
+**Review scope:** delta since {baseline SHA} (round {n}) — carried-over findings re-reported  *(or `full PR ({reason: no prior reviewed revision | baseline {sha} not an ancestor of HEAD after a history rewrite})` — always rendered, never omitted as an empty section)*
+**Coverage:** {result} (tool: {name or "not available — <reason>"})  *(render this line only when the `## Coverage` section is rendered — i.e. uncovered changed lines or unavailable tooling)*
+**Last updated:** {ISO-8601 timestamp of this CR run}
+**Quality gate:** {command} — {green | reported: <what>} on {full head SHA the gate ran on}{, tree {tree} — record {record path}, when `run-gate.sh` wrote one}  *(rendered on a converged run; `@skills/merge-github-pr/SKILL.md` *Pre-merge quality gate* reads this line off this comment. Omit it on a run that carries no gate record.)*
+**{tracker-mirror field}:** {tracker-mirror status}  *(field name and status wording are defined per-wrapper in that skill's own Output Rules section — see `@skills/code-review-github/SKILL.md`, `@skills/code-review-jira/SKILL.md`, or `@skills/code-review-bugsnag/SKILL.md` for the concrete values)*
+
+---
+
+## TL;DR
+
+> **The body of a converged run.** One plain-language line per change the review loop landed on the branch — the CR items it fixed, the pre-existing fixes, the gate commit, and the reason any reviewer point was rejected or deferred. When the run landed no change, one line stating the reviewed scope and the verdict. Render this section on every converged run and omit it on a run that still carries an outstanding finding, where `## Findings` below is the body instead. Canonical contract: `@rules/code-review/general.md` *One published comment per review run — a TL;DR, not a systematic report*.
+
+- {what changed, in one sentence}
+
+---
+
+## Technical Review
+
+> The technical half of the review — the Core Analysis bullets, the Architecture conformance walk, security, and the coverage gate. Wraps `## Findings` through `## Coverage` below, unchanged in content and conditional-rendering behavior (see `@rules/code-review/general.md` *Two-Part CR Output — Technical & Functional Review*). This heading renders only on a run that still carries an outstanding finding; a converged run renders `## TL;DR` above instead. Where it does render, it renders even when every subsection beneath it is empty — the header block's `Status: clean` / `Counts: Critical 0 · Moderate 0` above is the "nothing to fix" signal in that case.
+
+## Findings
+
+> Render only when at least one Critical or Moderate finding exists. Within this section, render only the severity sub-headings that have items — omit the other entirely. When both severities are empty, omit the entire `## Findings` parent heading.
+
+### 🔴 Critical 1. <short title>
+
+- **Location:** `path/to/file.php:42`
+- **Rule:** `@rules/<area>/<file>.md#<section>`
+- **Provenance:** `regression — introduced in this revision` | `pre-existing — carried from round {n}` | `pre-existing — untouched by this revision`
+- **Impact:** one sentence — what breaks or what risk this introduces.
+- **Faulty Example:**
+  ```php
+  // minimal code or input that reproduces the issue (no secrets / PII)
+  ```
+- **Expected behavior:** single assertable statement (return value, thrown exception, persisted state, emitted event).
+- **Test hint:** test layer (unit / integration / feature) + entry point, in one sentence.
+- **Suggested fix:**
+  ```php
+  // minimal corrected snippet — must comply with @rules/php/core-standards.md (and @rules/laravel/architecture.md on Laravel projects). Use `n/a — <reason>` only when a snippet adds no value.
+  ```
+- **Author:** `@<login>` — the pull request's `author.login`. *(Render only in a review-only run (`/report-code-review`), and only on a finding about a missing test or a DRY finding, per `@rules/code-review/general.md` *The author of the changes is the account that pushed the pull request* → *Second exception*. Omit the field on every other finding and on every other run.)*
+
+### 🟠 Moderate 1. <short title>
+
+(same fields as Critical, Provenance and Author included, plus one field that renders only on a round-3 deferral)
+
+- **Deferred:** `<sub-issue URL>` — filed as a sub-issue of the source tracker item per `@skills/process-code-review/references/round-three-deferral.md`; the finding is recorded, not resolved. *(Omit this field entirely unless the finding was deferred.)*
+
+---
+
+## Missing tests added
+
+> Render only in a review-only run (`/report-code-review`) whose missing-tests commit added at least one test. Omit the heading entirely otherwise. Each line is information, not a finding: the test is already on the branch, so it adds nothing to the Counts line. It names the gap the change shipped with and mentions its author, per `@rules/code-review/general.md` *The author of the changes is the account that pushed the pull request* → *Second exception*. Render it on a run with no finding too.
+
+- **Commit:** `{full SHA of the missing-tests commit}`
+- `path/to/SomethingTest.php` — {the behaviour the test protects, in plain language} — `@<login>`
+
+---
+
+## Delegated to another person
+
+> Render only when the **Reviewer Comment Fulfillment Gate** (`@skills/code-review-github/references/cr-wrapper-contract.md` *Delegation of a reviewer comment to another account*) classified at least one reviewer comment as delegated. Omit the entire section — no `None.` placeholder — when nothing was delegated. Entries here are not actionable findings: they block no merge, they count toward `M` in the `reviewer comments: M/N fulfilled` verdict rather than toward the Counts line, and they are never turned into a reproducer test or a fix.
+
+1. **Reviewer comment:** `<comment URL>` — targets `path/to/file.php:42`
+   **Addressed to:** `@<mentioned account>`
+   **Mention:** "verbatim quote of the mention as written in the comment"
+   **Declared by:** `<@author>` (`authorAssociation: OWNER|MEMBER|COLLABORATOR`)
+   **Instruction:** one sentence describing what the reviewer asked for.
+   **Note:** delegated — not this run's work, not resolved.
+
+---
+
+## Affected behaviour outside the diff
+
+> Render only when the impact walk of `@rules/code-review/core-analysis.md` *Behaviour changed outside the diff* listed at least one untouched part of the application whose behaviour the diff changes — on a converged run too. Omit the heading entirely otherwise. An entry is information, not a finding. An unintended change also appears as a finding under `## Findings`.
+
+1. **Affected part:** `path/to/Caller.php:42` — {the feature it serves, in plain language}
+   **Before:** {what it did before the diff}
+   **After:** {what it does after the diff}
+   **Asked for by the assignment:** {yes — <criterion> | no — see finding <n>}
+   **Test:** `{test that covers it}` | `no test`
+
+---
+
+## Input consistency
+
+> Render on every run whose diff writes persisted data — on a converged run too — per `@rules/code-review/general.md` *Input consistency and reuse*. When the diff writes no persisted data, omit the heading; the `Input consistency:` header line says `not applicable`. A bypassing entry point also appears as a Critical finding under `## Findings`.
+
+- **Stored data:** {table.column | JSON key | file | cache entry | queued payload}
+- `path/to/EntryPoint.php:42` — {the input it serves, in plain language} — {covered | bypasses the change — see finding <n>}
+
+---
+
+## Documentation Requests
+
+> Render only when **Third-Party API & Service Analysis** step 7 in `@skills/code-review/SKILL.md` produced at least one blocking documentation request — i.e. the ordered source walk in step 2 resolved no reference for a third-party contract the diff touches. Each entry accompanies (never replaces) the Moderate finding raised for that contract; it is what lets the author close it with a single link. Omit the entire section when every affected contract resolved a reference — no `None.` placeholder.
+
+1. **Vendor / service:** {name of the API, SDK, or webhook provider}
+   **Version in use:** {resolved version + where it was read from — `composer.json` / lock file / pinned API version in config — or `could not determine`}
+   **Verifying:** the concrete endpoints / SDK methods / webhook events / message contracts under review, one per line
+   **Needed:** a link to the official documentation for that version covering the items above.
+
+---
+
+## Database Analysis
+
+> Render only when the diff touches database operations (raw SQL, Eloquent / query-builder calls, eager loads, model scopes, ModelManager / Repository methods, migrations, seeders, DynamoDB / NoSQL access) **and** at least one finding is produced by the run's DB lens (`@skills/postgres-patterns/SKILL.md` on PostgreSQL; the advisory `casey` report on MySQL / MariaDB is a separate comment, never this section) or by the *N+1 queries* walk of `@rules/code-review/core-analysis.md`. An N+1 finding starts its one-sentence problem with `N+1:`.
+> Render one section whichever lens produced the findings — never a per-engine variant and never two sections. On MySQL / MariaDB the schema-feature trigger may add `@skills/mysql-patterns/SKILL.md` with `MODE=cr` as a producer of this same section — render its findings here beside the rule walks' findings, still as one section. The advisory `casey` report is its own PR comment and never renders here. Omit the entire section when no DB operations are present in the diff, or when DB ops are present but no findings result — never leave a placeholder or fold it into Coverage. Report only findings and their fix recommendations — never the trigger decision, an inspected `file:line` list, or an EXPLAIN / static-analysis summary.
+
+- **Findings:**
+  1. **{Critical / Moderate}** — `file:line` — one-sentence problem
+     **Suggested Fix:** {one-sentence fix category — query rewrite to reuse an existing index per `@rules/sql/optimalize.md`, batch operation per "Batch over per-row operations", or new-index proposal justified by EXPLAIN when no existing index covers the query}
+     ```sql
+     -- concrete rewritten query, index DDL, or batch-operation replacement implementing the fix above (issue #132) — never a category label alone
+     ```
+
+---
+
+## Architecture
+
+> **Laravel-only, conditional on findings (issue #530).** On every Laravel project (`laravel/framework` is in `composer.json` `require`), the architecture walk per `@skills/code-review/SKILL.md` Core Analysis "Architecture conformance (Laravel) — mandatory standalone walk-through" runs on every CR run, but this section is rendered **only when the walk produces at least one finding**. When the walk is clean, omit the entire `## Architecture` heading and body — do not render a `walked, 0 findings` status line, a `clean` placeholder, or any other confirmation that the check ran. On non-Laravel projects, omit the entire `## Architecture` section as well.
+>
+> Render findings under the standard severity sub-headings (Critical / Moderate) with the same six reproducer fields used in `## Findings`.
+
+### 🔴 Critical 1. <short title>
+
+(same fields as `## Findings` — Location / Rule / Provenance / Impact / Faulty Example / Expected behavior / Test hint / Suggested fix)
+
+### 🟠 Moderate 1. <short title>
+
+(same fields as Critical, Provenance included, plus one field that renders only on a round-3 deferral)
+
+- **Deferred:** `<sub-issue URL>` — filed as a sub-issue of the source tracker item per `@skills/process-code-review/references/round-three-deferral.md`; the finding is recorded, not resolved. *(Omit this field entirely unless the finding was deferred.)*
+
+---
+
+## Coverage
+
+> Render this section **only** when the coverage gate produced something to report — uncovered changed lines (Critical findings) or unavailable / non-runnable coverage tooling (Critical finding). When every changed line is at 100% coverage and the tool ran successfully, omit the entire `## Coverage` section, the `Coverage:` header line, and the `coverage …` slot in the summary line — the Counts line is the clean signal.
+
+- **Tool:** {discovered coverage command name, or "not available — <reason>"}
+- **Command:** `<exact command run>`
+- **Result:** {list of uncovered added/changed lines — which must also appear as Critical findings — or "coverage tooling unavailable — <reason>"}
+
+---
+
+## Functional Review
+
+> Always rendered — never omitted, the one exception to the omit-empty-section convention that governs `## Technical Review` above (see `@rules/code-review/general.md` *Two-Part CR Output — Technical & Functional Review*). Computed from the same Assignment Conformance Gate direction 1 already behind the `assignment conformance:` token on the Summary line below — no new analysis, only this explicit, always-present placement. Direction 2 (changes → requirements traceability / scope-creep) stays in `## Findings` above — it is diff hygiene, not "did the code satisfy the requirement".
+
+{conformant → "All stated assignment requirements are satisfied." | gaps → list every Critical functional / business-logic gap below — still counted in the Counts line above}
+
+### 🔴 Critical 1. <short title>  *(gaps case only)*
+
+(same fields as `## Findings` — Location / Rule / Provenance / Impact / Faulty Example / Expected behavior / Test hint / Suggested fix; **Rule** cites the unmet requirement / acceptance criterion and its source instead of a `@rules/*.md` path)
+
+(Repeat for every gap.)
+
+---
+
+**Summary:** {n} Critical · {n} Moderate · assignment conformance: {conformant | N gap(s) | no linked issue}{` · coverage {result}` — appended only when the `## Coverage` section is rendered; omitted on a clean 100% pass}
+{` · Assumption: <the assumption sentence verbatim from the branch that fired>` — appended **only** when the engine is unresolved or has no dedicated lens and the diff was handled as MySQL, per `@skills/code-review/references/specialized-reviews.md`; omitted when the engine resolved to `mysql` / `mariadb` / `pgsql`, and omitted when neither trigger fired at all, so no resolution step ran and no lens is waiting on its answer}
+{` · security: owned by leonardo (<url of leonardo's security comment>)` — appended **only** when the inline `security-review` pass was skipped because the caller set `SECURITY_OWNER=leonardo`; omitted when the pass ran here. **The URL is mandatory**: the token records a delegation, and without a link to the delivered review there is nothing to distinguish a security pass that ran from one that died mid-run. A token with no URL is itself the visible gap, and `@skills/merge-github-pr/SKILL.md` blocks the merge on it} · {tracker-mirror status}

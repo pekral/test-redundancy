@@ -15,3 +15,4 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `map` and `--across` — a per-test coverage map of the whole suite, to compare tests across files.
 - `test-redundancy.json` for source paths, ignored sources, environment, processes, map path and runner.
 - Support for PHP 8.2–8.5, Pest 3–5 and PHPUnit 10–13.
+- `pekral/ai-olympus` as a development dependency, with its Claude Code and Codex rules, skills and agents.
