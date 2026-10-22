@@ -24,7 +24,7 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : array_keys(array_diff_key($tokens[0], $tokens[1]));
+        return $tokens === null ? null : array_keys(array_diff_key($tokens['own'], $tokens['covering']));
     }
 
     /**
@@ -35,12 +35,12 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : array_keys(array_diff_key($tokens[1], $tokens[0]));
+        return $tokens === null ? null : array_keys(array_diff_key($tokens['covering'], $tokens['own']));
     }
 
     /**
      * @param list<string> $coveringTestKeys
-     * @return array{array<string, true>, array<string, true>}|null the tokens of the test and of its covering tests together
+     * @return array{own: array<string, true>, covering: array<string, true>}|null
      */
     private function tokens(string $testKey, array $coveringTestKeys): ?array
     {
@@ -62,7 +62,7 @@ final class FingerprintCache
             $coveringTokens += $tokens;
         }
 
-        return [$own, $coveringTokens];
+        return ['own' => $own, 'covering' => $coveringTokens];
     }
 
     /**

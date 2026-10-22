@@ -29,6 +29,7 @@ function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
     expect($candidate->action())->toBe($action);
 })->with([
+    'call in a sibling row' => [candidate('it works › a', ['it works › b'], ['value:1'], ['new:Money', 'value:2']), Action::ReviewDatasetRow],
     'call in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget']), Action::Review],
     'data in both tests' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
@@ -38,6 +39,10 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'one test of the same file' => [candidate('it works', ['it also works'], ['value:1', 'const:Foo::BAR']), Action::MergeIntoDataset],
     'row of another test' => [candidate('it works › empty', ['it also works'], ['value:\'\'']), Action::Review],
     'sibling row' => [candidate('it works › empty', ['it works › blank'], ['value:\'\'']), Action::ReviewDatasetRow],
+    'sibling row and another test' => [
+        candidate('it works › a', ['it works › b', 'it also works'], ['value:1'], ['value:2', 'call:toBeTrue']),
+        Action::ReviewDatasetRow,
+    ],
     'test of another file' => [candidate('it works', ['tests/BarTest.php :: it works'], ['value:1']), Action::Review],
     'two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1']), Action::Review],
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null), Action::Review],
