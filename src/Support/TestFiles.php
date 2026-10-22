@@ -47,6 +47,33 @@ final class TestFiles
     }
 
     /**
+     * The files beside the test files that a test may depend on: Pest datasets and configuration, base test cases,
+     * traits and fixtures. They sit in the top-level directory of a test file.
+     *
+     * @param list<string> $testFiles
+     * @return list<string>
+     */
+    public static function supportFiles(array $testFiles, string $projectRoot): array
+    {
+        $directories = array_unique(array_map(static fn (string $testFile): string => (string) strtok($testFile, '/'), $testFiles));
+        $supportFiles = [];
+
+        foreach ($directories as $directory) {
+            $absolutePath = $projectRoot . DIRECTORY_SEPARATOR . $directory;
+
+            if (!is_dir($absolutePath)) {
+                continue;
+            }
+
+            foreach (Finder::create()->files()->in($absolutePath)->notName(self::PATTERN)->sortByName() as $file) {
+                $supportFiles[] = ProjectPath::relative($file->getPathname(), $projectRoot);
+            }
+        }
+
+        return array_values(array_diff($supportFiles, $testFiles));
+    }
+
+    /**
      * @param list<string> $paths
      * @return list<list<string>>
      */

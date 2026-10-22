@@ -24,6 +24,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A candidate whose covering test makes a call, function call or `new` expression the candidate lacks is reported
   with the action `review` instead of `merge-into-dataset`. `merge-into-dataset` now requires that the two tests differ
   only in data in both directions, so a dataset can express them as rows of one test (#12).
+- `verify` reports a lost line in `lostLines`, not in `unstableLines`, when a test support file changed since `analyse`:
+  a Pest dataset, `tests/Pest.php`, a base test case, a trait or a fixture. `analyse` stores a digest of these files in
+  the baseline. A baseline written before this change has no digest, so `verify` reports every lost line of it in
+  `lostLines` (#20).
 
 ## [0.1] - 2026-10-22
 
