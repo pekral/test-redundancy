@@ -1,12 +1,11 @@
-<div align="left">
-    <img alt="pekral/test-redundancy — a coverage circle with a check mark in a frame" src="assets/logo.svg" width="160">
+<img align="left" alt="pekral/test-redundancy — a coverage circle with a check mark in a frame" src="assets/logo.svg" width="120">
 
 <h1>Fewer tests, the same coverage</h1>
 
 [![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 ![Checks](https://github.com/pekral/test-redundancy/workflows/Checks/badge.svg)
 
-</div>
+<br clear="left">
 
 `test-redundancy` finds the test cases in a **PHPUnit** or **Pest** suite whose covered lines other test cases
 already cover, and tells you — or an AI agent — what each of them asserts beyond those tests. Point it at a test folder
