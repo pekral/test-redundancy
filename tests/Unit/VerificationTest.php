@@ -21,7 +21,7 @@ it('does not tell an agent to restore a test for unstable coverage', function ()
 
     expect($verification->isOk())->toBeTrue()
         ->and($verification->jsonSerialize())->toMatchArray([
-            'instruction' => 'No test changed, but the coverage of "unstableLines" differs from the baseline. Do not restore a test. '
+            'instruction' => 'No test file that covered the lines in "unstableLines" changed, but their coverage differs from the baseline. Do not restore a test. '
                 . 'The coverage of an unchanged test depends on state outside the test run, such as a cache or a database. '
                 . 'Make that test independent of the state, or run analyse again for a new baseline.',
             'lostLines' => [],
