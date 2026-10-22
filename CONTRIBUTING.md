@@ -14,7 +14,7 @@ composer install
 
 1. `composer fix` applies Rector, Pint and PHPCS fixes.
 2. `composer check` must pass. It includes PHPStan at max level and tests with 100% coverage.
-3. `php bin/test-redundancy tests` — run the tool on its own tests. Resolve every candidate your new tests produce:
+3. `php bin/test-redundancy tests/Unit tests/Feature` — run the tool on its own tests. Resolve every candidate your new tests produce:
    delete it, merge it into a dataset, or keep it because it asserts something the others do not.
 4. Add an entry under `## [Unreleased]` in `CHANGELOG.md`.
 

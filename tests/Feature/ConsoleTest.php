@@ -15,6 +15,7 @@ function pestProject(): string
 {
     $project = gitRepository();
     (new Filesystem())->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    removeDirectory($project . '/build');
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'map' => 'build/coverage-map.json.gz',
         'processes' => 1,
@@ -130,6 +131,60 @@ it('runs the binary with an option and no path', function (): void {
 
     expect($text)->toContain('tests/CalculatorTest.php')->toContain('Tests to review')
         ->and(valueAt(decodedJson($noPath), 'summary.testFiles'))->toBe(0);
+
+    removeDirectory($project);
+});
+
+it('verifies that no covered source line was lost', function (): void {
+    $project = pestProject();
+    command($project, 'analyse')->execute(['paths' => ['tests']]);
+    $calculatorTest = $project . '/tests/CalculatorTest.php';
+    $original = (string) file_get_contents($calculatorTest);
+
+    file_put_contents($calculatorTest, (string) preg_replace("/it\\('adds zero'.*?\\}\\);\n/s", '', $original));
+    $kept = command($project, 'verify');
+    $kept->execute(['--pretty' => true]);
+
+    file_put_contents($calculatorTest, (string) preg_replace("/it\\('rejects a division by zero'.*?'Division by zero\\.'\\);\n/s", '', $original));
+    $lost = command($project, 'verify');
+    $lost->execute([]);
+
+    unlink($project . '/tests/OtherCalculatorTest.php');
+    $missing = command($project, 'verify');
+    $missing->execute(['--processes' => '1']);
+
+    expect($kept->getStatusCode())->toBe(0)
+        ->and(valueAt(decodedJson($kept->getDisplay()), 'ok'))->toBeTrue()
+        ->and($lost->getStatusCode())->toBe(1)
+        ->and(valueAt(decodedJson($lost->getDisplay()), 'lostLines'))->toBe(['src/Calculator.php:18'])
+        ->and(valueAt(decodedJson($missing->getDisplay()), 'missingTestFiles'))->toBe(['tests/OtherCalculatorTest.php']);
+
+    removeDirectory($project);
+});
+
+it('verifies against the coverage map after a cross-file analysis', function (): void {
+    $project = pestProject();
+    command($project, 'map')->execute([]);
+    command($project, 'analyse')->execute(['paths' => ['tests/CalculatorTest.php'], '--across' => true]);
+    $calculatorTest = $project . '/tests/CalculatorTest.php';
+    file_put_contents(
+        $calculatorTest,
+        (string) preg_replace("/it\\('divides two numbers'.*?\\}\\);\n/s", '', (string) file_get_contents($calculatorTest)),
+    );
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+
+    expect($verify->getStatusCode())->toBe(0)
+        ->and(valueAt(decodedJson($verify->getDisplay()), 'lostLines'))->toBe([]);
+
+    removeDirectory($project);
+});
+
+it('fails to verify without a baseline', function (): void {
+    $project = pestProject();
+
+    expect(fn (): int => command($project, 'verify')->execute([]))->toThrow(RuntimeException::class, 'No baseline');
 
     removeDirectory($project);
 });

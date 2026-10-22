@@ -12,9 +12,6 @@ final readonly class Candidate implements JsonSerializable
 
     private const DATA_TOKEN_PATTERN = '/^(value|const):/';
 
-    private const UNPARSED_REASON = 'Runs only lines other tests run, but the test or its dataset row could not be parsed, '
-        . 'so what it asserts is unknown. Compare it with "coveredBy" by hand.';
-
     /**
      * @param list<string> $coveredBy
      * @param list<string>|null $differsBy
@@ -51,7 +48,7 @@ final readonly class Candidate implements JsonSerializable
     }
 
     /**
-     * @return array{test: string, action: string, reason: string, coveredBy: list<string>, differsBy: list<string>|null}
+     * @return array{action: string, coveredBy: list<string>, differsBy: list<string>|null, steps: list<string>, test: string}
      */
     public function jsonSerialize(): array
     {
@@ -59,9 +56,21 @@ final readonly class Candidate implements JsonSerializable
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
             'differsBy' => $this->differsBy,
-            'reason' => $this->differsBy === null ? self::UNPARSED_REASON : $this->action()->instruction(),
+            'steps' => $this->steps(),
             'test' => $this->testCase(),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function steps(): array
+    {
+        $steps = $this->action()->steps($this->coveredBy[0] ?? '');
+
+        return $this->differsBy === null
+            ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
+            : $steps;
     }
 
     private function differsOnlyInData(): bool

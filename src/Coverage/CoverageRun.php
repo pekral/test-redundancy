@@ -13,6 +13,8 @@ final readonly class CoverageRun
 
     private const TIMEOUT_SECONDS = 7_200;
 
+    private const INHERITED_PARALLEL_ENVIRONMENT = ['PARATEST' => false, 'TEST_TOKEN' => false, 'UNIQUE_TEST_TOKEN' => false];
+
     public function __construct(private Configuration $configuration, private TestRunner $runner)
     {
     }
@@ -100,7 +102,7 @@ final readonly class CoverageRun
         $process = new Process(
             $this->runner->command($paths, $parallel, $this->configuration->processes, $coverageFile, $junitFile),
             $this->configuration->projectRoot,
-            [...CoverageDriver::environment(), ...$environment],
+            [...self::INHERITED_PARALLEL_ENVIRONMENT, ...CoverageDriver::environment(), ...$environment],
             timeout: self::TIMEOUT_SECONDS,
         );
         $process->start();

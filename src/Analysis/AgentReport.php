@@ -9,18 +9,13 @@ use JsonSerializable;
 final readonly class AgentReport implements JsonSerializable
 {
 
-    private const INSTRUCTIONS = [
-        'Goal: keep 100% line coverage with the fewest and simplest tests.',
-        'Every candidate runs only source lines other tests already run. '
-            . 'Coverage cannot see what a test asserts, so judge each one.',
-        'Apply "action" per candidate: delete, merge-into-dataset, review-dataset-row, or review. '
-            . '"differsBy" lists the literals, constants and calls the candidate has and its covering tests lack.',
-        'Keep a test that asserts a different result, a different input class (empty, boundary, another tenant, invalid), '
-            . 'an ordering, or a rejection. When in doubt, keep it.',
-        'Candidates of one file can be removed together without losing a covered line. Re-run the tool after every change.',
-        '"testsWithoutSourceLines" run no line under the configured source paths: check what they test, or the "source" setting.',
-        'A non-null "summary.staleMap" means source files changed since the coverage map was built: rebuild it before trusting '
-            . 'a candidate whose "coveredBy" names another file.',
+    private const WORKFLOW = [
+        'Goal: 100% coverage with the fewest and simplest tests. Coverage cannot see assertions, so judge every candidate.',
+        'For each candidate, follow "steps". Keep a test that asserts another result, input class, ordering or rejection.',
+        'All candidates of one file can be removed together without losing a covered line.',
+        Action::VERIFY_STEP . ' It lists every source line no test covers any more; restore the test that covered it.',
+        'testsWithoutSourceLines run no line under the configured source paths; check what they test.',
+        'A non-null summary.staleMap means the coverage map is out of date: run vendor/bin/test-redundancy map first.',
     ];
 
     /**
@@ -37,9 +32,9 @@ final readonly class AgentReport implements JsonSerializable
     {
         return [
             'files' => array_values(array_filter($this->reports, static fn (FileReport $report): bool => $report->hasFindings())),
-            'instructions' => self::INSTRUCTIONS,
             'summary' => $this->summary(),
             'tool' => 'pekral/test-redundancy',
+            'workflow' => self::WORKFLOW,
         ];
     }
 

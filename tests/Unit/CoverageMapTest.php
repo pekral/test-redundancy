@@ -2,6 +2,7 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
 
 function sampleMap(): CoverageMap
@@ -51,6 +52,15 @@ it('fails on a missing or broken map', function (): void {
             JsonException::class,
             'is not a coverage map',
         );
+
+    removeDirectory($directory);
+});
+
+it('fails on a broken coverage baseline', function (): void {
+    $directory = temporaryDirectory();
+    file_put_contents($directory . '/baseline.json', '{"lines": 1}');
+
+    expect(fn (): CoverageBaseline => CoverageBaseline::load($directory . '/baseline.json'))->toThrow(JsonException::class, 'is not a coverage baseline');
 
     removeDirectory($directory);
 });

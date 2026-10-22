@@ -64,7 +64,7 @@ it('serializes a candidate and a file report for an agent', function (): void {
                 [
                     'test' => 'it works › empty',
                     'action' => 'review-dataset-row',
-                    'reason' => Action::ReviewDatasetRow->instruction(),
+                    'steps' => Action::ReviewDatasetRow->steps('it works › blank'),
                     'coveredBy' => ['it works › blank'],
                     'differsBy' => ['value:\'\''],
                 ],
@@ -77,8 +77,8 @@ it('serializes a candidate and a file report for an agent', function (): void {
             'testsWithoutSourceLines' => ['it reads the config'],
             'candidates' => [],
         ],
-    ])->and($json['instructions'])->toHaveCount(7)
-        ->and(valueAt(decodedJson((string) json_encode(candidate('it works', ['it also works'], differsBy: null))), 'reason'))->toContain(
+    ])->and($json['workflow'])->toHaveCount(6)
+        ->and(valueAt(decodedJson((string) json_encode(candidate('it works', ['it also works'], differsBy: null))), 'steps.0'))->toContain(
             'could not be parsed',
         )
         ->and($candidate->testCase())->toBe('it works › empty')
@@ -125,3 +125,10 @@ it('compares with tests of other files from the map', function (): void {
     expect($reports[0]->candidates[0]->coveredBy)->toBe(['tests/OtherCalculatorTest.php :: divide returns a float'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe([]);
 });
+
+it('gives every action concrete steps that end with verify', function (Action $action): void {
+    $steps = $action->steps('it covers');
+
+    expect($steps)->toHaveCount(3)
+        ->and($steps[2])->toBe(Action::VERIFY_STEP);
+})->with(Action::cases());

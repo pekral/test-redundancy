@@ -17,6 +17,8 @@ final readonly class TestRunner
 
     private const PARATEST = 'paratest';
 
+    private const CACHE_DIRECTORY = '.test-redundancy/cache';
+
     private function __construct(private string $projectRoot, private string $binary, private bool $isPest, private bool $hasParatest)
     {
     }
@@ -44,7 +46,7 @@ final readonly class TestRunner
 
     public function cacheDirectory(): string
     {
-        return sys_get_temp_dir() . '/test-redundancy-cache/' . md5($this->projectRoot);
+        return $this->projectRoot . '/' . self::CACHE_DIRECTORY;
     }
 
     public function runsInParallel(bool $parallel, int $processes): bool

@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy;
 
 use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
+use Pekral\TestRedundancy\Analysis\Verification;
+use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
 use Pekral\TestRedundancy\Coverage\CoverageRun;
 use Pekral\TestRedundancy\Coverage\TestRunner;
@@ -54,6 +56,7 @@ final readonly class TestRedundancy
     public function analyse(array $testFiles, array $requestedPaths): array
     {
         $testsByFile = $this->testsByFile($testFiles, $this->linesByTest(count($requestedPaths) === 1 ? $requestedPaths : $testFiles));
+        CoverageBaseline::fromTestsByFile($testsByFile, across: false)->save($this->configuration->absoluteBaselinePath());
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
         $reports = [];
 
@@ -94,7 +97,32 @@ final readonly class TestRedundancy
             ];
         }
 
+        CoverageBaseline::fromTestsByFile($testsByFile, across: true)->save($this->configuration->absoluteBaselinePath());
+
         return (new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot)))->analyze($testsByFile, $map);
+    }
+
+    public function verify(): Verification
+    {
+        $baseline = CoverageBaseline::load($this->configuration->absoluteBaselinePath());
+        $existing = array_values(array_filter(
+            $baseline->testFiles,
+            fn (string $testFile): bool => is_file($this->configuration->projectRoot . DIRECTORY_SEPARATOR . $testFile),
+        ));
+        $covered = [];
+
+        foreach ($existing === [] ? [] : $this->linesByTest($existing) as $lines) {
+            $covered += $lines;
+        }
+
+        $lost = array_diff_key(array_fill_keys($baseline->lines, value: true), $covered);
+
+        if ($baseline->across && $lost !== []) {
+            $otherTests = $this->loadMap()->testsCovering($lost, array_fill_keys($existing, value: true));
+            $lost = array_diff_key($lost, array_merge([], ...array_values($otherTests)));
+        }
+
+        return new Verification(count($baseline->lines), array_keys($lost), array_values(array_diff($baseline->testFiles, $existing)));
     }
 
     public function sourceChangedSince(CoverageMap $map): bool
