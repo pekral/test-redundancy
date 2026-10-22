@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy;
 
+use InvalidArgumentException;
 use JsonException;
 use Pekral\TestRedundancy\Support\ProjectPath;
 
@@ -14,6 +15,8 @@ final readonly class Configuration
 
     private const DEFAULT_PROCESSES = 4;
 
+    private const MINIMUM_PROCESSES = 2;
+
     private const DEFAULT_MAP_PATH = '.test-redundancy/coverage-map.json.gz';
 
     private const BASELINE_FILE_NAME = 'baseline.json';
@@ -21,14 +24,12 @@ final readonly class Configuration
     /**
      * @param list<string> $sourcePaths
      * @param array<string, string> $environment
-     * @param array<string, string> $parallelEnvironment
      */
     public function __construct(
         public string $projectRoot,
         public array $sourcePaths,
         public ?string $ignoredSourcePattern,
         public array $environment,
-        public array $parallelEnvironment,
         public int $processes,
         public string $mapPath,
         public ?string $runner,
@@ -55,8 +56,7 @@ final readonly class Configuration
             ),
             ignoredSourcePattern: is_string($values['ignore'] ?? null) ? $values['ignore'] : null,
             environment: self::stringMap($values['env'] ?? []),
-            parallelEnvironment: self::stringMap($values['parallelEnv'] ?? []),
-            processes: is_int($values['processes'] ?? null) ? max(1, $values['processes']) : self::DEFAULT_PROCESSES,
+            processes: self::processes(is_int($values['processes'] ?? null) ? $values['processes'] : self::DEFAULT_PROCESSES),
             mapPath: is_string($values['map'] ?? null) ? $values['map'] : self::DEFAULT_MAP_PATH,
             runner: is_string($values['runner'] ?? null) ? $values['runner'] : null,
         );
@@ -69,8 +69,7 @@ final readonly class Configuration
             $this->sourcePaths,
             $this->ignoredSourcePattern,
             $this->environment,
-            $this->parallelEnvironment,
-            max(1, $processes),
+            self::processes($processes),
             $this->mapPath,
             $this->runner,
         );
@@ -95,6 +94,17 @@ final readonly class Configuration
     public function absoluteMapPath(): string
     {
         return $this->projectRoot . DIRECTORY_SEPARATOR . $this->mapPath;
+    }
+
+    private static function processes(int $processes): int
+    {
+        if ($processes < self::MINIMUM_PROCESSES) {
+            throw new InvalidArgumentException(
+                sprintf('"processes" must be at least %d; the tool runs the tests only in parallel.', self::MINIMUM_PROCESSES),
+            );
+        }
+
+        return $processes;
     }
 
     /**

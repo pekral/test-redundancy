@@ -25,17 +25,11 @@ final readonly class CoverageRun
      */
     public function linesByTest(array $paths): array
     {
-        $groupCount = min(count($paths), $this->configuration->processes);
-
-        if ($groupCount <= 1) {
-            $parallel = count($paths) === 1;
-            $environment = $this->runner->runsInParallel($parallel, $this->configuration->processes)
-                ? $this->configuration->parallelEnvironment
-                : $this->configuration->environment;
-
-            return $this->runGroups([[$paths, $parallel, $environment]]);
+        if (count($paths) === 1) {
+            return $this->runGroups([[$paths, true, $this->configuration->environment]]);
         }
 
+        $groupCount = min(count($paths), $this->configuration->processes);
         $groups = [];
 
         foreach (array_keys($paths) as $index) {
@@ -54,7 +48,7 @@ final readonly class CoverageRun
      */
     private function workerEnvironment(int $token): array
     {
-        return [...$this->configuration->parallelEnvironment, 'TEST_TOKEN' => (string) $token, 'UNIQUE_TEST_TOKEN' => uniqid($token . '_')];
+        return [...$this->configuration->environment, 'TEST_TOKEN' => (string) $token, 'UNIQUE_TEST_TOKEN' => uniqid($token . '_')];
     }
 
     /**

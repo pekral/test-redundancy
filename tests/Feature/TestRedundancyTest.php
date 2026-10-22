@@ -53,7 +53,7 @@ it('compares test files with each other through the coverage map', function (): 
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 1,
+        'processes' => 2,
         'map' => 'build/coverage-map.json.gz',
     ]));
     runIn($project, ['git', 'add', '.']);
@@ -103,7 +103,7 @@ it('ignores lines outside the configured source paths', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['lib'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 1,
+        'processes' => 2,
     ]));
 
     $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/CalculatorTest.php'], ['tests/CalculatorTest.php']);
@@ -122,7 +122,7 @@ it('ignores lines outside the configured source paths', function (): void {
     removeDirectory($project);
 });
 
-it('runs several test files as concurrent groups with their own test token', function (): void {
+it('runs several test files as concurrent groups and one path in the runner\'s parallel mode', function (): void {
     $project = temporaryDirectory();
     (new Filesystem())->mirror(fixturePath('pest'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
@@ -132,9 +132,9 @@ it('runs several test files as concurrent groups with their own test token', fun
     $testFiles = ['tests/CalculatorTest.php', 'tests/OtherCalculatorTest.php'];
 
     $concurrent = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
-    $sequential = TestRedundancy::forProject($project, processes: 1)->analyse($testFiles, $testFiles);
+    $parallel = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
 
-    expect(candidatesOf($concurrent))->toBe(candidatesOf($sequential))
+    expect(candidatesOf($concurrent))->toBe(candidatesOf($parallel))
         ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 1]);
 
     removeDirectory($project);
@@ -146,7 +146,7 @@ it('fails when the analysed tests fail', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
-        'processes' => 1,
+        'processes' => 2,
     ]));
     file_put_contents(
         $project . '/tests/GreeterTest.php',

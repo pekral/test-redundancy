@@ -18,7 +18,7 @@ function pestProject(): string
     removeDirectory($project . '/build');
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'map' => 'build/coverage-map.json.gz',
-        'processes' => 1,
+        'processes' => 2,
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
         'source' => ['src'],
     ]));
@@ -99,7 +99,7 @@ it('warns about a test file that covers no source line', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['lib'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 1,
+        'processes' => 2,
     ]));
     $tester = command($project, 'analyse');
 
@@ -151,7 +151,7 @@ it('verifies that no covered source line was lost', function (): void {
 
     unlink($project . '/tests/OtherCalculatorTest.php');
     $missing = command($project, 'verify');
-    $missing->execute(['--processes' => '1']);
+    $missing->execute(['--processes' => '3']);
 
     expect($kept->getStatusCode())->toBe(0)
         ->and(valueAt(decodedJson($kept->getDisplay()), 'ok'))->toBeTrue()

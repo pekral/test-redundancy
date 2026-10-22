@@ -3,6 +3,7 @@
 declare(strict_types = 1);
 
 use Pekral\TestRedundancy\Configuration;
+use Pekral\TestRedundancy\Coverage\CoverageDriver;
 use Pekral\TestRedundancy\Coverage\TestRunner;
 
 function projectWithBinaries(string ...$binaries): string
@@ -30,6 +31,7 @@ function fromRunner(array $command): array
 
 it('runs Pest in parallel through its own option', function (): void {
     $directory = projectWithBinaries('pest', 'phpunit', 'paratest');
+    touch($directory . '/phpunit.xml.dist');
     $runner = TestRunner::detect(Configuration::load($directory));
 
     $command = $runner->command(['tests'], parallel: true, processes: 3, coverageFile: 'coverage.php', junitFile: 'junit.xml');
@@ -38,33 +40,42 @@ it('runs Pest in parallel through its own option', function (): void {
         ->toBe([
             'vendor/bin/pest',
             'tests',
+            '--configuration=' . $directory . '/phpunit.xml.dist',
             '--parallel',
             '--processes=3',
+            '--passthru-php=\'' . implode('\' \'', CoverageDriver::iniArguments($directory)) . '\'',
             '--coverage-php=coverage.php',
             '--log-junit=junit.xml',
             '--cache-directory=' . $runner->cacheDirectory(),
         ])
         ->and($command)->toContain('pcov.directory=' . $directory)
-        ->and($runner->rootDirectory())->toBe($directory)
-        ->and($runner->runsInParallel(parallel: true, processes: 3))->toBeTrue();
+        ->and($runner->rootDirectory())->toBe($directory);
 
     removeDirectory($directory);
 });
 
-it('builds the PHPUnit command', function (string $binaries, bool $parallel, int $processes, array $expected): void {
-    $directory = projectWithBinaries(...explode(' ', $binaries));
+it('builds the PHPUnit command', function (bool $parallel, array $expected): void {
+    $directory = projectWithBinaries('phpunit', 'paratest');
     $runner = TestRunner::detect(Configuration::load($directory));
 
-    expect(array_slice(fromRunner($runner->command(['tests'], $parallel, $processes, 'coverage.php', 'junit.xml')), 0, 3))->toBe($expected)
-        ->and($runner->runsInParallel($parallel, $processes))->toBe($expected[0] === 'vendor/bin/paratest');
+    expect(array_slice(fromRunner($runner->command(['tests'], $parallel, 3, 'coverage.php', 'junit.xml')), 0, 3))->toBe($expected);
 
     removeDirectory($directory);
 })->with([
-    'paratest in parallel' => ['phpunit paratest', true, 3, ['vendor/bin/paratest', 'tests', '--processes=3']],
-    'sequential on request' => ['phpunit paratest', false, 3, ['vendor/bin/phpunit', 'tests', '--coverage-php=coverage.php']],
-    'sequential with one process' => ['phpunit paratest', true, 1, ['vendor/bin/phpunit', 'tests', '--coverage-php=coverage.php']],
-    'sequential without paratest' => ['phpunit', true, 3, ['vendor/bin/phpunit', 'tests', '--coverage-php=coverage.php']],
+    'a concurrent group' => [false, ['vendor/bin/phpunit', 'tests', '--coverage-php=coverage.php']],
+    'one path through paratest' => [true, ['vendor/bin/paratest', 'tests', '--processes=3']],
 ]);
+
+it('refuses PHPUnit without paratest', function (): void {
+    $directory = projectWithBinaries('phpunit');
+
+    $runner = TestRunner::detect(Configuration::load($directory));
+
+    expect(fn (): array => $runner->command(['tests'], parallel: true, processes: 2, coverageFile: 'coverage.php', junitFile: 'junit.xml'))
+        ->toThrow(RuntimeException::class, 'No paratest found next to vendor/bin/phpunit');
+
+    removeDirectory($directory);
+});
 
 it('fails when no test runner is installed', function (): void {
     $directory = temporaryDirectory();
