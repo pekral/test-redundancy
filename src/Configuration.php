@@ -13,7 +13,7 @@ final readonly class Configuration
 
     public const FILE_NAME = 'test-redundancy.json';
 
-    private const DEFAULT_PROCESSES = 4;
+    private const DEFAULT_PROCESSES = 2;
 
     private const MINIMUM_PROCESSES = 2;
 

@@ -22,7 +22,7 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | PHP | `^8.2` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
 | Coverage driver | `pcov` (the tool sets `pcov.directory` to the project root) or `xdebug` |
-| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel |
+| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel, so PHPUnit 13 needs 13.4+, the oldest version `paratest` supports |
 
 Contributing to this repository needs PHP 8.4+, because the development dependencies require it.
 
@@ -38,7 +38,7 @@ composer require --dev pekral/test-redundancy
 
 ## Configuration
 
-Optional. Without a file the tool reads `src/` and `app/`, runs 4 parallel processes, and picks `vendor/bin/pest`
+Optional. Without a file the tool reads `src/` and `app/`, runs 2 parallel processes, and picks `vendor/bin/pest`
 when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redundancy.json` to the project root:
 
 ```json
@@ -57,7 +57,7 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 | `source` | `["src", "app"]` | Directories whose lines count. |
 | `ignore` | none | A regex of source paths to leave out, e.g. code every test boots. |
 | `env` | `{}` | Environment variables for every test run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do. |
-| `processes` | `4` | Parallel processes, at least `2`; `--processes` overrides it. The tool never runs the tests sequentially. |
+| `processes` | `2` | Parallel processes, at least `2`; `--processes` overrides it. The tool never runs the tests sequentially. |
 | `map` | `.test-redundancy/coverage-map.json.gz` | Where the `map` command stores the coverage map. |
 | `runner` | auto | Path to `pest` or `phpunit`, relative to the project root or absolute. |
 
@@ -223,7 +223,7 @@ PHPCS, PHPStan and Rector use [pekral/phpcs-rules](https://github.com/pekral/php
 
 Pull requests and pushes to `master` run `composer check` on PHP 8.5, then the tool on its own tests. A matrix runs
 the tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies, and a second matrix runs the tool
-on the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.0 and no Pest. A security audit runs every
+on the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.4 with `paratest` and no Pest. A security audit runs every
 Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---
