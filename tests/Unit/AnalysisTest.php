@@ -28,6 +28,8 @@ function candidate(string $testCase, array $coveredBy, ?array $differsBy): Candi
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
     expect($candidate->action())->toBe($action);
 })->with([
+    'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
+    'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'new call' => [candidate('it works', ['it also works'], ['call:toThrow']), Action::Review],
     'nothing new' => [candidate('it works', ['it also works'], []), Action::Delete],
     'one test of the same file' => [candidate('it works', ['it also works'], ['value:1', 'const:Foo::BAR']), Action::MergeIntoDataset],

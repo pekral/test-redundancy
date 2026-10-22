@@ -10,7 +10,7 @@ use Pekral\TestRedundancy\Support\TestKey;
 final readonly class Candidate implements JsonSerializable
 {
 
-    private const string DATA_TOKEN_PATTERN = '/^(value|const):/';
+    private const string DATA_TOKEN_PATTERN = '/^(key:)?(value|const):/';
 
     /**
      * @param list<string> $coveredBy
