@@ -37,6 +37,10 @@ final readonly class CoverageReader
             $linesByTest[$testKey] = ($linesByTest[$testKey] ?? []) + $lines;
         }
 
+        foreach ($junit->testsWithoutCoverage(array_keys($linesByTest)) as $testKey) {
+            $linesByTest[$testKey] = [];
+        }
+
         return $linesByTest;
     }
 

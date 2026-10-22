@@ -12,6 +12,9 @@ final readonly class Candidate implements JsonSerializable
 
     private const DATA_TOKEN_PATTERN = '/^(value|const):/';
 
+    private const UNPARSED_REASON = 'Runs only lines other tests run, but the test or its dataset row could not be parsed, '
+        . 'so what it asserts is unknown. Compare it with "coveredBy" by hand.';
+
     /**
      * @param list<string> $coveredBy
      * @param list<string>|null $differsBy
@@ -56,7 +59,7 @@ final readonly class Candidate implements JsonSerializable
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
             'differsBy' => $this->differsBy,
-            'reason' => $this->action()->instruction(),
+            'reason' => $this->differsBy === null ? self::UNPARSED_REASON : $this->action()->instruction(),
             'test' => $this->testCase(),
         ];
     }

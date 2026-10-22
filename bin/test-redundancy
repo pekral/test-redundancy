@@ -15,11 +15,9 @@ foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php
 
 ini_set('memory_limit', '-1');
 
+$application = new Application((string) getcwd());
+
+/** @var list<string> $arguments */
 $arguments = $_SERVER['argv'];
-$commands = ['analyse', 'map', 'list', 'help', 'completion'];
 
-if (!isset($arguments[1]) || (!in_array($arguments[1], $commands, true) && !str_starts_with($arguments[1], '-'))) {
-    array_splice($arguments, 1, 0, 'analyse');
-}
-
-exit((new Application((string) getcwd()))->run(new Symfony\Component\Console\Input\ArgvInput($arguments)));
+exit($application->run(new Symfony\Component\Console\Input\ArgvInput($application->withDefaultCommand($arguments))));

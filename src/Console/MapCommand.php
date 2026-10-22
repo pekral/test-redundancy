@@ -9,6 +9,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -23,7 +24,9 @@ final class MapCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('paths', InputArgument::IS_ARRAY, 'Test files or directories to map', ['tests']);
+        $this
+            ->addArgument('paths', InputArgument::IS_ARRAY, 'Test files or directories to map', ['tests'])
+            ->addOption('processes', mode: InputOption::VALUE_REQUIRED, description: 'Parallel processes; overrides "processes"');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,7 +34,7 @@ final class MapCommand extends Command
         $io = new SymfonyStyle($input, $output);
         /** @var list<string> $paths */
         $paths = $input->getArgument('paths');
-        $map = TestRedundancy::forProject($this->projectRoot)->buildMap(
+        $map = TestRedundancy::forProject($this->projectRoot, $this->processesOption($input))->buildMap(
             $paths,
             static fn (array $chunk) => $io->writeln(sprintf('<comment>coverage run:</comment> %s', implode(' ', $chunk))),
         );
@@ -39,6 +42,13 @@ final class MapCommand extends Command
         $io->success(sprintf('%d test cases mapped at %s.', $map->testCount(), substr($map->commit, 0, 10)));
 
         return self::SUCCESS;
+    }
+
+    private function processesOption(InputInterface $input): ?int
+    {
+        $processes = $input->getOption('processes');
+
+        return is_numeric($processes) ? (int) $processes : null;
     }
 
 }

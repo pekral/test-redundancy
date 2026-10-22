@@ -21,7 +21,7 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | --- | --- |
 | PHP | `^8.2` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
-| Coverage driver | `pcov` or `xdebug` |
+| Coverage driver | `pcov` (the tool sets `pcov.directory` to the project root) or `xdebug` |
 | Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` (and `vendor/bin/paratest` for parallel runs) |
 
 Contributing to this repository needs PHP 8.4+, because the development dependencies require it.
@@ -57,9 +57,9 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 | --- | --- | --- |
 | `source` | `["src", "app"]` | Directories whose lines count. |
 | `ignore` | none | A regex of source paths to leave out, e.g. code every test boots. |
-| `env` | `{}` | Environment variables for a sequential run. |
-| `parallelEnv` | `{}` | Environment variables for a parallel run. |
-| `processes` | `4` | Parallel processes. `1` runs sequentially. |
+| `env` | `{}` | Environment variables for a sequential run: `processes: 1`, or one path with PHPUnit and no `paratest`. |
+| `parallelEnv` | `{}` | Environment variables for a parallel run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do. |
+| `processes` | `4` | Parallel processes; `--processes` overrides it. `1` runs sequentially. |
 | `map` | `.test-redundancy/coverage-map.json.gz` | Where the `map` command stores the coverage map. |
 | `runner` | auto | Path to `pest` or `phpunit`, relative to the project root or absolute. |
 
@@ -78,10 +78,15 @@ vendor/bin/test-redundancy --base=master
 
 # A report for people instead of JSON
 vendor/bin/test-redundancy tests/Unit --format=text
+
+# More or fewer parallel processes than the configuration says
+vendor/bin/test-redundancy tests/Unit --processes=8
 ```
 
-A single folder or file runs once, in parallel — `pest --parallel`, or `paratest` for PHPUnit. Several paths run
-once, sequentially. `vendor/bin/test-redundancy analyse --help` lists every option.
+One folder or file runs in the runner's own parallel mode — `pest --parallel`, or `paratest` next to `phpunit`.
+Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
+each with its own `TEST_TOKEN`. Every run passes `--cache-directory`, so the coverage analysis cache survives between
+runs. `vendor/bin/test-redundancy analyse --help` lists every option.
 
 ### The JSON report
 
@@ -102,7 +107,8 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
       ],
       "coveredLines": 4,
       "file": "tests/CalculatorTest.php",
-      "testCases": 6
+      "testCases": 6,
+      "testsWithoutSourceLines": []
     }
   ],
   "instructions": ["Goal: keep 100% line coverage with the fewest and simplest tests.", "…"],
@@ -110,8 +116,10 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
     "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 },
     "candidates": 3,
     "seconds": 0,
+    "staleMap": null,
     "testCases": 7,
-    "testFiles": 2
+    "testFiles": 2,
+    "testsWithoutSourceLines": 0
   },
   "tool": "pekral/test-redundancy"
 }
@@ -119,9 +127,14 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 
 | Field | Meaning |
 | --- | --- |
-| `coveredBy` | The smallest set of kept tests that covers every line of the candidate. A test from another file carries its path. |
-| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed. |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not. |
+| `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file. |
+| `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
+| `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
+| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed; `reason` then says so. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. |
+| `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
+| `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
+| `summary.seconds` | How long the analysis took. |
 
 ### How to read a candidate
 
@@ -158,7 +171,8 @@ since the map was built. Of two tests that cover each other, it proposes at most
    tests before dataset rows.
 3. For each candidate it computes the smallest covering set and compares contract fingerprints built with
    `nikic/php-parser`: Pest `it()` / `test()` with `->with()` datasets and chained modifiers such as `->throws()`, and
-   PHPUnit `test*` / `#[Test]` / `@test` methods with `#[DataProvider]` / `@dataProvider` rows.
+   PHPUnit `test*` / `#[Test]` / `@test` methods with `#[DataProvider]` / `@dataProvider` rows. Pest tests inside a
+   namespace or `describe()` blocks, and shared `dataset('name', …)` rows of the same file, are parsed too.
 
 ---
 
@@ -183,7 +197,8 @@ PHPCS, PHPStan and Rector use [pekral/phpcs-rules](https://github.com/pekral/php
 ### CI
 
 Pull requests and pushes to `master` run `composer check` on PHP 8.5, then the tool on its own tests. A matrix runs
-the tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies. A security audit runs every
+the tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies, and a second matrix runs the tool
+on the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.0 and no Pest. A security audit runs every
 Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---

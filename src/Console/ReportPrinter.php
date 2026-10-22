@@ -55,7 +55,13 @@ final readonly class ReportPrinter
             ['Test cases' => (string) $report->testCases],
             ['Covered lines' => (string) $report->coveredLines],
             ['Candidates' => (string) count($report->candidates)],
+            ['Tests without source lines' => (string) count($report->testsWithoutSourceLines)],
         );
+
+        if ($report->testsWithoutSourceLines !== []) {
+            $this->io->writeln('<comment>Tests without source lines (check what they test, or "source")</comment>');
+            $this->io->listing($report->testsWithoutSourceLines);
+        }
 
         if ($report->candidates === []) {
             $this->io->success('Every test case covers a line no other test case covers.');

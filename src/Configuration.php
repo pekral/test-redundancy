@@ -60,6 +60,20 @@ final readonly class Configuration
         );
     }
 
+    public function withProcesses(int $processes): self
+    {
+        return new self(
+            $this->projectRoot,
+            $this->sourcePaths,
+            $this->ignoredSourcePattern,
+            $this->environment,
+            $this->parallelEnvironment,
+            max(1, $processes),
+            $this->mapPath,
+            $this->runner,
+        );
+    }
+
     public function isSource(string $relativePath): bool
     {
         foreach ($this->sourcePaths as $sourcePath) {

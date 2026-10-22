@@ -114,3 +114,34 @@ it('reports what a test asserts beyond the tests that cover it', function (): vo
         ->and($cache->difference('tests/MissingTest.php :: it works', []))->toBeNull()
         ->and($cache->difference('tests/CalculatorTest.php :: it adds one and two', ['tests/CalculatorTest.php :: it is unknown']))->toBeNull();
 });
+
+it('fingerprints Pest tests in a namespace, inside describe blocks and with a shared dataset', function (): void {
+    $fingerprints = fingerprintsOf(<<<'PHP'
+        <?php
+        namespace Probe\Tests;
+
+        dataset('numbers', ['one' => [1], 'two' => [2]]);
+        dataset($dynamic, []);
+
+        describe('adding', function (): void {
+            it('adds', function (int $value): void {
+                expect($value)->toBeInt();
+            })->with('numbers');
+
+            describe('nested', function (): void {
+                test('deep', fn () => true);
+            });
+        });
+
+        describe('arrow', fn () => null);
+        it('uses an unknown dataset', fn () => null)->with('unknown');
+        PHP);
+
+    expect(array_keys($fingerprints))->toBe([
+        '`adding` → it adds › one',
+        '`adding` → it adds › two',
+        '`adding` → `nested` → deep',
+        'it uses an unknown dataset',
+    ])
+        ->and($fingerprints['`adding` → it adds › two'])->toHaveKey('value:2');
+});

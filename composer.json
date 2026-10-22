@@ -25,6 +25,9 @@
     },
     "require": {
         "php": "^8.2",
+        "ext-libxml": "*",
+        "ext-simplexml": "*",
+        "ext-zlib": "*",
         "nikic/php-parser": "^5.0",
         "phpunit/php-code-coverage": "^10.1 || ^11.0 || ^12.0 || ^13.0 || ^14.0",
         "symfony/console": "^6.4 || ^7.0 || ^8.0",

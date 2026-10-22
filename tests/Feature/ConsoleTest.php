@@ -92,3 +92,44 @@ it('compares across test files without a warning when the map is current', funct
 
     removeDirectory($project);
 });
+
+it('warns about a test file that covers no source line', function (): void {
+    $project = pestProject();
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['lib'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'processes' => 1,
+    ]));
+    $tester = command($project, 'analyse');
+
+    $tester->execute(['paths' => ['tests/CalculatorTest.php'], '--format' => 'text'], ['capture_stderr_separately' => true]);
+
+    expect($tester->getErrorOutput())->toContain('tests/CalculatorTest.php covers no line')
+        ->and($tester->getDisplay())->toContain('Tests without source lines')->toContain('it adds zero');
+
+    removeDirectory($project);
+});
+
+it('runs the analyse command when the first argument is an option', function (): void {
+    $application = new Application('/project');
+
+    expect($application->withDefaultCommand(['bin', '--format=text']))->toBe(['bin', 'analyse', '--format=text'])
+        ->and($application->withDefaultCommand(['bin', 'tests']))->toBe(['bin', 'analyse', 'tests'])
+        ->and($application->withDefaultCommand(['bin']))->toBe(['bin', 'analyse'])
+        ->and($application->withDefaultCommand([]))->toBe(['test-redundancy', 'analyse'])
+        ->and($application->withDefaultCommand(['bin', 'map', 'tests']))->toBe(['bin', 'map', 'tests'])
+        ->and($application->withDefaultCommand(['bin', '--help']))->toBe(['bin', '--help']);
+});
+
+it('runs the binary with an option and no path', function (): void {
+    $project = pestProject();
+    $binary = dirname(__DIR__, 2) . '/bin/test-redundancy';
+
+    $text = runIn($project, [PHP_BINARY, $binary, '--format=text', 'tests/CalculatorTest.php']);
+    $noPath = runIn($project, [PHP_BINARY, $binary, '--base=master']);
+
+    expect($text)->toContain('tests/CalculatorTest.php')->toContain('Tests to review')
+        ->and(valueAt(decodedJson($noPath), 'summary.testFiles'))->toBe(0);
+
+    removeDirectory($project);
+});
