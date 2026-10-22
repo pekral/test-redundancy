@@ -56,7 +56,7 @@ final readonly class Configuration
             ),
             ignoredSourcePattern: is_string($values['ignore'] ?? null) ? $values['ignore'] : null,
             environment: self::stringMap($values['env'] ?? []),
-            processes: self::processes(is_int($values['processes'] ?? null) ? $values['processes'] : self::DEFAULT_PROCESSES),
+            processes: is_int($values['processes'] ?? null) ? $values['processes'] : self::DEFAULT_PROCESSES,
             mapPath: is_string($values['map'] ?? null) ? $values['map'] : self::DEFAULT_MAP_PATH,
             runner: is_string($values['runner'] ?? null) ? $values['runner'] : null,
         );
@@ -69,7 +69,7 @@ final readonly class Configuration
             $this->sourcePaths,
             $this->ignoredSourcePattern,
             $this->environment,
-            self::processes($processes),
+            $processes,
             $this->mapPath,
             $this->runner,
         );
@@ -96,15 +96,15 @@ final readonly class Configuration
         return $this->projectRoot . DIRECTORY_SEPARATOR . $this->mapPath;
     }
 
-    private static function processes(int $processes): int
+    public function validated(): self
     {
-        if ($processes < self::MINIMUM_PROCESSES) {
+        if ($this->processes < self::MINIMUM_PROCESSES) {
             throw new InvalidArgumentException(
                 sprintf('"processes" must be at least %d; the tool runs the tests only in parallel.', self::MINIMUM_PROCESSES),
             );
         }
 
-        return $processes;
+        return $this;
     }
 
     /**

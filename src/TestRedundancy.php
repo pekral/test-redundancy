@@ -30,7 +30,7 @@ final readonly class TestRedundancy
     public static function forProject(string $projectRoot, ?int $processes): self
     {
         $configuration = Configuration::load($projectRoot);
-        $configuration = $processes === null ? $configuration : $configuration->withProcesses($processes);
+        $configuration = ($processes === null ? $configuration : $configuration->withProcesses($processes))->validated();
 
         return new self($configuration, new CoverageRun($configuration, TestRunner::detect($configuration)));
     }

@@ -47,6 +47,19 @@ it('analyses a single PHPUnit test file in parallel', function (): void {
     ]);
 });
 
+it('runs in parallel from a project path with an apostrophe', function (): void {
+    $project = temporaryDirectory() . '/o\'brien';
+    new Filesystem()->mirror(fixturePath('phpunit'), $project);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
+    ]));
+
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests']);
+
+    expect(candidatesOf($reports))->toHaveCount(2);
+});
+
 it('compares test files with each other through the coverage map', function (): void {
     $project = gitRepository();
     new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);

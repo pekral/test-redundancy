@@ -59,8 +59,11 @@ it('rejects fewer than two processes', function (): void {
     $directory = temporaryDirectory();
     file_put_contents($directory . '/test-redundancy.json', '{"processes": 1}');
 
-    expect(fn (): Configuration => Configuration::load($directory))->toThrow(InvalidArgumentException::class, '"processes" must be at least 2')
-        ->and(fn (): Configuration => Configuration::load(temporaryDirectory())->withProcesses(1))->toThrow(InvalidArgumentException::class);
+    $configuration = Configuration::load($directory);
+
+    expect(fn (): Configuration => $configuration->validated())->toThrow(InvalidArgumentException::class, '"processes" must be at least 2')
+        ->and($configuration->withProcesses(2)->validated()->processes)->toBe(2)
+        ->and(fn (): Configuration => $configuration->withProcesses(2)->withProcesses(1)->validated())->toThrow(InvalidArgumentException::class);
 
     removeDirectory($directory);
 });

@@ -94,7 +94,7 @@ final readonly class TestRunner
      */
     private function quoted(array $arguments): string
     {
-        return implode(' ', array_map(static fn (string $argument): string => '\'' . $argument . '\'', $arguments));
+        return implode(' ', array_map(escapeshellarg(...), $arguments));
     }
 
     private function paratest(): string
