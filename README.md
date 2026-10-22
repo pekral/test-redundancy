@@ -1,5 +1,5 @@
 <div align="left">
-    <img alt="pekral/test-redundancy — two overlapping test coverage circles, one kept, one removed" src="assets/logo.svg" width="480">
+    <img alt="pekral/test-redundancy — two overlapping test coverage circles, one kept, one removed" src="assets/logo.svg" width="160">
 
 <h1>Fewer tests, the same coverage</h1>
 
