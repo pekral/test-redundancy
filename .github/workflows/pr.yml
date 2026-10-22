@@ -82,7 +82,7 @@ jobs:
       - name: Remove the quality tooling
         run: >
           composer remove --dev --no-update --no-interaction
-          ergebnis/composer-normalize laravel/pint pekral/phpcs-rules pekral/phpstan-rules pekral/rector-rules
+          ergebnis/composer-normalize laravel/pint pekral/ai-olympus pekral/phpcs-rules pekral/phpstan-rules pekral/rector-rules
           phpstan/phpstan-deprecation-rules phpstan/phpstan-phpunit
 
       - name: Install dependencies

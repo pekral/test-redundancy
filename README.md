@@ -172,6 +172,7 @@ composer install
 | `composer fix` | Apply Rector, Pint and PHPCS fixes |
 | `composer test` | Tests without coverage |
 | `php bin/test-redundancy tests` | Run the tool on its own tests |
+| `composer ai-olympus:install` | Reinstall the [pekral/ai-olympus](https://github.com/pekral/ai-olympus) agent rules and skills |
 
 ### CI
 

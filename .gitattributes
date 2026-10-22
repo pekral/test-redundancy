@@ -9,3 +9,7 @@
 /rector.php export-ignore
 /ruleset.xml export-ignore
 /tests export-ignore
+/.agents export-ignore
+/.claude export-ignore
+/.codex export-ignore
+/AGENTS.md export-ignore
