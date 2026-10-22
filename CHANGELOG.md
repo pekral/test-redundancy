@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1] - 2026-10-22
+
 ### Added
 
 - `vendor/bin/test-redundancy [paths]` — finds PHPUnit and Pest test cases whose covered lines other test cases
@@ -35,3 +37,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
+
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1...HEAD
+[0.1]: https://github.com/pekral/test-redundancy/releases/tag/0.1
