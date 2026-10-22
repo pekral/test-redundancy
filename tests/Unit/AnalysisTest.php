@@ -19,15 +19,18 @@ function analyzer(): RedundancyAnalyzer
 /**
  * @param list<string> $coveredBy
  * @param list<string>|null $differsBy
+ * @param list<string>|null $coveringDiffersBy
  */
-function candidate(string $testCase, array $coveredBy, ?array $differsBy): Candidate
+function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDiffersBy = []): Candidate
 {
-    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy);
+    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy);
 }
 
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
     expect($candidate->action())->toBe($action);
 })->with([
+    'call in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget']), Action::Review],
+    'data in both tests' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'new call' => [candidate('it works', ['it also works'], ['call:toThrow']), Action::Review],
@@ -48,7 +51,7 @@ it('names every covering test, or the sibling row, in the first step', function 
 ]);
 
 it('serializes a candidate and a file report for an agent', function (): void {
-    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\'']);
+    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], []);
     $json = decodedJson((string) json_encode(new AgentReport([
         new FileReport('tests/FooTest.php', 2, 5, [$candidate], []),
         new FileReport('tests/BarTest.php', 1, 3, [], []),
@@ -145,6 +148,44 @@ it('asks for a review of a test whose covering test asserts the negated result',
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it reads the stored value'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['call:toBeEmpty'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('asks for a review of a test whose covering test makes a call it does not', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TemplateTest.php', <<<'PHP'
+        <?php
+        it('puts and gets the template HTML content', function (): void {
+            expect($this->manager->get($this->id))->toBeNull();
+
+            $this->manager->put($this->id, '<html><body><h1>Test</h1></body></html>');
+
+            expect($this->manager->get($this->id))->toBe('<html><body><h1>Test</h1></body></html>');
+        });
+        it('forgets the template HTML content', function (): void {
+            $this->manager->put($this->id, '<p>Some HTML</p>');
+            expect($this->manager->get($this->id))->toBe('<p>Some HTML</p>');
+
+            $this->manager->forget($this->id);
+
+            expect($this->manager->get($this->id))->toBeNull();
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TemplateTest.php' => [
+        'tests/TemplateTest.php :: it puts and gets the template HTML content' => ['src/Manager.php:10' => true, 'src/Manager.php:20' => true],
+        'tests/TemplateTest.php :: it forgets the template HTML content' => [
+            'src/Manager.php:10' => true,
+            'src/Manager.php:20' => true,
+            'src/Manager.php:30' => true,
+        ],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:\'<html><body><h1>Test</h1></body></html>\''])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
