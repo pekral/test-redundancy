@@ -33,7 +33,8 @@ final class AnalyseCommand extends Command
             ->addOption('across', mode: InputOption::VALUE_NONE, description: 'Compare with every test in the coverage map')
             ->addOption('base', mode: InputOption::VALUE_REQUIRED, description: 'Git ref for the changed test files; default: origin/HEAD')
             ->addOption('format', mode: InputOption::VALUE_REQUIRED, description: 'Output: json (for AI agents) or text', default: 'json')
-            ->addOption('processes', mode: InputOption::VALUE_REQUIRED, description: 'Parallel processes; overrides "processes"');
+            ->addOption('processes', mode: InputOption::VALUE_REQUIRED, description: 'Parallel processes; overrides "processes"')
+            ->addOption('pretty', mode: InputOption::VALUE_NONE, description: 'Indent the JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -62,7 +63,10 @@ final class AnalyseCommand extends Command
 
         $input->getOption('format') === 'text'
             ? $printer->printText($reports)
-            : $printer->printJson(new AgentReport($reports, (int) round((hrtime(as_number: true) - $startedAt) / 1e9), $staleMap));
+            : $printer->printJson(
+                new AgentReport($reports, (int) round((hrtime(as_number: true) - $startedAt) / 1e9), $staleMap),
+                $input->getOption('pretty') === true,
+            );
 
         return self::SUCCESS;
     }

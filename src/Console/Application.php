@@ -19,7 +19,7 @@ final class Application extends ConsoleApplication
     {
         parent::__construct(self::NAME);
 
-        $this->addCommands([new AnalyseCommand($projectRoot), new MapCommand($projectRoot)]);
+        $this->addCommands([new AnalyseCommand($projectRoot), new MapCommand($projectRoot), new VerifyCommand($projectRoot)]);
     }
 
     /**

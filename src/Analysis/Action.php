@@ -12,17 +12,35 @@ enum Action: string
     case ReviewDatasetRow = 'review-dataset-row';
     case Review = 'review';
 
-    public function instruction(): string
+    public const VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
+
+    /**
+     * @return list<string>
+     */
+    public function steps(string $coveringTest): array
     {
-        return match ($this) {
-            self::Delete => 'Runs only lines other tests run and asserts no value or call they lack. '
-                . 'Check how inputs pair with results, then delete it.',
-            self::MergeIntoDataset => 'Differs from the covering test only in data. Merge both into one test with a dataset row per case.',
-            self::ReviewDatasetRow => 'Another row of the same dataset runs the same lines. '
-                . 'Delete the row unless its input is a different class (empty, boundary, another tenant, invalid).',
-            self::Review => 'Runs only lines other tests run, but asserts values or calls they do not. '
-                . 'Keep it unless those assertions add nothing.',
-        };
+        return [
+            ...match ($this) {
+                self::Delete => [
+                    sprintf('Confirm that "%s" asserts the same input and result.', $coveringTest),
+                    'Delete this test.',
+                ],
+                self::MergeIntoDataset => [
+                    sprintf('Turn "%s" into one test with a dataset and add a row with the values in differsBy.', $coveringTest),
+                    'Delete this test.',
+                ],
+                self::ReviewDatasetRow => [
+                    sprintf('Compare this row with "%s".', $coveringTest),
+                    'Delete the row when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input.',
+                ],
+                self::Review => [
+                    'Check whether differsBy holds an assertion the covering tests lack: '
+                        . 'another result, input class, ordering or rejection.',
+                    'Delete this test only when it does not; otherwise keep it.',
+                ],
+            },
+            self::VERIFY_STEP,
+        ];
     }
 
 }

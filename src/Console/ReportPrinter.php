@@ -40,12 +40,9 @@ final readonly class ReportPrinter
     /**
      * @throws \JsonException
      */
-    public function printJson(AgentReport $report): void
+    public function printJson(AgentReport $report, bool $pretty): void
     {
-        $this->io->writeln(json_encode(
-            $report,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
-        ));
+        $this->io->writeln(Json::encode($report, $pretty));
     }
 
     private function printReport(FileReport $report): void

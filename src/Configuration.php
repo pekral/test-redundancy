@@ -16,6 +16,8 @@ final readonly class Configuration
 
     private const DEFAULT_MAP_PATH = '.test-redundancy/coverage-map.json.gz';
 
+    private const BASELINE_FILE_NAME = 'baseline.json';
+
     /**
      * @param list<string> $sourcePaths
      * @param array<string, string> $environment
@@ -83,6 +85,11 @@ final readonly class Configuration
         }
 
         return false;
+    }
+
+    public function absoluteBaselinePath(): string
+    {
+        return dirname($this->absoluteMapPath()) . DIRECTORY_SEPARATOR . self::BASELINE_FILE_NAME;
     }
 
     public function absoluteMapPath(): string

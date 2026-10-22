@@ -81,12 +81,17 @@ vendor/bin/test-redundancy tests/Unit --format=text
 
 # More or fewer parallel processes than the configuration says
 vendor/bin/test-redundancy tests/Unit --processes=8
+
+# After changing the tests: fail when a source line the last analyse covered is no longer covered
+vendor/bin/test-redundancy verify
 ```
+
+The JSON is compact; `--pretty` indents it.
 
 One folder or file runs in the runner's own parallel mode — `pest --parallel`, or `paratest` next to `phpunit`.
 Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
-each with its own `TEST_TOKEN`. Every run passes `--cache-directory`, so the coverage analysis cache survives between
-runs. `vendor/bin/test-redundancy analyse --help` lists every option.
+each with its own `TEST_TOKEN`. Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
+between runs. `vendor/bin/test-redundancy analyse --help` lists every option.
 
 ### The JSON report
 
@@ -101,7 +106,11 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "action": "merge-into-dataset",
           "coveredBy": ["it adds two numbers › negative numbers"],
           "differsBy": ["value:0", "value:5"],
-          "reason": "Differs from the covering test only in data. Merge both into one test with a dataset row per case.",
+          "steps": [
+            "Turn \"it adds two numbers › negative numbers\" into one test with a dataset and add a row with the values in differsBy.",
+            "Delete this test.",
+            "Run vendor/bin/test-redundancy verify; it must report \"ok\": true."
+          ],
           "test": "it adds zero"
         }
       ],
@@ -111,7 +120,6 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
       "testsWithoutSourceLines": []
     }
   ],
-  "instructions": ["Goal: keep 100% line coverage with the fewest and simplest tests.", "…"],
   "summary": {
     "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 },
     "candidates": 3,
@@ -121,7 +129,8 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
     "testFiles": 2,
     "testsWithoutSourceLines": 0
   },
-  "tool": "pekral/test-redundancy"
+  "tool": "pekral/test-redundancy",
+  "workflow": ["Goal: 100% coverage with the fewest and simplest tests. Coverage cannot see assertions, so judge every candidate.", "…"]
 }
 ```
 
@@ -130,11 +139,25 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
-| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed; `reason` then says so. |
+| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
+| `steps` | What to do with the candidate, naming the covering test. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
+| `workflow` | The rules an agent follows for the whole report. |
+
+### Verifying that coverage stayed
+
+`analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). After
+the tests change, `verify` runs the same test files again and compares:
+
+```json
+{"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy"}
+```
+
+It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
+mapped test file still covers does not count as lost.
 
 ### How to read a candidate
 
@@ -169,7 +192,7 @@ since the map was built. Of two tests that cover each other, it proposes at most
    covers which source line. Test descriptions come from the JUnit log.
 2. A greedy pass removes test cases whose lines the remaining test cases still cover. On a tie it removes standalone
    tests before dataset rows.
-3. For each candidate it computes the smallest covering set and compares contract fingerprints built with
+3. For each candidate it picks a small covering set greedily and compares contract fingerprints built with
    `nikic/php-parser`: Pest `it()` / `test()` with `->with()` datasets and chained modifiers such as `->throws()`, and
    PHPUnit `test*` / `#[Test]` / `@test` methods with `#[DataProvider]` / `@dataProvider` rows. Pest tests inside a
    namespace or `describe()` blocks, and shared `dataset('name', …)` rows of the same file, are parsed too.
