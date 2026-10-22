@@ -18,7 +18,6 @@ function pestProject(): string
     removeDirectory($project . '/build');
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'map' => 'build/coverage-map.json.gz',
-        'processes' => 2,
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
         'source' => ['src'],
     ]));
@@ -99,7 +98,6 @@ it('warns about a test file that covers no source line', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['lib'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 2,
     ]));
     $tester = command($project, 'analyse');
 

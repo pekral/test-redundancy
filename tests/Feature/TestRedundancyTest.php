@@ -53,7 +53,6 @@ it('compares test files with each other through the coverage map', function (): 
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 2,
         'map' => 'build/coverage-map.json.gz',
     ]));
     runIn($project, ['git', 'add', '.']);
@@ -103,7 +102,6 @@ it('ignores lines outside the configured source paths', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['lib'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
-        'processes' => 2,
     ]));
 
     $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/CalculatorTest.php'], ['tests/CalculatorTest.php']);
@@ -146,7 +144,6 @@ it('fails when the analysed tests fail', function (): void {
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
-        'processes' => 2,
     ]));
     file_put_contents(
         $project . '/tests/GreeterTest.php',

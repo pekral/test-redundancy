@@ -12,7 +12,7 @@ it('uses the defaults without a configuration file', function (): void {
     expect($configuration->sourcePaths)->toBe(['src/', 'app/'])
         ->and($configuration->ignoredSourcePattern)->toBeNull()
         ->and($configuration->environment)->toBe([])
-        ->and($configuration->processes)->toBe(4)
+        ->and($configuration->processes)->toBe(2)
         ->and($configuration->absoluteMapPath())->toBe($directory . '/.test-redundancy/coverage-map.json.gz')
         ->and($configuration->runner)->toBeNull();
 
