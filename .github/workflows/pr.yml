@@ -131,5 +131,5 @@ jobs:
       - name: Analyse the PHPUnit fixture
         working-directory: tests/Fixtures/phpunit
         run: |
-          php ../../../bin/test-redundancy tests/Unit tests/Feature > report.json
+          php ../../../bin/test-redundancy tests > report.json
           php -r '$candidates = json_decode(file_get_contents("report.json"), true, flags: JSON_THROW_ON_ERROR)["summary"]["candidates"]; echo "candidates: $candidates\n"; exit($candidates === 2 ? 0 : 1);'
