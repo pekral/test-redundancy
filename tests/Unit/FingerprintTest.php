@@ -58,6 +58,29 @@ it('collects the Pest negation as part of the call it negates', function (): voi
     ]);
 });
 
+it('tells a literal used as an array key from the same literal used as a value', function (): void {
+    $fingerprints = fingerprintsOf(<<<'PHP'
+        <?php
+        it('normalizes', function (mixed $input, mixed $expected): void {
+            expect(normalize($input))->toBe($expected);
+        })->with([
+            'scalar string' => ['x', 'x'],
+            'nested array' => [['z' => ['y' => 1, 'x' => 2]], ['z' => ['x' => 2, 'y' => 1]]],
+            'false' => [false, false],
+            'false key' => [[false => 1], [false => 1]],
+        ]);
+        PHP);
+    $scalarString = $fingerprints['it normalizes › scalar string'];
+    $nestedArray = $fingerprints['it normalizes › nested array'];
+
+    expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(['value:\'x\''])
+        ->and(array_keys(array_diff_key($nestedArray, $scalarString)))->toEqualCanonicalizing(
+            ['key:value:\'z\'', 'key:value:\'y\'', 'key:value:\'x\'', 'value:1', 'value:2'],
+        )
+        ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
+        ->toBe(['value:false']);
+});
+
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php

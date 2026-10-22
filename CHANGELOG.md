@@ -18,6 +18,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `verify` reports a lost line in a source file that changed since `analyse` in `lostLines`, not in `unstableLines`.
   `analyse` stores a hash of each covered source file in the baseline. A baseline written before this change has no
   source hashes, so `verify` reports every lost line of it in `lostLines`.
+- An array key now carries a `key:` prefix in the contract fingerprint (`key:value:'x'`),
+  so a dataset row whose input equals only an array key of the covering row is reported with `differsBy: ["value:'x'"]`
+  instead of `differsBy: []` and the action `delete` (#11).
 
 ## [0.1] - 2026-10-22
 

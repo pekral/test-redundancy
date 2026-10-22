@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
+use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
@@ -34,13 +35,14 @@ final class TokenCollector
 
         $nodeFinder = new NodeFinder();
         $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
+        $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
         $tokens = [];
 
         foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
             $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::token($node);
 
             if ($token !== null) {
-                $tokens[$token] = true;
+                $tokens[self::keyPrefix($arrayKeys, $node) . $token] = true;
             }
         }
 
@@ -62,6 +64,23 @@ final class TokenCollector
         }
 
         return $negatedScalars;
+    }
+
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @return array<int, true>
+     */
+    private static function arrayKeys(NodeFinder $nodeFinder, Node|array $nodes): array
+    {
+        $arrayKeys = [];
+
+        foreach ($nodeFinder->findInstanceOf($nodes, ArrayItem::class) as $arrayItem) {
+            if ($arrayItem->key !== null) {
+                $arrayKeys[spl_object_id($arrayItem->key)] = true;
+            }
+        }
+
+        return $arrayKeys;
     }
 
     private static function carriesContract(Node $node): bool
@@ -95,6 +114,14 @@ final class TokenCollector
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
             default => null,
         };
+    }
+
+    /**
+     * @param array<int, true> $arrayKeys
+     */
+    private static function keyPrefix(array $arrayKeys, Node $node): string
+    {
+        return isset($arrayKeys[spl_object_id($node)]) ? 'key:' : '';
     }
 
     private static function negation(Expr $receiver): string
