@@ -17,20 +17,20 @@ enum Action: string
     /**
      * @return list<string>
      */
-    public function steps(string $coveringTest): array
+    public function steps(string $coveringTests): array
     {
         return [
             ...match ($this) {
                 self::Delete => [
-                    sprintf('Confirm that "%s" asserts the same input and result.', $coveringTest),
+                    sprintf('Confirm that %s together assert the same input and result.', $coveringTests),
                     'Delete this test.',
                 ],
                 self::MergeIntoDataset => [
-                    sprintf('Turn "%s" into one test with a dataset and add a row with the values in differsBy.', $coveringTest),
+                    sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests),
                     'Delete this test.',
                 ],
                 self::ReviewDatasetRow => [
-                    sprintf('Compare this row with "%s".', $coveringTest),
+                    sprintf('Compare this row with %s.', $coveringTests),
                     'Delete the row when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input.',
                 ],
                 self::Review => [

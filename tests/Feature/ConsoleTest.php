@@ -174,9 +174,14 @@ it('verifies against the coverage map after a cross-file analysis', function ():
     $verify = command($project, 'verify');
 
     $verify->execute([]);
+    unlink($calculatorTest);
+    $deleted = command($project, 'verify');
+    $deleted->execute([]);
 
     expect($verify->getStatusCode())->toBe(0)
-        ->and(valueAt(decodedJson($verify->getDisplay()), 'lostLines'))->toBe([]);
+        ->and(valueAt(decodedJson($verify->getDisplay()), 'lostLines'))->toBe([])
+        ->and($deleted->getStatusCode())->toBe(1)
+        ->and(valueAt(decodedJson($deleted->getDisplay()), 'lostLines'))->toContain('src/Calculator.php:18');
 
     removeDirectory($project);
 });

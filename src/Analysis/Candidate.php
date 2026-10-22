@@ -66,7 +66,8 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
-        $steps = $this->action()->steps($this->coveredBy[0] ?? '');
+        $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
+        $steps = $this->action()->steps('"' . implode('", "', $coveringTests) . '"');
 
         return $this->differsBy === null
             ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
@@ -91,15 +92,20 @@ final readonly class Candidate implements JsonSerializable
 
     private function isCoveredBySiblingRow(): bool
     {
+        return $this->siblingRow() !== null;
+    }
+
+    private function siblingRow(): ?string
+    {
         $test = explode(TestKey::DATASET_SEPARATOR, $this->testCase(), 2)[0];
 
         foreach ($this->coveredBy as $coveringTest) {
             if (str_starts_with($coveringTest, $test . TestKey::DATASET_SEPARATOR)) {
-                return true;
+                return $coveringTest;
             }
         }
 
-        return false;
+        return null;
     }
 
 }

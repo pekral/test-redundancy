@@ -140,7 +140,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
 | `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
-| `steps` | What to do with the candidate, naming the covering test. The last step always runs `verify`. |
+| `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
@@ -149,7 +149,8 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 
 ### Verifying that coverage stayed
 
-`analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). After
+`analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). Add
+`.test-redundancy/` to `.gitignore`; the map, the baseline and the runner cache are local state. After
 the tests change, `verify` runs the same test files again and compares:
 
 ```json

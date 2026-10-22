@@ -118,7 +118,7 @@ final readonly class TestRedundancy
         $lost = array_diff_key(array_fill_keys($baseline->lines, value: true), $covered);
 
         if ($baseline->across && $lost !== []) {
-            $otherTests = $this->loadMap()->testsCovering($lost, array_fill_keys($existing, value: true));
+            $otherTests = $this->loadMap()->testsCovering($lost, array_fill_keys($baseline->testFiles, value: true));
             $lost = array_diff_key($lost, array_merge([], ...array_values($otherTests)));
         }
 
