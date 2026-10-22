@@ -1,0 +1,25 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types = 1);
+
+use Pekral\TestRedundancy\Console\Application;
+
+foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php'] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+
+        break;
+    }
+}
+
+ini_set('memory_limit', '-1');
+
+$arguments = $_SERVER['argv'];
+$commands = ['analyse', 'map', 'list', 'help', 'completion'];
+
+if (!isset($arguments[1]) || (!in_array($arguments[1], $commands, true) && !str_starts_with($arguments[1], '-'))) {
+    array_splice($arguments, 1, 0, 'analyse');
+}
+
+exit((new Application((string) getcwd()))->run(new Symfony\Component\Console\Input\ArgvInput($arguments)));
