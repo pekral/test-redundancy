@@ -53,7 +53,7 @@ final readonly class Git
      */
     private function run(array $command): string
     {
-        return (new Process($command, $this->projectRoot))->mustRun()->getOutput();
+        return new Process($command, $this->projectRoot)->mustRun()->getOutput();
     }
 
     /**

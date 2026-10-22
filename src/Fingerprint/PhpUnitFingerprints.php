@@ -23,7 +23,7 @@ final class PhpUnitFingerprints
     {
         $fingerprints = [];
 
-        foreach ((new NodeFinder())->findInstanceOf($statements, Class_::class) as $class) {
+        foreach (new NodeFinder()->findInstanceOf($statements, Class_::class) as $class) {
             $fingerprints = [...$fingerprints, ...self::tests($class)];
         }
 

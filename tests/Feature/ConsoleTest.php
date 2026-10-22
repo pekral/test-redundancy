@@ -8,13 +8,13 @@ use Symfony\Component\Filesystem\Filesystem;
 
 function command(string $projectRoot, string $name): CommandTester
 {
-    return new CommandTester((new Application($projectRoot))->find($name));
+    return new CommandTester(new Application($projectRoot)->find($name));
 }
 
 function pestProject(): string
 {
     $project = gitRepository();
-    (new Filesystem())->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
     removeDirectory($project . '/build');
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
         'map' => 'build/coverage-map.json.gz',

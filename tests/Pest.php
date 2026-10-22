@@ -14,7 +14,7 @@ function fixturePath(string $fixture): string
 function temporaryDirectory(): string
 {
     $directory = Path::canonicalize(__DIR__ . '/../build/tmp/project' . bin2hex(random_bytes(6)));
-    (new Filesystem())->mkdir($directory);
+    new Filesystem()->mkdir($directory);
     register_shutdown_function(removeDirectory(...), $directory);
 
     return $directory;
@@ -22,7 +22,7 @@ function temporaryDirectory(): string
 
 function removeDirectory(string $directory): void
 {
-    (new Filesystem())->remove($directory);
+    new Filesystem()->remove($directory);
 }
 
 /**
@@ -30,7 +30,7 @@ function removeDirectory(string $directory): void
  */
 function runIn(string $directory, array $command): string
 {
-    return (new Process($command, $directory))->mustRun()->getOutput();
+    return new Process($command, $directory)->mustRun()->getOutput();
 }
 
 function gitRepository(): string

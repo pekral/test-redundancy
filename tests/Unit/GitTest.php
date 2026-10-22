@@ -26,7 +26,7 @@ it('takes the base branch from origin', function (): void {
     runIn($repository, ['git', 'update-ref', 'refs/remotes/origin/master', 'HEAD']);
     runIn($repository, ['git', 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/master']);
 
-    expect((new Git($repository))->defaultBaseRef())->toBe('origin/master');
+    expect(new Git($repository)->defaultBaseRef())->toBe('origin/master');
 
     removeDirectory($repository);
 });
@@ -37,7 +37,7 @@ it('reports paths relative to a project in a subdirectory of the repository', fu
     file_put_contents($repository . '/packages/app/tests/AppTest.php', '<?php');
     runIn($repository, ['git', 'add', '.']);
     runIn($repository, ['git', 'commit', '--quiet', '-m', 'app']);
-    $commit = (new Git($repository))->headCommit();
+    $commit = new Git($repository)->headCommit();
     file_put_contents($repository . '/packages/app/tests/AppTest.php', '<?php // changed');
     file_put_contents($repository . '/packages/app/tests/NewTest.php', '<?php');
 

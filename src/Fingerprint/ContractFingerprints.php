@@ -14,7 +14,7 @@ final class ContractFingerprints
      */
     public static function of(string $testFile): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse((string) file_get_contents($testFile)) ?? [];
+        $statements = new ParserFactory()->createForHostVersion()->parse((string) file_get_contents($testFile)) ?? [];
 
         return [...PestFingerprints::of($statements), ...PhpUnitFingerprints::of($statements)];
     }
