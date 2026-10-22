@@ -15,6 +15,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A call made through Pest's negation `->not` or `->not()` now carries a `not:` prefix in the contract fingerprint
   (`not:call:toBeEmpty`), so a test that asserts the opposite result is reported with a non-empty `differsBy`
   and the action `review` instead of `delete` (#10).
+- `verify` reports a lost line in a source file that changed since `analyse` in `lostLines`, not in `unstableLines`.
+  `analyse` stores a hash of each covered source file in the baseline. A baseline written before this change has no
+  source hashes, so `verify` reports every lost line of it in `lostLines`.
 
 ## [0.1] - 2026-10-22
 

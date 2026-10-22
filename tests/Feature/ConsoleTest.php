@@ -263,6 +263,52 @@ it('keeps reporting a lost line when a covering test file was deleted', function
     removeDirectory($project);
 });
 
+it('stores a hash of each covered source file in the baseline', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $baseline = decodedJson((string) file_get_contents($project . '/build/baseline.json'));
+
+    expect(valueAt($baseline, 'sources'))->toBe(['src/Calculator.php' => hash_file('sha256', $project . '/src/Calculator.php')]);
+
+    removeDirectory($project);
+});
+
+it('reports a lost line of a changed source file as lost even when no covering test file changed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    file_put_contents($project . '/src/Calculator.php', "\n// the source changed after analyse\n", FILE_APPEND);
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([])
+        ->and(valueAt($report, 'instruction'))->toContain('Restore the test');
+
+    removeDirectory($project);
+});
+
+it('reports every lost line of a baseline written before source file hashes existed', function (): void {
+    $project = warmCacheProject();
+    command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
+    $baselinePath = $project . '/build/baseline.json';
+    $baseline = decodedJson((string) file_get_contents($baselinePath));
+    unset($baseline['sources']);
+    file_put_contents($baselinePath, (string) json_encode($baseline));
+    $verify = command($project, 'verify');
+
+    $verify->execute([]);
+    $report = decodedJson($verify->getDisplay());
+
+    expect($verify->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
+        ->and(valueAt($report, 'unstableLines'))->toBe([]);
+
+    removeDirectory($project);
+});
+
 it('reports every lost line of a baseline written before test file hashes existed', function (): void {
     $project = warmCacheProject();
     command($project, 'analyse')->execute(['paths' => ['tests/WarmCacheTest.php']]);
