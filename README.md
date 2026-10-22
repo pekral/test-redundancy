@@ -139,7 +139,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
-| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
+| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and its covering tests lack. A call made through Pest's `->not` carries a `not:` prefix, e.g. `not:call:toBeEmpty`. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |

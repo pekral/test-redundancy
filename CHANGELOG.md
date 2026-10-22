@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stores a hash of each analysed test file in the baseline. A lost line whose covering test files are all unchanged is
   reported in the new `unstableLines`, with an instruction not to restore a test, and `verify` exits with `0`. A baseline
   written by an earlier version reports every lost line as before.
+- A call made through Pest's negation `->not` now carries a `not:` prefix in the contract fingerprint
+  (`not:call:toBeEmpty`), so a test that asserts the opposite result is reported with a non-empty `differsBy`
+  and the action `review` instead of `delete` (#10).
 
 ## [0.1] - 2026-10-22
 
