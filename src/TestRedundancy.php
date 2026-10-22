@@ -56,7 +56,7 @@ final readonly class TestRedundancy
     public function analyse(array $testFiles, array $requestedPaths): array
     {
         $testsByFile = $this->testsByFile($testFiles, $this->linesByTest(count($requestedPaths) === 1 ? $requestedPaths : $testFiles));
-        CoverageBaseline::fromTestsByFile($testsByFile, across: false)->save($this->configuration->absoluteBaselinePath());
+        $this->saveBaseline($testsByFile, across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
         $reports = [];
 
@@ -97,7 +97,7 @@ final readonly class TestRedundancy
             ];
         }
 
-        CoverageBaseline::fromTestsByFile($testsByFile, across: true)->save($this->configuration->absoluteBaselinePath());
+        $this->saveBaseline($testsByFile, across: true);
 
         return new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot))->analyze($testsByFile, $map);
     }
@@ -122,7 +122,14 @@ final readonly class TestRedundancy
             $lost = array_diff_key($lost, array_merge([], ...array_values($otherTests)));
         }
 
-        return new Verification(count($baseline->lines), array_keys($lost), array_values(array_diff($baseline->testFiles, $existing)));
+        $unstable = $baseline->unstableAmong(array_keys($lost), $this->configuration->projectRoot);
+
+        return new Verification(
+            count($baseline->lines),
+            array_values(array_diff(array_keys($lost), $unstable)),
+            array_values(array_diff($baseline->testFiles, $existing)),
+            $unstable,
+        );
     }
 
     public function sourceChangedSince(CoverageMap $map): bool
@@ -189,6 +196,15 @@ final readonly class TestRedundancy
         }
 
         return $testsByFile;
+    }
+
+    /**
+     * @param array<string, array<string, array<string, true>>> $testsByFile
+     */
+    private function saveBaseline(array $testsByFile, bool $across): void
+    {
+        CoverageBaseline::fromTestsByFile($testsByFile, $across, $this->configuration->projectRoot)
+            ->save($this->configuration->absoluteBaselinePath());
     }
 
 }

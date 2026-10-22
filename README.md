@@ -154,11 +154,16 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 the tests change, `verify` runs the same test files again and compares:
 
 ```json
-{"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy"}
+{"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy","unstableLines":[]}
 ```
 
 It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
 mapped test file still covers does not count as lost.
+
+`analyse` also stores a hash of every analysed test file. When a line is no longer covered but none of the test files that
+covered it changed, `verify` lists it in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to
+restore a test. The coverage of such a test depends on state outside the test run, such as a cache or a database. A line
+that a changed or deleted test file also covered stays in `lostLines`.
 
 ### How to read a candidate
 
