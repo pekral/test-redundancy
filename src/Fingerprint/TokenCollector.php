@@ -5,11 +5,13 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Identifier;
@@ -83,7 +85,9 @@ final class TokenCollector
             $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
                 ? sprintf('const:%s::%s', $node->class->toString(), $node->name->toString())
                 : null,
-            $node instanceof MethodCall => $node->name instanceof Identifier ? 'call:' . $node->name->toString() : null,
+            $node instanceof MethodCall => $node->name instanceof Identifier
+                ? self::negation($node->var) . 'call:' . $node->name->toString()
+                : null,
             $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
                 ? sprintf('call:%s::%s', $node->class->toString(), $node->name->toString())
                 : null,
@@ -91,6 +95,13 @@ final class TokenCollector
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
             default => null,
         };
+    }
+
+    private static function negation(Expr $receiver): string
+    {
+        return $receiver instanceof PropertyFetch && $receiver->name instanceof Identifier && $receiver->name->toString() === 'not'
+            ? 'not:'
+            : '';
     }
 
     private static function scalar(Scalar $scalar, string $sign): ?string

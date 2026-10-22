@@ -41,6 +41,19 @@ it('collects every node that carries a contract', function (): void {
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
+it('collects the Pest negation as part of the call it negates', function (): void {
+    $parser = new ParserFactory()->createForHostVersion();
+
+    expect(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
+        'function:expect',
+        'not:call:toBeEmpty',
+        'call:toBeArray',
+    ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->toBeEmpty();'))))->toEqualCanonicalizing([
+        'function:expect',
+        'call:toBeEmpty',
+    ]);
+});
+
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php

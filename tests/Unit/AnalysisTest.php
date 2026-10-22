@@ -119,6 +119,33 @@ it('never proposes both tests of a pair that cover each other across files', fun
         ->and($candidates[0]->coveredBy[0])->toContain(' :: ');
 });
 
+it('asks for a review of a test whose covering test asserts the negated result', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/CacheTest.php', <<<'PHP'
+        <?php
+        it('reads nothing when the cache is empty', function (): void {
+            expect(app(Cache::class)->read('key'))->toBeEmpty();
+        });
+        it('reads the stored value', function (): void {
+            app(Cache::class)->store('key', ['a' => 1]);
+
+            expect(app(Cache::class)->read('key'))->not->toBeEmpty();
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/CacheTest.php' => [
+        'tests/CacheTest.php :: it reads nothing when the cache is empty' => ['src/Cache.php:20' => true],
+        'tests/CacheTest.php :: it reads the stored value' => ['src/Cache.php:15' => true, 'src/Cache.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it reads the stored value'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['call:toBeEmpty'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+});
+
 it('compares with tests of other files from the map', function (): void {
     $map = CoverageMap::fromLinesByTest('abc', [
         'tests/OtherCalculatorTest.php :: divide returns a float' => ['src/Calculator.php:17' => true],
