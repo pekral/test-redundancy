@@ -16,9 +16,9 @@ use SebastianBergmann\CodeCoverage\Serialization\Unserializer;
 final readonly class CoverageReader
 {
 
-    private const SERIALIZATION_HEADER = '<?php // phpunit/php-code-coverage serialization format';
+    private const string SERIALIZATION_HEADER = '<?php // phpunit/php-code-coverage serialization format';
 
-    private const HEADER_LENGTH = 64;
+    private const int HEADER_LENGTH = 64;
 
     public function __construct(private Configuration $configuration)
     {
@@ -108,7 +108,7 @@ final readonly class CoverageReader
         }
 
         if (str_starts_with((string) file_get_contents($coverageFile, length: self::HEADER_LENGTH), self::SERIALIZATION_HEADER)) {
-            $coverage = (new Unserializer())->unserialize($coverageFile);
+            $coverage = new Unserializer()->unserialize($coverageFile);
 
             return [$coverage['codeCoverage'], $coverage['basePath']];
         }

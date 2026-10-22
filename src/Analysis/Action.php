@@ -12,7 +12,7 @@ enum Action: string
     case ReviewDatasetRow = 'review-dataset-row';
     case Review = 'review';
 
-    public const VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
+    public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
     /**
      * @return list<string>

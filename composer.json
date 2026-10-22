@@ -24,7 +24,7 @@
         "source": "https://github.com/pekral/test-redundancy"
     },
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "ext-libxml": "*",
         "ext-simplexml": "*",
         "ext-zlib": "*",

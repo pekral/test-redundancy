@@ -18,7 +18,7 @@ use Pekral\TestRedundancy\Support\TestKey;
 final readonly class TestRedundancy
 {
 
-    private const MAX_TEST_FILES_PER_MAP_RUN = 400;
+    private const int MAX_TEST_FILES_PER_MAP_RUN = 400;
 
     private Git $git;
 
@@ -99,7 +99,7 @@ final readonly class TestRedundancy
 
         CoverageBaseline::fromTestsByFile($testsByFile, across: true)->save($this->configuration->absoluteBaselinePath());
 
-        return (new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot)))->analyze($testsByFile, $map);
+        return new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot))->analyze($testsByFile, $map);
     }
 
     public function verify(): Verification

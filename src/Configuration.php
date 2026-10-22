@@ -11,15 +11,15 @@ use Pekral\TestRedundancy\Support\ProjectPath;
 final readonly class Configuration
 {
 
-    public const FILE_NAME = 'test-redundancy.json';
+    public const string FILE_NAME = 'test-redundancy.json';
 
-    private const DEFAULT_PROCESSES = 2;
+    private const int DEFAULT_PROCESSES = 2;
 
-    private const MINIMUM_PROCESSES = 2;
+    private const int MINIMUM_PROCESSES = 2;
 
-    private const DEFAULT_MAP_PATH = '.test-redundancy/coverage-map.json.gz';
+    private const string DEFAULT_MAP_PATH = '.test-redundancy/coverage-map.json.gz';
 
-    private const BASELINE_FILE_NAME = 'baseline.json';
+    private const string BASELINE_FILE_NAME = 'baseline.json';
 
     /**
      * @param list<string> $sourcePaths

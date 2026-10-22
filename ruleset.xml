@@ -2,10 +2,7 @@
 <ruleset name="pekral/test-redundancy">
     <description>Coding standard for pekral/test-redundancy</description>
 
-    <rule ref="vendor/pekral/phpcs-rules/ruleset.xml">
-        <!-- Typed class constants need PHP 8.3; the package supports PHP 8.2. -->
-        <exclude name="SlevomatCodingStandard.TypeHints.ClassConstantTypeHint"/>
-    </rule>
+    <rule ref="vendor/pekral/phpcs-rules/ruleset.xml"/>
 
     <file>src</file>
     <file>tests</file>

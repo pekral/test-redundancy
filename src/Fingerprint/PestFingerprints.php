@@ -20,9 +20,9 @@ use PhpParser\Node\Stmt\Namespace_;
 final readonly class PestFingerprints
 {
 
-    private const TEST_FUNCTIONS = ['it', 'test'];
+    private const array TEST_FUNCTIONS = ['it', 'test'];
 
-    private const DESCRIBE_SEPARATOR = ' → ';
+    private const string DESCRIBE_SEPARATOR = ' → ';
 
     /**
      * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
@@ -39,7 +39,7 @@ final readonly class PestFingerprints
     {
         $statements = self::withoutNamespaces($statements);
 
-        return (new self(self::namedDatasets($statements)))->walk($statements, '');
+        return new self(self::namedDatasets($statements))->walk($statements, '');
     }
 
     /**

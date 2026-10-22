@@ -9,11 +9,11 @@ use Symfony\Component\Console\Application as ConsoleApplication;
 final class Application extends ConsoleApplication
 {
 
-    public const NAME = 'test-redundancy';
+    public const string NAME = 'test-redundancy';
 
-    private const DEFAULT_COMMAND = 'analyse';
+    private const string DEFAULT_COMMAND = 'analyse';
 
-    private const APPLICATION_OPTIONS = ['-h', '--help', '-V', '--version'];
+    private const array APPLICATION_OPTIONS = ['-h', '--help', '-V', '--version'];
 
     public function __construct(string $projectRoot)
     {

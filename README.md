@@ -19,12 +19,12 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 
 | | Version |
 | --- | --- |
-| PHP | `^8.2` |
+| PHP | `^8.4` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
 | Coverage driver | `pcov` (the tool sets `pcov.directory` to the project root) or `xdebug` |
 | Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel, so PHPUnit 13 needs 13.4+, the oldest version `paratest` supports |
 
-Contributing to this repository needs PHP 8.4+, because the development dependencies require it.
+Contributing to this repository needs PHP 8.4+ with `pcov`.
 
 ---
 
@@ -221,9 +221,9 @@ PHPCS, PHPStan and Rector use [pekral/phpcs-rules](https://github.com/pekral/php
 
 ### CI
 
-Pull requests and pushes to `master` run `composer check` on PHP 8.5, then the tool on its own tests. A matrix runs
-the tests on PHP 8.2, 8.3, 8.4 and 8.5 with the lowest and the highest dependencies, and a second matrix runs the tool
-on the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.4 with `paratest` and no Pest. A security audit runs every
+Pull requests and pushes to `master` run `composer check` on PHP 8.4 and 8.5, then the tool on its own tests. A matrix
+runs the tests on PHP 8.4 and 8.5 with the lowest and the highest dependencies, and a second matrix runs the tool on
+the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.4 with `paratest` and no Pest, on PHP 8.4. A security audit runs every
 Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---

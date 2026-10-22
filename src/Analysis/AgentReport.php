@@ -9,7 +9,7 @@ use JsonSerializable;
 final readonly class AgentReport implements JsonSerializable
 {
 
-    private const WORKFLOW = [
+    private const array WORKFLOW = [
         'Goal: 100% coverage with the fewest and simplest tests. Coverage cannot see assertions, so judge every candidate.',
         'For each candidate, follow "steps". Keep a test that asserts another result, input class, ordering or rejection.',
         'All candidates of one file can be removed together without losing a covered line.',

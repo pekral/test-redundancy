@@ -9,7 +9,7 @@ use Symfony\Component\Finder\Finder;
 final class TestFiles
 {
 
-    private const PATTERN = '*Test.php';
+    private const string PATTERN = '*Test.php';
 
     /**
      * @param list<string> $paths
