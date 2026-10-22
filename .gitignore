@@ -1,0 +1,11 @@
+/vendor/
+composer.lock
+build/
+.idea/
+.vscode/
+.DS_Store
+/.phpunit.cache
+/.phpunit.result.cache
+/coverage.xml
+/coverage-html
+/.test-redundancy/

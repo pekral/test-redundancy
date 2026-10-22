@@ -1,0 +1,24 @@
+name: Bug report
+description: The tool crashed, missed a test, or proposed a test it should not have.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and the output you got (the relevant part of the JSON is enough).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: PHP, Pest or PHPUnit, and php-code-coverage (composer show phpunit/php-code-coverage).
+    validations:
+      required: true

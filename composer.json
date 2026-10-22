@@ -1,0 +1,89 @@
+{
+    "name": "pekral/test-redundancy",
+    "description": "Finds PHPUnit and Pest tests whose covered lines other tests already cover, and shows what each candidate asserts beyond them.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "phpunit",
+        "pest",
+        "testing",
+        "coverage",
+        "redundant tests",
+        "test suite"
+    ],
+    "authors": [
+        {
+            "name": "Petr Král",
+            "email": "kral.petr.88@gmail.com",
+            "homepage": "https://github.com/pekral"
+        }
+    ],
+    "homepage": "https://github.com/pekral/test-redundancy",
+    "support": {
+        "issues": "https://github.com/pekral/test-redundancy/issues",
+        "source": "https://github.com/pekral/test-redundancy"
+    },
+    "require": {
+        "php": "^8.2",
+        "nikic/php-parser": "^5.0",
+        "phpunit/php-code-coverage": "^10.1 || ^11.0 || ^12.0 || ^13.0 || ^14.0",
+        "symfony/console": "^6.4 || ^7.0 || ^8.0",
+        "symfony/filesystem": "^6.4 || ^7.0 || ^8.0",
+        "symfony/finder": "^6.4 || ^7.0 || ^8.0",
+        "symfony/process": "^6.4 || ^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "ergebnis/composer-normalize": "^2.50.0",
+        "laravel/pint": "^1.27.1",
+        "pekral/phpcs-rules": "^0.5",
+        "pekral/phpstan-rules": "^0.4.5",
+        "pekral/rector-rules": "^0.6",
+        "pestphp/pest": "^3.0 || ^4.0 || ^5.0",
+        "phpstan/phpstan-deprecation-rules": ">=2.0.3",
+        "phpstan/phpstan-phpunit": "^2.0.14",
+        "roave/security-advisories": "dev-latest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Pekral\\TestRedundancy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Pekral\\TestRedundancy\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/test-redundancy"
+    ],
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "ergebnis/composer-normalize": true,
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "scripts": {
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=2G",
+        "build": "composer fix && composer check",
+        "check": "composer run composer-normalize-check && composer run phpcs-check && composer run pint-check && composer run rector-check && composer run analyse && composer run security-audit && composer run test:coverage",
+        "composer-normalize-check": "@composer normalize --dry-run",
+        "composer-normalize-fix": "@composer normalize",
+        "fix": "composer run composer-normalize-fix && composer run rector-fix && composer run pint-fix && composer run phpcs-fix || true",
+        "phpcs-check": "vendor/bin/phpcs --standard=ruleset.xml src/ tests/",
+        "phpcs-fix": "vendor/bin/phpcbf --standard=ruleset.xml src/ tests/ || true",
+        "pint-check": "vendor/bin/pint src/ tests/ --test --parallel",
+        "pint-fix": "vendor/bin/pint src/ tests/ --parallel",
+        "rector-check": "vendor/bin/rector process --dry-run",
+        "rector-fix": "vendor/bin/rector process",
+        "security-audit": "composer audit",
+        "test": "vendor/bin/pest --no-coverage",
+        "test:coverage": "php -dpcov.enabled=1 -dpcov.directory=. -dxdebug.mode=off -dpcov.exclude=\"~(vendor|tests)~\" vendor/bin/pest --coverage --min=100"
+    }
+}
