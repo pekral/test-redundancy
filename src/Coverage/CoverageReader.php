@@ -126,6 +126,10 @@ final readonly class CoverageReader
      */
     private function testIdsOf(ProcessedCodeCoverageData $data, array $hits): array
     {
+        if ($hits === []) {
+            return [];
+        }
+
         $legacyTestIds = array_values(array_filter($hits, is_string(...)));
 
         // @codeCoverageIgnoreStart
