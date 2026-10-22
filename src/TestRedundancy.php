@@ -25,9 +25,10 @@ final readonly class TestRedundancy
         $this->git = new Git($configuration->projectRoot);
     }
 
-    public static function forProject(string $projectRoot): self
+    public static function forProject(string $projectRoot, ?int $processes): self
     {
         $configuration = Configuration::load($projectRoot);
+        $configuration = $processes === null ? $configuration : $configuration->withProcesses($processes);
 
         return new self($configuration, new CoverageRun($configuration, TestRunner::detect($configuration)));
     }
@@ -139,7 +140,7 @@ final readonly class TestRedundancy
      */
     private function linesByTest(array $paths): array
     {
-        return $this->coverageRun->linesByTest($paths, parallel: count($paths) === 1);
+        return $this->coverageRun->linesByTest($paths);
     }
 
     /**

@@ -15,9 +15,9 @@ final readonly class TestRunner
 
     private const PHPUNIT = 'vendor/bin/phpunit';
 
-    private const PARATEST = 'vendor/bin/paratest';
+    private const PARATEST = 'paratest';
 
-    private function __construct(private string $binary, private bool $isPest, private bool $hasParatest)
+    private function __construct(private string $projectRoot, private string $binary, private bool $isPest, private bool $hasParatest)
     {
     }
 
@@ -29,12 +29,27 @@ final readonly class TestRunner
             throw new RuntimeException(sprintf('No test runner found at %s. Install Pest or PHPUnit, or set "runner".', $binary));
         }
 
-        return new self($binary, str_ends_with($binary, 'pest'), is_file(Path::join($configuration->projectRoot, self::PARATEST)));
+        return new self(
+            $configuration->projectRoot,
+            $binary,
+            str_ends_with($binary, 'pest'),
+            is_file(Path::makeAbsolute(self::paratestNextTo($binary), $configuration->projectRoot)),
+        );
     }
 
-    public function rootDirectory(string $projectRoot): string
+    public function rootDirectory(): string
     {
-        return Path::makeAbsolute(dirname($this->binary, 3), $projectRoot);
+        return Path::makeAbsolute(dirname($this->binary, 3), $this->projectRoot);
+    }
+
+    public function cacheDirectory(): string
+    {
+        return sys_get_temp_dir() . '/test-redundancy-cache/' . md5($this->projectRoot);
+    }
+
+    public function runsInParallel(bool $parallel, int $processes): bool
+    {
+        return $parallel && $processes > 1 && ($this->isPest || $this->hasParatest);
     }
 
     /**
@@ -43,25 +58,30 @@ final readonly class TestRunner
      */
     public function command(array $paths, bool $parallel, int $processes, string $coverageFile, string $junitFile): array
     {
-        $runsInParallel = $parallel && $processes > 1;
-        $binary = $runsInParallel && !$this->isPest && $this->hasParatest ? self::PARATEST : $this->binary;
+        $runsInParallel = $this->runsInParallel($parallel, $processes);
+        $binary = $runsInParallel && !$this->isPest ? self::paratestNextTo($this->binary) : $this->binary;
         $parallelArguments = match (true) {
             !$runsInParallel => [],
             $this->isPest => ['--parallel', '--processes=' . $processes],
-            $this->hasParatest => ['--processes=' . $processes],
-            default => [],
+            default => ['--processes=' . $processes],
         };
 
         return [
             PHP_BINARY,
             '-d', 'memory_limit=-1',
-            ...CoverageDriver::iniArguments(),
+            ...CoverageDriver::iniArguments($this->projectRoot),
             $binary,
             ...$paths,
             ...$parallelArguments,
             '--coverage-php=' . $coverageFile,
             '--log-junit=' . $junitFile,
+            '--cache-directory=' . $this->cacheDirectory(),
         ];
+    }
+
+    private static function paratestNextTo(string $binary): string
+    {
+        return dirname($binary) . '/' . self::PARATEST;
     }
 
 }

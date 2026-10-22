@@ -89,7 +89,45 @@ jobs:
         run: composer update --prefer-dist --no-progress --no-interaction ${{ matrix.dependencies == 'lowest' && '--prefer-lowest' || '' }}
 
       - name: Lint the shipped sources
-        run: find src bin -type f -exec php -l {} \; > /dev/null
+        run: find src bin -type f -print0 | xargs -0 -n1 php -l > /dev/null
 
       - name: Run tests
         run: vendor/bin/pest
+
+  phpunit-compatibility:
+    name: "PHPUnit ${{ matrix.phpunit }} without Pest (PHP ${{ matrix.php }})"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.2', phpunit: '10.5.*' }
+          - { php: '8.2', phpunit: '11.5.*' }
+          - { php: '8.3', phpunit: '12.5.*' }
+          - { php: '8.4', phpunit: '13.0.*' }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+
+      - name: Install PHPUnit ${{ matrix.phpunit }} without Pest
+        run: |
+          composer remove --dev --no-update --no-interaction \
+            ergebnis/composer-normalize laravel/pint pekral/ai-olympus pekral/phpcs-rules pekral/phpstan-rules pekral/rector-rules \
+            pestphp/pest phpstan/phpstan-deprecation-rules phpstan/phpstan-phpunit
+          composer require --dev --no-update --no-interaction "phpunit/phpunit:${{ matrix.phpunit }}"
+          composer update --prefer-dist --no-progress --no-interaction
+          composer show phpunit/php-code-coverage | grep -E '^versions'
+
+      - name: Analyse the PHPUnit fixture
+        working-directory: tests/Fixtures/phpunit
+        run: |
+          php ../../../bin/test-redundancy tests > report.json
+          php -r '$candidates = json_decode(file_get_contents("report.json"), true, flags: JSON_THROW_ON_ERROR)["summary"]["candidates"]; echo "candidates: $candidates\n"; exit($candidates === 2 ? 0 : 1);'

@@ -24,7 +24,7 @@ final readonly class Git
      */
     public function changedSince(string $commit, array $paths): array
     {
-        return $this->lines($this->run(['git', 'diff', '--name-only', $commit, '--', ...$paths]));
+        return $this->lines($this->run(['git', 'diff', '--name-only', '--relative', $commit, '--', ...$paths]));
     }
 
     /**
@@ -35,7 +35,7 @@ final readonly class Git
         $mergeBase = trim($this->run(['git', 'merge-base', $baseRef, 'HEAD']));
 
         return array_values(array_unique([
-            ...$this->lines($this->run(['git', 'diff', '--name-only', '--diff-filter=ACMR', $mergeBase])),
+            ...$this->lines($this->run(['git', 'diff', '--name-only', '--relative', '--diff-filter=ACMR', $mergeBase])),
             ...$this->lines($this->run(['git', 'ls-files', '--others', '--exclude-standard'])),
         ]));
     }

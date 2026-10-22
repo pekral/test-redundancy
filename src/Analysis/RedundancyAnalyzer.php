@@ -21,7 +21,7 @@ final readonly class RedundancyAnalyzer
      */
     public function analyze(array $testsByFile, ?CoverageMap $map): array
     {
-        $analyzedTests = array_merge([], ...array_values($testsByFile));
+        $analyzedTests = array_filter(array_merge([], ...array_values($testsByFile)), static fn (array $lines): bool => $lines !== []);
         $analyzedLines = array_merge([], ...array_values($analyzedTests));
         $fixedTests = $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
         $removed = $this->eliminate($analyzedTests, $fixedTests);
@@ -40,7 +40,13 @@ final readonly class RedundancyAnalyzer
                 );
             }
 
-            $reports[] = new FileReport($testFile, count($tests), count(array_merge([], ...array_values($tests))), $candidates);
+            $reports[] = new FileReport(
+                $testFile,
+                count($tests),
+                count(array_merge([], ...array_values($tests))),
+                $candidates,
+                array_map(TestKey::testCase(...), array_keys(array_filter($tests, static fn (array $lines): bool => $lines === []))),
+            );
         }
 
         return $reports;

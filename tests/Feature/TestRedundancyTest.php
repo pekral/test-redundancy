@@ -2,8 +2,10 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\TestRedundancy;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 
 /**
  * @param list<\Pekral\TestRedundancy\Analysis\FileReport> $reports
@@ -23,7 +25,7 @@ function candidatesOf(array $reports): array
 }
 
 it('analyses a Pest test folder', function (): void {
-    $testRedundancy = TestRedundancy::forProject(fixturePath('pest'));
+    $testRedundancy = TestRedundancy::forProject(fixturePath('pest'), processes: null);
 
     $reports = $testRedundancy->analyse($testRedundancy->testFiles(['tests'], baseRef: null), ['tests']);
 
@@ -35,7 +37,7 @@ it('analyses a Pest test folder', function (): void {
 });
 
 it('analyses a single PHPUnit test file in parallel', function (): void {
-    $testRedundancy = TestRedundancy::forProject(fixturePath('phpunit'));
+    $testRedundancy = TestRedundancy::forProject(fixturePath('phpunit'), processes: null);
 
     $reports = $testRedundancy->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
 
@@ -56,7 +58,7 @@ it('compares test files with each other through the coverage map', function (): 
     ]));
     runIn($project, ['git', 'add', '.']);
     runIn($project, ['git', 'commit', '--quiet', '-m', 'fixture']);
-    $testRedundancy = TestRedundancy::forProject($project);
+    $testRedundancy = TestRedundancy::forProject($project, processes: null);
     $chunks = new ArrayObject();
 
     $map = $testRedundancy->buildMap(['tests'], function (array $chunk) use ($chunks): void {
@@ -89,8 +91,8 @@ it('takes the changed test files from git', function (): void {
     mkdir($project . '/vendor/bin', recursive: true);
     touch($project . '/vendor/bin/phpunit');
 
-    expect(TestRedundancy::forProject($project)->testFiles([], 'master'))->toBe(['tests/NewTest.php'])
-        ->and(TestRedundancy::forProject($project)->testFiles([], baseRef: null))->toBe(['tests/NewTest.php']);
+    expect(TestRedundancy::forProject($project, processes: null)->testFiles([], 'master'))->toBe(['tests/NewTest.php'])
+        ->and(TestRedundancy::forProject($project, processes: null)->testFiles([], baseRef: null))->toBe(['tests/NewTest.php']);
 
     removeDirectory($project);
 });
@@ -104,10 +106,55 @@ it('ignores lines outside the configured source paths', function (): void {
         'processes' => 1,
     ]));
 
-    $reports = TestRedundancy::forProject($project)->analyse(['tests/CalculatorTest.php'], ['tests/CalculatorTest.php']);
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/CalculatorTest.php'], ['tests/CalculatorTest.php']);
 
-    expect($reports[0]->testCases)->toBe(0)
-        ->and($reports[0]->candidates)->toBe([]);
+    expect($reports[0]->testCases)->toBe(5)
+        ->and($reports[0]->coveredLines)->toBe(0)
+        ->and($reports[0]->candidates)->toBe([])
+        ->and($reports[0]->testsWithoutSourceLines)->toBe([
+            'it adds two numbers',
+            'it adds one and two',
+            'it divides two numbers',
+            'it rejects a division by zero',
+            'it adds zero',
+        ]);
+
+    removeDirectory($project);
+});
+
+it('runs several test files as concurrent groups with their own test token', function (): void {
+    $project = temporaryDirectory();
+    (new Filesystem())->mirror(fixturePath('pest'), $project);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+    ]));
+    $testFiles = ['tests/CalculatorTest.php', 'tests/OtherCalculatorTest.php'];
+
+    $concurrent = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $sequential = TestRedundancy::forProject($project, processes: 1)->analyse($testFiles, $testFiles);
+
+    expect(candidatesOf($concurrent))->toBe(candidatesOf($sequential))
+        ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 1]);
+
+    removeDirectory($project);
+});
+
+it('fails when the analysed tests fail', function (): void {
+    $project = temporaryDirectory();
+    (new Filesystem())->mirror(fixturePath('phpunit'), $project);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
+        'processes' => 1,
+    ]));
+    file_put_contents(
+        $project . '/tests/GreeterTest.php',
+        str_replace('\'Hello, Jane!\'', '\'Hello, nobody!\'', (string) file_get_contents($project . '/tests/GreeterTest.php')),
+    );
+
+    expect(fn (): array => TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']))
+        ->toThrow(ProcessFailedException::class);
 
     removeDirectory($project);
 });

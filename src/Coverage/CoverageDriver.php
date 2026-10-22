@@ -12,9 +12,9 @@ final class CoverageDriver
     /**
      * @return list<string>
      */
-    public static function iniArguments(): array
+    public static function iniArguments(string $projectRoot): array
     {
-        return self::argumentsFor(extension_loaded('pcov'), extension_loaded('xdebug'));
+        return self::argumentsFor(extension_loaded('pcov'), extension_loaded('xdebug'), $projectRoot);
     }
 
     /**
@@ -28,10 +28,10 @@ final class CoverageDriver
     /**
      * @return list<string>
      */
-    public static function argumentsFor(bool $hasPcov, bool $hasXdebug): array
+    public static function argumentsFor(bool $hasPcov, bool $hasXdebug, string $projectRoot): array
     {
         return match (true) {
-            $hasPcov => ['-d', 'pcov.enabled=1'],
+            $hasPcov => ['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . $projectRoot, '-d', 'pcov.exclude=~/vendor/~'],
             $hasXdebug => ['-d', 'xdebug.mode=coverage'],
             default => throw new RuntimeException('Per-test coverage needs the pcov or the xdebug extension.'),
         };

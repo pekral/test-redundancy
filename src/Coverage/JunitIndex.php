@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Coverage;
 
 use Pekral\TestRedundancy\Support\PestName;
 use Pekral\TestRedundancy\Support\ProjectPath;
+use Pekral\TestRedundancy\Support\TestKey;
 use Symfony\Component\Filesystem\Path;
 
 final readonly class JunitIndex
@@ -14,8 +15,9 @@ final readonly class JunitIndex
     /**
      * @param array<string, string> $fileByClass
      * @param array<string, string> $descriptionByEvaluable
+     * @param array<string, true> $testKeys
      */
-    private function __construct(private array $fileByClass, private array $descriptionByEvaluable)
+    private function __construct(private array $fileByClass, private array $descriptionByEvaluable, private array $testKeys)
     {
     }
 
@@ -30,6 +32,7 @@ final readonly class JunitIndex
         libxml_use_internal_errors($previousErrorHandling);
         $fileByClass = [];
         $descriptionByEvaluable = [];
+        $testKeys = [];
 
         $testCases = $report === false ? null : $report->xpath('//testcase');
 
@@ -43,9 +46,25 @@ final readonly class JunitIndex
             }
 
             $descriptionByEvaluable[$class . '::' . PestName::evaluable($description)] = $description;
+            $testKeys[TestKey::make($fileByClass[$class] ?? $class, $description)] = true;
         }
 
-        return new self($fileByClass, $descriptionByEvaluable);
+        return new self($fileByClass, $descriptionByEvaluable, $testKeys);
+    }
+
+    /**
+     * @param list<string> $coveredTestKeys
+     * @return list<string>
+     */
+    public function testsWithoutCoverage(array $coveredTestKeys): array
+    {
+        $covered = [];
+
+        foreach ($coveredTestKeys as $coveredTestKey) {
+            $covered[explode(TestKey::DATASET_SEPARATOR, $coveredTestKey, 2)[0]] = true;
+        }
+
+        return array_keys(array_diff_key($this->testKeys, $covered));
     }
 
     public function fileOf(string $class): string

@@ -30,3 +30,21 @@ it('takes the base branch from origin', function (): void {
 
     removeDirectory($repository);
 });
+
+it('reports paths relative to a project in a subdirectory of the repository', function (): void {
+    $repository = gitRepository();
+    mkdir($repository . '/packages/app/tests', recursive: true);
+    file_put_contents($repository . '/packages/app/tests/AppTest.php', '<?php');
+    runIn($repository, ['git', 'add', '.']);
+    runIn($repository, ['git', 'commit', '--quiet', '-m', 'app']);
+    $commit = (new Git($repository))->headCommit();
+    file_put_contents($repository . '/packages/app/tests/AppTest.php', '<?php // changed');
+    file_put_contents($repository . '/packages/app/tests/NewTest.php', '<?php');
+
+    $git = new Git($repository . '/packages/app');
+
+    expect($git->changedSince($commit, ['tests']))->toBe(['tests/AppTest.php'])
+        ->and($git->changedFilesAgainst('master'))->toBe(['tests/AppTest.php', 'tests/NewTest.php']);
+
+    removeDirectory($repository);
+});

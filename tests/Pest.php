@@ -15,6 +15,7 @@ function temporaryDirectory(): string
 {
     $directory = Path::canonicalize(__DIR__ . '/../build/tmp/project' . bin2hex(random_bytes(6)));
     (new Filesystem())->mkdir($directory);
+    register_shutdown_function(removeDirectory(...), $directory);
 
     return $directory;
 }

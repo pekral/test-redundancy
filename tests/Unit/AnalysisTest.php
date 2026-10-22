@@ -7,6 +7,7 @@ use Pekral\TestRedundancy\Analysis\AgentReport;
 use Pekral\TestRedundancy\Analysis\Candidate;
 use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
+use Pekral\TestRedundancy\Analysis\StaleMap;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
 
@@ -40,21 +41,25 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
 it('serializes a candidate and a file report for an agent', function (): void {
     $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\'']);
     $json = decodedJson((string) json_encode(new AgentReport([
-        new FileReport('tests/FooTest.php', 2, 5, [$candidate]),
-        new FileReport('tests/BarTest.php', 1, 3, []),
-    ], 4)));
+        new FileReport('tests/FooTest.php', 2, 5, [$candidate], []),
+        new FileReport('tests/BarTest.php', 1, 3, [], []),
+        new FileReport('tests/BazTest.php', 1, 0, [], ['it reads the config']),
+    ], 4, new StaleMap('abc123', ['src/Foo.php']))));
 
     expect(valueAt($json, 'summary'))->toEqual([
-        'testFiles' => 2,
-        'testCases' => 3,
+        'testFiles' => 3,
+        'testCases' => 4,
         'candidates' => 1,
+        'testsWithoutSourceLines' => 1,
         'byAction' => ['delete' => 0, 'merge-into-dataset' => 0, 'review-dataset-row' => 1, 'review' => 0],
         'seconds' => 4,
+        'staleMap' => ['commit' => 'abc123', 'changedSourceFiles' => ['src/Foo.php']],
     ])->and($json['files'])->toEqual([
         [
             'file' => 'tests/FooTest.php',
             'testCases' => 2,
             'coveredLines' => 5,
+            'testsWithoutSourceLines' => [],
             'candidates' => [
                 [
                     'test' => 'it works › empty',
@@ -65,7 +70,17 @@ it('serializes a candidate and a file report for an agent', function (): void {
                 ],
             ],
         ],
-    ])->and($json['instructions'])->toHaveCount(5)
+        [
+            'file' => 'tests/BazTest.php',
+            'testCases' => 1,
+            'coveredLines' => 0,
+            'testsWithoutSourceLines' => ['it reads the config'],
+            'candidates' => [],
+        ],
+    ])->and($json['instructions'])->toHaveCount(7)
+        ->and(valueAt(decodedJson((string) json_encode(candidate('it works', ['it also works'], differsBy: null))), 'reason'))->toContain(
+            'could not be parsed',
+        )
         ->and($candidate->testCase())->toBe('it works › empty')
         ->and($candidate->addsNoValueOrCall())->toBeFalse();
 });
