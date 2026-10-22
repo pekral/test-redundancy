@@ -38,6 +38,13 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null), Action::Review],
 ]);
 
+it('names every covering test, or the sibling row, in the first step', function (Candidate $candidate, string $firstStep): void {
+    expect($candidate->steps()[0])->toBe($firstStep);
+})->with([
+    'delete' => [candidate('it works', ['it a', 'it b'], []), 'Confirm that "it a", "it b" together assert the same input and result.'],
+    'sibling row' => [candidate('it works › empty', ['it a', 'it works › blank'], ['value:\'\'']), 'Compare this row with "it works › blank".'],
+]);
+
 it('serializes a candidate and a file report for an agent', function (): void {
     $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\'']);
     $json = decodedJson((string) json_encode(new AgentReport([
@@ -64,7 +71,7 @@ it('serializes a candidate and a file report for an agent', function (): void {
                 [
                     'test' => 'it works › empty',
                     'action' => 'review-dataset-row',
-                    'steps' => Action::ReviewDatasetRow->steps('it works › blank'),
+                    'steps' => Action::ReviewDatasetRow->steps('"it works › blank"'),
                     'coveredBy' => ['it works › blank'],
                     'differsBy' => ['value:\'\''],
                 ],

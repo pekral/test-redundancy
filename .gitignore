@@ -8,4 +8,4 @@ build/
 /.phpunit.result.cache
 /coverage.xml
 /coverage-html
-/.test-redundancy/
+.test-redundancy/
