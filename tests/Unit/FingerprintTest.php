@@ -155,6 +155,7 @@ it('tells a literal under one array key from the same literal under another key'
         'key:value:\'limit\'' => 1,
     ],
     ],
+    'literal in a list inside a list' => ['store([[1]]);', ['function:store' => 1, 'value:1' => 1]],
     'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
         'function:store' => 1,
         'in:function:store#0/value:\'tags\'/value:\'a\'' => 1,

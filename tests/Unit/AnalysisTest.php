@@ -974,6 +974,62 @@ it('does not delete a test whose covering test passes its literal only as part o
     'concatenation' => ['\'a\' . $suffix', '\'a\''],
 ]);
 
+it('does not delete a test whose covering test passes its literal inside a nested list', function (
+    string $argument,
+    string $coveringArgument,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: <<<PHP
+            <?php
+            it('passes the literal', function (): void {
+                expect(foo({$argument}))->toBeTrue();
+            });
+            it('passes the literal in a nested list', function (): void {
+                expect(foo({$coveringArgument}))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it passes the literal' => ['src/Foo.php:5'],
+            'it passes the literal in a nested list' => ['src/Foo.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it passes the literal')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+})->with([
+    'list in a list' => ['1', '[[1]]', ['in:function:foo#0/value:1']],
+    'list in a list against a list' => ['[1]', '[[1]]', ['in:function:foo#0/value:1']],
+    'list in a list in a call' => ['bar(1)', 'bar([[1]])', ['in:function:foo#0/function:bar#0/value:1']],
+    'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
+    'list in a list under a key' => ['[\'a\' => 1]', '[\'a\' => [[1]]]', ['in:function:foo#0/value:\'a\'/value:1']],
+]);
+
+it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('foos', function (mixed $value): void {
+                expect(foo($value))->toBeTrue();
+            })->with([
+                'flat' => [1],
+                'nested' => [[[1]]],
+            ]);
+            PHP,
+        linesByTest: [
+            'it foos › flat' => ['src/Foo.php:5'],
+            'it foos › nested' => ['src/Foo.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it foos › flat')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/value:1'])
+        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+});
+
 it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
