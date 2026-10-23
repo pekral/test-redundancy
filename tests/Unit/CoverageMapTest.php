@@ -65,6 +65,21 @@ it('fails on a broken coverage baseline', function (): void {
     removeDirectory($directory);
 });
 
+it('saves a baseline into a directory that does not exist yet', function (): void {
+    $directory = temporaryDirectory();
+    $baseline = CoverageBaseline::fromTestsByFile(
+        ['tests/ATest.php' => ['tests/ATest.php :: it a' => ['src/A.php:1' => true]]],
+        across: false,
+        projectRoot: $directory,
+    );
+
+    $baseline->save($directory . '/nested/baseline.json');
+
+    expect(CoverageBaseline::load($directory . '/nested/baseline.json')->lines)->toBe(['src/A.php:1']);
+
+    removeDirectory($directory);
+});
+
 function filesystemAcceptsRawBytesInNames(): bool
 {
     $root = temporaryDirectory();

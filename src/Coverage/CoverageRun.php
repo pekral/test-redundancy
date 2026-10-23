@@ -29,12 +29,8 @@ final readonly class CoverageRun
             return $this->runGroups([[$paths, true, $this->configuration->environment]]);
         }
 
-        $groupCount = min(count($paths), $this->configuration->processes);
-        $groups = [];
-
-        foreach (array_keys($paths) as $index) {
-            $groups[$index % $groupCount][] = $paths[$index];
-        }
+        $groups = TestDurations::load($this->configuration->absoluteDurationsPath())
+            ->split($paths, min(count($paths), $this->configuration->processes));
 
         return $this->runGroups(array_map(
             fn (array $group, int $token): array => [$group, false, $this->workerEnvironment($token + 1)],
@@ -65,14 +61,19 @@ final readonly class CoverageRun
             }
 
             $linesByTest = [];
+            $secondsByFile = [];
 
             foreach ($runs as [$process, $coverageFile, $junitFile]) {
                 if ($process->wait() !== 0) {
                     throw new ProcessFailedException($process);
                 }
 
-                $linesByTest = [...$linesByTest, ...$this->read($coverageFile, $junitFile)];
+                $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
+                $linesByTest = [...$linesByTest, ...new CoverageReader($this->configuration)->linesByTest($coverageFile, $junit)];
+                $secondsByFile = [...$secondsByFile, ...$junit->secondsByFile()];
             }
+
+            $this->recordDurations($secondsByFile);
 
             return $linesByTest;
         } finally {
@@ -105,13 +106,15 @@ final readonly class CoverageRun
     }
 
     /**
-     * @return array<string, array<string, true>>
+     * @param array<string, float> $secondsByFile
      */
-    private function read(string $coverageFile, string $junitFile): array
+    private function recordDurations(array $secondsByFile): void
     {
-        $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
+        $path = $this->configuration->absoluteDurationsPath();
 
-        return new CoverageReader($this->configuration)->linesByTest($coverageFile, $junit);
+        if ($secondsByFile !== []) {
+            TestDurations::load($path)->with($secondsByFile)->save($path);
+        }
     }
 
 }
