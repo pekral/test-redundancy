@@ -19,7 +19,13 @@ final readonly class FileReport implements JsonSerializable
         public int $coveredLines,
         public array $candidates,
         public array $testsWithoutSourceLines,
+        public bool $skipped = false,
     ) {
+    }
+
+    public static function skipped(string $testFile): self
+    {
+        return new self($testFile, 1, 0, [], [], skipped: true);
     }
 
     public function hasFindings(): bool

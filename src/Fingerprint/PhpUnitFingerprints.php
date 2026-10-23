@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Yield_;
 use PhpParser\Node\Scalar\String_;
@@ -28,6 +29,21 @@ final class PhpUnitFingerprints
         }
 
         return $fingerprints;
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     */
+    public static function declaresDataset(array $statements): bool
+    {
+        return array_any(
+            new NodeFinder()->findInstanceOf($statements, ClassMethod::class),
+            static fn (ClassMethod $method): bool => array_any(
+                self::attributes($method),
+                static fn (Attribute $attribute): bool => str_starts_with($attribute->name->getLast(), 'DataProvider')
+                    || str_starts_with($attribute->name->getLast(), 'TestWith'),
+            ) || preg_match('/@(?:dataProvider|testWith)\b/i', (string) $method->getDocComment()?->getText()) === 1,
+        );
     }
 
     /**

@@ -4,12 +4,14 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy;
 
+use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
 use Pekral\TestRedundancy\Analysis\Verification;
 use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
 use Pekral\TestRedundancy\Coverage\CoverageRun;
 use Pekral\TestRedundancy\Coverage\TestRunner;
+use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
 use Pekral\TestRedundancy\Support\Git;
 use Pekral\TestRedundancy\Support\TestFiles;
@@ -55,13 +57,21 @@ final readonly class TestRedundancy
      */
     public function analyse(array $testFiles, array $requestedPaths): array
     {
-        $testsByFile = $this->testsByFile($testFiles, $this->linesByTest(count($requestedPaths) === 1 ? $requestedPaths : $testFiles));
+        $skipped = array_filter($testFiles, $this->declaresSingleTestCase(...));
+        $analysed = array_values(array_diff($testFiles, $skipped));
+        $runPaths = $skipped === [] && count($requestedPaths) === 1 ? $requestedPaths : $analysed;
+        $testsByFile = $this->testsByFile($analysed, $analysed === [] ? [] : $this->linesByTest($runPaths));
         $this->saveBaseline($testsByFile, across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
         $reports = [];
 
-        foreach ($testsByFile as $testFile => $tests) {
-            $reports = [...$reports, ...$analyzer->analyze([$testFile => $tests], map: null)];
+        foreach ($testFiles as $testFile) {
+            $reports = [
+                ...$reports,
+                ...(isset($testsByFile[$testFile])
+                    ? $analyzer->analyze([$testFile => $testsByFile[$testFile]], map: null)
+                    : [FileReport::skipped($testFile)]),
+            ];
         }
 
         return $reports;
@@ -168,6 +178,11 @@ final readonly class TestRedundancy
         $map->save($this->configuration->absoluteMapPath());
 
         return $map;
+    }
+
+    private function declaresSingleTestCase(string $testFile): bool
+    {
+        return ContractFingerprints::declaresSingleTestCase($this->configuration->projectRoot . DIRECTORY_SEPARATOR . $testFile);
     }
 
     /**

@@ -17,6 +17,7 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Namespace_;
+use PhpParser\NodeFinder;
 
 final readonly class PestFingerprints
 {
@@ -24,6 +25,8 @@ final readonly class PestFingerprints
     private const array TEST_FUNCTIONS = ['it', 'test'];
 
     private const string DESCRIBE_SEPARATOR = ' → ';
+
+    private const array REPEATING_METHODS = ['with', 'repeat'];
 
     /**
      * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
@@ -41,6 +44,21 @@ final readonly class PestFingerprints
         $statements = self::withoutNamespaces($statements);
 
         return new self(self::namedDatasets($statements))->walk($statements, '');
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     */
+    public static function declaresOnlyFingerprintedTests(array $statements): bool
+    {
+        $nodeFinder = new NodeFinder();
+        $testCalls = $nodeFinder->find(
+            $statements,
+            static fn (Node $node): bool => $node instanceof FuncCall && $node->args !== [] && self::isCallOf($node, self::TEST_FUNCTIONS),
+        );
+        $repeatingCalls = $nodeFinder->find($statements, self::repeatsTest(...));
+
+        return $repeatingCalls === [] && count($testCalls) === count(self::of($statements));
     }
 
     /**
@@ -186,15 +204,40 @@ final readonly class PestFingerprints
         return $name !== null && $rows instanceof Array_ ? [$name, $rows->items] : [null, []];
     }
 
+    private static function repeatsTest(Node $node): bool
+    {
+        if (!$node instanceof MethodCall
+            || !$node->name instanceof Identifier
+            || !in_array($node->name->toLowerString(), self::REPEATING_METHODS, strict: true)
+        ) {
+            return false;
+        }
+
+        $root = $node;
+
+        while ($root instanceof MethodCall) {
+            $root = $root->var;
+        }
+
+        return $root instanceof FuncCall && self::isCallOf($root, [...self::TEST_FUNCTIONS, 'describe']);
+    }
+
+    /**
+     * @param list<string> $functions
+     */
+    private static function isCallOf(FuncCall $call, array $functions): bool
+    {
+        return $call->name instanceof Name && in_array($call->name->toLowerString(), $functions, strict: true);
+    }
+
     /**
      * @param list<string> $functions
      */
     private static function functionCall(FuncCall $call, array $functions): ?string
     {
         $firstArgument = self::argument($call, 0);
-        $isFunction = $call->name instanceof Name && in_array($call->name->toLowerString(), $functions, strict: true);
 
-        return $isFunction && $firstArgument instanceof String_ ? $firstArgument->value : null;
+        return self::isCallOf($call, $functions) && $firstArgument instanceof String_ ? $firstArgument->value : null;
     }
 
     private static function argument(FuncCall|MethodCall $call, int $position): ?Node

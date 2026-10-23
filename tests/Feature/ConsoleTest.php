@@ -56,6 +56,10 @@ function warmCacheProject(): string
 
             expect(is_file($cacheMarker))->toBeTrue();
         });
+
+        it('adds beside the warm cache', function (): void {
+            expect((new Calculator())->add(1, 1))->toBe(2);
+        });
         PHP);
 
     return $project;
@@ -81,7 +85,16 @@ it('prints a text report for people', function (): void {
         ->toContain('Tests to review')
         ->toContain('Dataset rows to review')
         ->toContain('action: merge-into-dataset')
-        ->toContain('Every test case covers a line no other test case covers.');
+        ->toContain('tests/OtherCalculatorTest.php')
+        ->toContain('Skipped: the file declares one test case and no dataset');
+});
+
+it('reports a file without candidates as covering a line no other test case covers', function (): void {
+    $output = new BufferedOutput();
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([new FileReport('tests/FooTest.php', 2, 3, [], [])]);
+
+    expect($output->fetch())->toContain('Every test case covers a line no other test case covers.');
 });
 
 it('prints the covering-side tokens that made the action review in the text report', function (): void {
@@ -118,6 +131,36 @@ it('prints the lines only the union of the covering tests reaches in the text re
 
     expect($display)->toContain("differs by: \n    union only lines: src/Foo.php:12, src/Foo.php:15")
         ->and($display)->not->toContain('No new value or call');
+});
+
+it('names a skipped test file in the text report instead of reporting its coverage', function (): void {
+    $output = new BufferedOutput();
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([FileReport::skipped('tests/OneTest.php')]);
+
+    $display = $output->fetch();
+
+    expect($display)->toContain('tests/OneTest.php')
+        ->toContain('Skipped: the file declares one test case and no dataset, so no other test case of the file can cover it.')
+        ->and($display)->not->toContain('Covered lines')
+        ->and($display)->not->toContain('Every test case covers a line no other test case covers.');
+});
+
+it('counts a skipped test file in the summary without a warning about its source lines', function (): void {
+    $project = pestProject();
+    $tester = command($project, 'analyse');
+
+    $tester->execute(['paths' => ['tests']], ['capture_stderr_separately' => true]);
+    $report = decodedJson($tester->getDisplay());
+
+    expect($tester->getErrorOutput())->toBe('')
+        ->and(valueAt($report, 'summary.testFiles'))->toBe(2)
+        ->and(valueAt($report, 'summary.testCases'))->toBe(7)
+        ->and(valueAt($report, 'summary.skippedFiles'))->toBe(1)
+        ->and(valueAt($report, 'summary.candidates'))->toBe(3)
+        ->and(array_column((array) valueAt($report, 'files'), 'file'))->toBe(['tests/CalculatorTest.php']);
+
+    removeDirectory($project);
 });
 
 it('reports when no test file changed', function (): void {
@@ -205,6 +248,13 @@ it('runs the binary with an option and no path', function (): void {
 
 it('verifies that no covered source line was lost', function (): void {
     $project = pestProject();
+    file_put_contents($project . '/tests/OtherCalculatorTest.php', <<<'PHP'
+
+
+        test('divide returns another float', function (): void {
+            expect((new Calculator())->divide(9, 3))->toBe(3.0);
+        });
+        PHP, FILE_APPEND);
     command($project, 'analyse')->execute(['paths' => ['tests']]);
     $calculatorTest = $project . '/tests/CalculatorTest.php';
     $original = (string) file_get_contents($calculatorTest);
