@@ -143,9 +143,7 @@ final class TokenCollector
         $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
 
         foreach ($pathNodes as $pathNode) {
-            $segments = $pathNode instanceof ArrayItem
-                ? self::keySegments($nodeFinder, $pathNode)
-                : self::argumentSegments($nodeFinder, $pathNode);
+            $segments = $pathNode instanceof ArrayItem ? self::keySegments($nodeFinder, $pathNode) : self::argumentSegments($pathNode);
 
             foreach ($segments as $nodeId => $segment) {
                 $paths[$nodeId][] = $segment;
@@ -168,7 +166,7 @@ final class TokenCollector
     /**
      * @return array<int, string>
      */
-    private static function argumentSegments(NodeFinder $nodeFinder, Node $call): array
+    private static function argumentSegments(Node $call): array
     {
         $callToken = self::token($call);
         $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
@@ -178,7 +176,7 @@ final class TokenCollector
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
                 $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
-                $segments += array_fill_keys(self::argumentValueIds($nodeFinder, $argument->value, $isAssertion), $segment);
+                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion), $segment);
             }
         }
 
@@ -186,16 +184,25 @@ final class TokenCollector
     }
 
     /**
-     * @return array<int>
+     * @return list<int>
      */
-    private static function argumentValueIds(NodeFinder $nodeFinder, Expr $argument, bool $isAssertion): array
+    private static function argumentValueIds(Expr $value, bool $isAssertion): array
     {
-        $nestedCalls = $isAssertion ? $nodeFinder->findInstanceOf($argument, CallLike::class) : [];
+        $passedValues = match (true) {
+            $value instanceof Array_ => array_map(static fn (ArrayItem $item): Expr => $item->value, $value->items),
+            $value instanceof CallLike && !$isAssertion => array_map(
+                static fn (Arg $argument): Expr => $argument->value,
+                array_filter($value->getRawArgs(), static fn (Node $argument): bool => $argument instanceof Arg),
+            ),
+            default => [],
+        };
 
-        return array_diff(
-            self::nodeIds($nodeFinder, $argument),
-            ...array_map(static fn (CallLike $call): array => self::nodeIds($nodeFinder, $call), $nestedCalls),
+        $passedValueIds = array_map(
+            static fn (Expr $passedValue): array => self::argumentValueIds($passedValue, $isAssertion),
+            array_values($passedValues),
         );
+
+        return [spl_object_id($value), ...array_merge([], ...$passedValueIds)];
     }
 
     /**

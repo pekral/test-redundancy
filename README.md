@@ -204,13 +204,14 @@ test lacks.
   passed straight to a call carries the call and the position before the key, e.g.
   `in:function:store#0/value:'enabled'/value:false` for `store(['enabled' => false])`, so the same array at swapped
   positions is a different token.
-- **Enclosing calls.** A value anywhere inside an argument carries every enclosing call and array key, outermost
-  first. `json_encode(json_encode(['test' => true]))` has the token
+- **Enclosing calls.** A value that an argument passes on through an array or a nested call carries every enclosing
+  call and array key, outermost first. `json_encode(json_encode(['test' => true]))` has the token
   `in:function:json_encode#0/function:json_encode#0/value:'test'/value:true`, and `json_encode(['test' => true])` has
   `in:function:json_encode#0/value:'test'/value:true`, so a value passed through one more call is a different token.
   An assertion, such as a Pest expectation (`expect`, `toBe`) or a PHPUnit `assert*` or `expect*` call, is left out
   of the path of a value that reaches it through another call: `expect(add(1, 2))` has the token
-  `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`.
+  `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`. An operand of an operator, a cast or a closure body
+  keeps no call path: `store(1 + 2)` has the tokens `value:1` and `value:2`.
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
   method. A literal, constant, empty array, list or map in a row is counted where the test reads that
   parameter: the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as

@@ -210,8 +210,8 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'literal inside an argument' => ['store([true], 1 + 2);', [
         'function:store' => 1,
         'in:function:store#0/value:true' => 1,
-        'in:function:store#1/value:1' => 1,
-        'in:function:store#1/value:2' => 1,
+        'value:1' => 1,
+        'value:2' => 1,
     ],
     ],
     'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],

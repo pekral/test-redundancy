@@ -944,6 +944,36 @@ it('does not delete a dataset row whose value a sibling row passes through one m
         ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
+it('does not delete a test whose covering test passes its literal only as part of a larger argument expression', function (
+    string $coveringArgument,
+    string $literal,
+): void {
+    $report = analyzeTokenTest(
+        source: <<<PHP
+            <?php
+            it('passes the literal', function (): void {
+                expect(foo({$literal}))->toBeTrue();
+            });
+            it('passes the literal in an expression', function (): void {
+                \$suffix = suffix();
+                expect(foo({$coveringArgument}))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it passes the literal' => ['src/Foo.php:5'],
+            'it passes the literal in an expression' => ['src/Foo.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it passes the literal')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/value:' . $literal])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'addition' => ['1 + $suffix', '1'],
+    'concatenation' => ['\'a\' . $suffix', '\'a\''],
+]);
+
 it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
