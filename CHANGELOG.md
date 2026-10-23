@@ -40,6 +40,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   uses more times than the covering test appears in `differsBy`, so a test that differs only by repeating a value is
   no longer reported as `delete`. The count is the number of places the token appears in the test source, so a call
   inside a loop body counts once (#17).
+- A Pest assertion written as a property, without parentheses (`expect($x)->toBeEmpty`, `expect($x)->not->toBeEmpty`),
+  now carries the same token as its call form (`call:toBeEmpty`, `not:call:toBeEmpty`) in the contract fingerprint.
+  Only a property fetch on an `expect()` chain whose name is a method of Pest's `Expectation` is collected; a plain
+  object property and a higher-order property such as `expect($user)->name` carry no token (#21).
 
 ## [0.1] - 2026-10-22
 
