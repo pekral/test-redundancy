@@ -178,14 +178,17 @@ test lacks.
   name instead of the position, e.g. `in:function:store#enabled/value:true`. An element of a list passed straight to a
   call carries the same path, e.g. `in:function:store#0/value:'a'` for `store(['a'])`.
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
-  method. A literal, constant or empty array in a row is counted where the test reads that parameter: the row
-  `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as `expect(add(1, 2))->toBe(3)`. Any
-  other row value, such as `new Contact()`, is counted once, as the row has it, however many times the test reads the
-  parameter. A row
-  value whose parameter the test never reads by its name keeps its token without a path.
-- **Local variables.** A literal, constant or empty array that the test assigns once to a local variable in its own
-  statements is counted where the test reads the variable: `$email = 'a@example.com'; notify($email);` has the same
-  tokens as `notify('a@example.com')`. A variable the test writes more than once keeps its tokens without a path.
+  method. A literal, constant, empty array or list of them in a row is counted where the test reads that parameter:
+  the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as
+  `expect(add(1, 2))->toBe(3)`, and the row `[['id', 'tags']]` of `load($columns)` has the same tokens as
+  `load(['id', 'tags'])`. A list is an array whose elements have no key and are each a literal, constant or empty
+  array. Any other row value, such as `new Contact()` or `['id' => 5]`, is counted once, as the row has it, however
+  many times the test reads the parameter. A row value whose parameter the test never reads by its name keeps its
+  token without a path.
+- **Local variables.** A literal, constant, empty array or list of them that the test assigns once to a local variable
+  in its own statements is counted where the test reads the variable: `$email = 'a@example.com'; notify($email);` has
+  the same tokens as `notify('a@example.com')`, and `$columns = ['id', 'tags']; load($columns);` has the same tokens
+  as `load(['id', 'tags'])`. A variable the test writes more than once keeps its tokens without a path.
 
 ### Verifying that coverage stayed
 

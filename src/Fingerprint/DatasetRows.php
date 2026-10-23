@@ -140,7 +140,7 @@ final class DatasetRows
     {
         $expression = $statement instanceof Expression ? $statement->expr : null;
 
-        return $expression instanceof Assign && TokenCollector::isData($expression->expr) ? $expression : null;
+        return $expression instanceof Assign && self::isBindable($expression->expr) ? $expression : null;
     }
 
     /**
@@ -188,9 +188,18 @@ final class DatasetRows
             || $item->unpack
             || $parameter === null
             || $parameter->variadic
-            || !TokenCollector::isData($item->value);
+            || !self::isBindable($item->value);
 
         return self::variableName($isUnbindable ? null : $parameter->var);
+    }
+
+    private static function isBindable(Expr $value): bool
+    {
+        $isDataList = $value instanceof Array_
+            && $value->items !== []
+            && array_all($value->items, static fn (ArrayItem $item): bool => $item->key === null && TokenCollector::isData($item->value));
+
+        return TokenCollector::isData($value) || $isDataList;
     }
 
     private static function variableName(?Node $node): ?string

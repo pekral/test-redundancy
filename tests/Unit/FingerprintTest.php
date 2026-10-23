@@ -295,10 +295,18 @@ it('counts a literal a test assigns once to a local variable where the test read
         '$email = \'a\'; $notify = function () use ($email): void { notify($email); };',
         ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1],
     ],
+    'variable assigned a list with an object and read twice' => [
+        '$contacts = [new Contact()]; notify($contacts); notify($contacts);',
+        ['function:notify' => 2, 'new:Contact' => 1],
+    ],
     'variable assigned a literal once' => ['$email = \'a\'; notify($email);', ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1]],
     'variable assigned a literal twice' => [
         '$email = \'a\'; $email = \'b\'; notify($email);',
         ['function:notify' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
+    ],
+    'variable assigned an array with a key and read twice' => [
+        '$data = [\'id\' => 5]; notify($data); notify($data);',
+        ['function:notify' => 2, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1],
     ],
     'variable assigned an object' => ['$contact = new Contact(); notify($contact);', ['function:notify' => 1, 'new:Contact' => 1]],
     'variable the test appends to' => [
