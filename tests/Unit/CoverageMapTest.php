@@ -64,3 +64,31 @@ it('fails on a broken coverage baseline', function (): void {
 
     removeDirectory($directory);
 });
+
+function filesystemAcceptsRawBytesInNames(): bool
+{
+    $root = temporaryDirectory();
+    set_error_handler(static fn (): bool => true);
+    $created = touch($root . "/caf\xE9.txt");
+    restore_error_handler();
+    removeDirectory($root);
+
+    return $created;
+}
+
+it('hashes a support file whose name is not valid UTF-8', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests/fixtures', recursive: true);
+    touch($root . '/tests/ATest.php');
+    touch($root . "/tests/fixtures/caf\xE9.txt");
+
+    $testsByFile = ['tests/ATest.php' => ['tests/ATest.php :: it a' => ['src/A.php:1' => true]]];
+    $baseline = CoverageBaseline::fromTestsByFile($testsByFile, false, $root);
+    file_put_contents($root . "/tests/fixtures/caf\xE9.txt", 'changed');
+    $changed = CoverageBaseline::fromTestsByFile($testsByFile, false, $root);
+
+    expect($baseline->supportHash)->not->toBe('')
+        ->and($changed->supportHash)->not->toBe($baseline->supportHash);
+
+    removeDirectory($root);
+})->skip(fn (): bool => !filesystemAcceptsRawBytesInNames(), 'The filesystem rejects a file name that is not valid UTF-8.');
