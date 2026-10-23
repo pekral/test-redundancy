@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   closure source as `nikic/php-parser` prints it. Two rows whose closures have different bodies differ in `differsBy`,
   so such a row is no longer reported with the action `delete` against its sibling row. Two closures that differ only
   in formatting still have the same token (#57).
+- A dataset row whose value is a map of literals, such as `['listId' => 1, 'store' => 'shop']`, now carries the
+  position of the parameter it binds to and, through it, the argument position of the call it reaches, such as
+  `in:function:changedKeys#1/value:'store'/value:'shop'`. The same holds for a map written inline in a call. Two rows
+  that swap the same maps between two arguments differ in `differsBy`, so such a row is no longer reported with the
+  action `delete` against its sibling row (#58).
 
 ## [0.1.2] - 2026-10-23
 
