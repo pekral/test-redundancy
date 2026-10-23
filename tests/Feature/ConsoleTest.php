@@ -351,6 +351,7 @@ it('reports a lost line as lost when a test support file changed since analyse',
     removeDirectory($project);
 })->with([
     'added' => static fn (string $project): int|bool => file_put_contents($project . '/tests/Datasets.php', "<?php\n"),
+    'added dot file' => static fn (string $project): int|bool => file_put_contents($project . '/tests/.env.testing', "APP_ENV=testing\n"),
     'deleted' => static fn (string $project): bool => unlink($project . '/tests/Pest.php'),
     'edited' => static fn (string $project): int|bool => file_put_contents(
         $project . '/tests/Pest.php',
