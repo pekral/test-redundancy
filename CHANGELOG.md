@@ -17,7 +17,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop now carries a
   `loop:` prefix in the contract fingerprint (`loop:call:Batch::import`), because the fingerprint cannot count how many
   times the loop runs. A test that makes the call in a loop against one that makes it once is reported with the action
-  `review` instead of `merge-into-dataset` (#33).
+  `review` instead of `merge-into-dataset` (#33). A test that makes the call once, covered by a test that makes it in a
+  loop, is reported with the action `review` instead of `delete`.
 - `verify` no longer lists a line in `lostLines` and says to restore a test when no covering test file changed. `analyse`
   stores a hash of each analysed test file in the baseline. A lost line whose covering test files are all unchanged is
   reported in the new `unstableLines`, with an instruction not to restore a test, and `verify` exits with `0`. A baseline
