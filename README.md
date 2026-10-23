@@ -93,7 +93,7 @@ Several paths, such as the files a branch changes, are split into up to `process
 each with its own `TEST_TOKEN`. Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
 group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
-stored time the files are split round-robin. The split changes how long the run takes, never the report or the baseline.
+stored time the files are split round-robin. The split changes how long the run takes. For tests that share no state inside one process it never changes the report or the baseline; a test whose coverage depends on what an earlier test file in the same group already ran, such as a static cache, can cover other lines in another group.
 Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
 between runs. `vendor/bin/test-redundancy analyse --help` lists every option.
 
