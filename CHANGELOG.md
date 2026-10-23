@@ -31,6 +31,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `differsBy` is the smallest difference against one covering test, not against the union of all covering tests.
   A candidate whose values each appear in some covering test, but never together in one, is reported with the action
   `review` instead of `delete` (#15).
+- An empty array literal `[]` now carries the token `value:[]` in the contract fingerprint, so a test or dataset row
+  that differs from its covering test only by passing `[]` is reported with `differsBy: ["value:[]"]` instead of
+  `differsBy: []` and the action `delete`. Any number of empty or nested empty arrays adds the token once (#16).
 
 ## [0.1] - 2026-10-22
 
