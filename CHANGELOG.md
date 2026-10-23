@@ -6,8 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-24
+
 ### Changed
 
+- The concurrent groups of a coverage run are balanced by the time of each test file instead of round-robin. Every run
+  stores the time of each test file from its JUnit log in `.test-redundancy/durations.json`. The next run puts the
+  longest file first and every file into the group with the smallest total; a file without a stored time goes first,
+  and without any stored time the files are split round-robin as before. For tests that share no state inside one
+  process the report and the baseline stay the same (#54).
 - `analyse` without `--across` does not run a test file that declares exactly one test case and no dataset, because
   such a file can never hold a candidate. A file with a dataset (`->with()`, `->repeat()`, `#[DataProvider]`,
   `#[TestWith]`, `@dataProvider`, `@testWith`), a named or shared dataset, or a test case the parser cannot resolve
@@ -22,6 +29,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A candidate without an assertion is reported with the action `review` instead of `delete` when its covering test
+  arranges more input, such as a call, function, `new` expression or value that the candidate lacks. The tokens are
+  listed in `coveringDiffersBy`, and a step asks whether the empty or missing input is a case of its own. An assertion
+  and a value passed only to an assertion do not count (#60).
 - A dataset row whose value is a closure or an arrow function carries the token `value:closure:<hash>`, a hash of the
   closure source as `nikic/php-parser` prints it. Two rows whose closures have different bodies differ in `differsBy`,
   so such a row is no longer reported with the action `delete` against its sibling row. Two closures that differ only
@@ -184,7 +195,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.2...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.3...HEAD
+[0.1.3]: https://github.com/pekral/test-redundancy/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/pekral/test-redundancy/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/pekral/test-redundancy/compare/0.1...0.1.1
 [0.1]: https://github.com/pekral/test-redundancy/releases/tag/0.1
