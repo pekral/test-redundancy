@@ -752,6 +752,75 @@ it('asks for a review of a test that passes the code under test a list without a
         ->and(valueAt($candidates, 'it does not duplicate the email column when it is already requested.action'))->toBe('delete');
 });
 
+it('asks for a review of a test that passes a list through a local variable or a dataset row without an element its covering test passes', function (
+    FileReport $report,
+    string $test,
+    string $covering,
+): void {
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe($test)
+        ->and($report->candidates[0]->coveredBy)->toBe([$covering])
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['in:call:getByListIdAndLastId#4/value:\'email\''])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'list in a dataset row' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('loads the subscriber relation with the requested columns', function (array $columns): void {
+                    $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], $columns);
+
+                    expect($connections[0]->subscriber->email)->toBe('owner@example.com');
+                })->with(['without email' => [['id', 'tags']], 'with email' => [['id', 'email', 'tags']]]);
+                PHP,
+            linesByTest: [
+                'it loads the subscriber relation with the requested columns › with email' => [
+                    'src/Repository.php:788',
+                    'src/Repository.php:790',
+                    'src/Repository.php:791',
+                ],
+                'it loads the subscriber relation with the requested columns › without email' => [
+                    'src/Repository.php:788',
+                    'src/Repository.php:790',
+                ],
+            ],
+        ),
+        'it loads the subscriber relation with the requested columns › without email',
+        'it loads the subscriber relation with the requested columns › with email',
+    ],
+    'list in a local variable' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('forces the email column even when it is omitted from the subscriber columns', function (): void {
+                    $columns = ['id', 'tags'];
+                    $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], $columns);
+
+                    expect($connections[0]->subscriber->email)->toBe('owner@example.com');
+                });
+                it('loads the subscriber relation with the requested columns', function (): void {
+                    $columns = ['id', 'email', 'tags'];
+                    $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], $columns);
+
+                    expect($connections[0]->subscriber->email)->toBe('owner@example.com')
+                        ->and($connections[0]->subscriber->tags)->toBe('vip');
+                });
+                PHP,
+            linesByTest: [
+                'it forces the email column even when it is omitted from the subscriber columns' => ['src/Repository.php:788', 'src/Repository.php:790'],
+                'it loads the subscriber relation with the requested columns' => [
+                    'src/Repository.php:788',
+                    'src/Repository.php:790',
+                    'src/Repository.php:791',
+                ],
+            ],
+        ),
+        'it forces the email column even when it is omitted from the subscriber columns',
+        'it loads the subscriber relation with the requested columns',
+    ],
+]);
+
 it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
     FileReport $report,
     string $test,

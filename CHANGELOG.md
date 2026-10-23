@@ -33,6 +33,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   list without an element is told apart from the full list. A value the covering test passes only to an assertion,
   such as `toBe`, `assert*` or `expect*`, keeps the action `delete`, so a test such as `add(1, 2)` covered by the
   dataset row `[1, 2, 3]` is still reported with the action `delete` (#47).
+- A list of literals that reaches the code under test through a local variable the test assigns once, or through a
+  dataset row, now carries the call path its elements carry when the list is written inline in the call, such as
+  `in:call:getByListIdAndLastId#4/value:'email'`. A candidate whose list lacks an element the covering test passes in
+  the same way is reported with the action `review`, and `coveringDiffersBy` names the element. Before, both forms got
+  `differsBy: []` and the action `delete` (#51).
 
 ## [0.1.1] - 2026-10-23
 
