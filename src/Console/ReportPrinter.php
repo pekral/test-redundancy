@@ -76,12 +76,15 @@ final readonly class ReportPrinter
 
     private function describe(Candidate $candidate): string
     {
+        $coveringTokens = $candidate->coveringTokensForReview();
+
         return sprintf(
-            "%s\n    action: %s\n    covered by:\n      - %s\n    differs by: %s",
+            "%s\n    action: %s\n    covered by:\n      - %s\n    differs by: %s%s",
             $candidate->testCase(),
             $candidate->action()->value,
             implode("\n      - ", $candidate->coveredBy),
             $candidate->differsBy === null ? self::UNPARSED : implode(', ', $candidate->differsBy),
+            $coveringTokens === [] ? '' : "\n    covering differs by: " . implode(', ', $coveringTokens),
         );
     }
 

@@ -52,6 +52,29 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null), Action::Review],
 ]);
 
+it('reports the covering-side tokens that made the action review', function (Candidate $candidate, array $coveringDiffersBy): void {
+    expect(valueAt(decodedJson((string) json_encode($candidate)), 'coveringDiffersBy'))->toBe($coveringDiffersBy);
+})->with([
+    'call and new in the covering test' => [
+        candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money']),
+        ['call:forget', 'new:Money'],
+    ],
+    'call in a sibling row' => [candidate('it works › a', ['it works › b'], ['value:1'], ['new:Money']), []],
+    'call in both tests' => [candidate('it works', ['it also works'], ['call:toThrow'], ['call:forget']), []],
+    'call in one of two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1'], ['call:forget']), []],
+    'call in the covering test of a test that adds nothing' => [candidate('it works', ['it also works'], [], ['call:forget']), []],
+    'data in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2']), []],
+    'unparsed' => [candidate('it works', ['it also works'], differsBy: null, coveringDiffersBy: null), []],
+]);
+
+it('names the covering-side tokens in the review steps', function (): void {
+    $steps = candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money'])->steps();
+
+    expect($steps)->toHaveCount(4)
+        ->and($steps[1])->toContain('coveringDiffersBy (call:forget, new:Money)')
+        ->and($steps[3])->toBe(Action::VERIFY_STEP);
+});
+
 it('names every covering test, or the sibling row, in the first step', function (Candidate $candidate, string $firstStep): void {
     expect($candidate->steps()[0])->toBe($firstStep);
 })->with([
@@ -85,8 +108,9 @@ it('serializes a candidate and a file report for an agent', function (): void {
                 [
                     'test' => 'it works › empty',
                     'action' => 'review-dataset-row',
-                    'steps' => Action::ReviewDatasetRow->steps('"it works › blank"'),
+                    'steps' => Action::ReviewDatasetRow->steps('"it works › blank"', coveringDiffersBy: []),
                     'coveredBy' => ['it works › blank'],
+                    'coveringDiffersBy' => [],
                     'differsBy' => ['value:\'\''],
                 ],
             ],
@@ -195,7 +219,8 @@ it('asks for a review of a test whose covering test makes a call it does not', f
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:\'<html><body><h1>Test</h1></body></html>\''])
-        ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Review)
+        ->and($reports[0]->candidates[0]->coveringTokensForReview())->toBe(['call:forget']);
 });
 
 it('asks for a review of a test whose values each appear in a covering test but never together', function (): void {
@@ -451,7 +476,7 @@ it('compares with tests of other files from the map', function (): void {
 });
 
 it('gives every action concrete steps that end with verify', function (Action $action): void {
-    $steps = $action->steps('it covers');
+    $steps = $action->steps('it covers', coveringDiffersBy: []);
 
     expect($steps)->toHaveCount(3)
         ->and($steps[2])->toBe(Action::VERIFY_STEP);

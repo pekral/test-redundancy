@@ -105,6 +105,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
         {
           "action": "merge-into-dataset",
           "coveredBy": ["it adds two numbers › negative numbers"],
+          "coveringDiffersBy": [],
           "differsBy": ["value:0", "value:5"],
           "steps": [
             "Turn \"it adds two numbers › negative numbers\" into one test with a dataset and add a row with the values in differsBy.",
@@ -140,6 +141,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
 | `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and the covering test that lacks the fewest of them lacks. The fingerprint counts each token, so a token the candidate uses more times than the covering test is listed too. The count is the number of places the token appears in the test source: a call inside a loop body counts once. With several covering tests, `differsBy` is the smallest difference against one of them, never against their union. A call made through Pest's `->not` or `->not()` carries a `not:` prefix, e.g. `not:call:toBeEmpty`. A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`, carries the token of its call form. An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `['enabled' => false]`, so the same literal under another key, or in a list without a key, is a different token. An empty array literal `[]` carries the token `value:[]`. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
+| `coveringDiffersBy` | The calls, functions and `new` expressions that made the action `review` although `differsBy` holds only data: the candidate differs only in data from one test of the same file, and that test has them, or has them more times, while the candidate lacks them. The `review` steps name them. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file, and that test has no call, function or `new` expression this test lacks or uses fewer times; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, or could not be parsed. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
