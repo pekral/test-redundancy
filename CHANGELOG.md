@@ -12,8 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   such a file can never hold a candidate. A file with a dataset (`->with()`, `->repeat()`, `#[DataProvider]`,
   `#[TestWith]`, `@dataProvider`, `@testWith`), a named or shared dataset, or a test case the parser cannot resolve
   still runs. A skipped file counts in `summary.testFiles` and `summary.testCases`, `summary.skippedFiles` counts it,
-  and it is not in the baseline, so `verify` reports no `lostLines` or `missingTestFiles` for it. The candidates of
-  every other file stay the same. `--across` and `map` run every file (#56).
+  and it stays in the baseline without lines, so `verify` still runs it and lists a deleted skipped file in
+  `missingTestFiles`. The candidates of every other file stay the same. `--across` and `map` run every file (#56).
 - With `pcov`, the coverage run instruments only the `source` directories. `pcov.directory` is the one `source`
   directory, or the deepest directory that holds all of them, and `pcov.exclude` keeps out `vendor/` and what lies
   under that directory outside the `source`. Before, `pcov` instrumented every PHP file under the project root, such

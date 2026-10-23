@@ -61,7 +61,7 @@ final readonly class TestRedundancy
         $analysed = array_values(array_diff($testFiles, $skipped));
         $runPaths = $skipped === [] && count($requestedPaths) === 1 ? $requestedPaths : $analysed;
         $testsByFile = $this->testsByFile($analysed, $analysed === [] ? [] : $this->linesByTest($runPaths));
-        $this->saveBaseline($testsByFile, across: false);
+        $this->saveBaseline([...array_fill_keys($testFiles, []), ...$testsByFile], across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
         $reports = [];
 

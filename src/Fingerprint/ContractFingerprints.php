@@ -15,9 +15,7 @@ final class ContractFingerprints
      */
     public static function of(string $testFile): array
     {
-        $statements = self::statements($testFile);
-
-        return [...PestFingerprints::of($statements), ...PhpUnitFingerprints::of($statements)];
+        return self::fingerprintsOf(self::statements($testFile));
     }
 
     public static function declaresSingleTestCase(string $testFile): bool
@@ -32,9 +30,18 @@ final class ContractFingerprints
             return false;
         }
 
-        return count([...PestFingerprints::of($statements), ...PhpUnitFingerprints::of($statements)]) === 1
+        return count(self::fingerprintsOf($statements)) === 1
             && PestFingerprints::declaresOnlyFingerprintedTests($statements)
             && !PhpUnitFingerprints::declaresDataset($statements);
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     * @return array<string, array<string, int>>
+     */
+    private static function fingerprintsOf(array $statements): array
+    {
+        return [...PestFingerprints::of($statements), ...PhpUnitFingerprints::of($statements)];
     }
 
     /**
