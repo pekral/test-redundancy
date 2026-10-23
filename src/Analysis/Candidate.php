@@ -5,12 +5,11 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use JsonSerializable;
+use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Support\TestKey;
 
 final readonly class Candidate implements JsonSerializable
 {
-
-    private const string DATA_TOKEN_PATTERN = '/^(key:)?(value|const):/';
 
     /**
      * @param list<string> $coveredBy
@@ -83,7 +82,7 @@ final readonly class Candidate implements JsonSerializable
     private function isDataOnly(array $tokens): bool
     {
         foreach ($tokens as $token) {
-            if (preg_match(self::DATA_TOKEN_PATTERN, $token) !== 1) {
+            if (preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) !== 1) {
                 return false;
             }
         }

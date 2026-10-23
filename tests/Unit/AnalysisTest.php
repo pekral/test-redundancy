@@ -34,6 +34,10 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'data in both tests' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
+    'literal under a key in both tests' => [
+        candidate('it works', ['it also works'], ['in:value:\'a/b\'/value:false'], ['in:value:\'c\'/value:\'x\'/const:Foo::BAR']),
+        Action::MergeIntoDataset,
+    ],
     'new call' => [candidate('it works', ['it also works'], ['call:toThrow']), Action::Review],
     'nothing new' => [candidate('it works', ['it also works'], []), Action::Delete],
     'one test of the same file' => [candidate('it works', ['it also works'], ['value:1', 'const:Foo::BAR']), Action::MergeIntoDataset],
@@ -287,6 +291,55 @@ it('keeps a test that adds only an empty array to its covering test', function (
     ],
 ]);
 
+it('keeps a dataset row whose literal the covering row has only under an unrelated key', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/ToggleTest.php', <<<'PHP'
+        <?php
+        it('toggles', function (mixed $input, mixed $expected): void {
+            expect(toggle($input))->toBe($expected);
+        })->with([
+            'plain false' => [false, false],
+            'false under a key' => [['enabled' => false], ['enabled' => false]],
+        ]);
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/ToggleTest.php' => [
+        'tests/ToggleTest.php :: it toggles › plain false' => ['src/Toggle.php:10' => true],
+        'tests/ToggleTest.php :: it toggles › false under a key' => ['src/Toggle.php:10' => true, 'src/Toggle.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/ToggleTest.php :: it toggles › plain false')
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:false'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+});
+
+it('still deletes a dataset row whose literal sits under the same key as in the covering row', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/ToggleTest.php', <<<'PHP'
+        <?php
+        it('toggles', function (mixed $input, mixed $expected): void {
+            expect(toggle($input))->toBe($expected);
+        })->with([
+            'first false' => [['enabled' => false], ['enabled' => false]],
+            'second false' => [['enabled' => false], ['enabled' => false], 'extra'],
+        ]);
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/ToggleTest.php' => [
+        'tests/ToggleTest.php :: it toggles › first false' => ['src/Toggle.php:10' => true],
+        'tests/ToggleTest.php :: it toggles › second false' => ['src/Toggle.php:10' => true, 'src/Toggle.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe([])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
+});
+
 it('asks for a review only when a test makes a call or creates an object a different number of times than its covering test', function (
     string $source,
     string $test,
@@ -330,7 +383,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it deactivates a contact unsubscribed from its only subscribed list',
         'it activates an inactive contact still subscribed in another list',
-        ['value:-1'],
+        ['in:value:\'active\'/value:1', 'value:-1'],
         Action::Review,
     ],
     'an address stored twice against once' => [
