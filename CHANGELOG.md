@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-23
+
 ### Added
 
 - `coveringDiffersBy` in the JSON report and `covering differs by` in the text report list the calls, functions and
@@ -105,5 +107,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/pekral/test-redundancy/compare/0.1...0.1.1
 [0.1]: https://github.com/pekral/test-redundancy/releases/tag/0.1
