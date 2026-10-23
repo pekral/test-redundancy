@@ -44,8 +44,10 @@ final class PhpUnitFingerprints
 
             $provider = self::dataProviderName($method);
             $rows = $provider === null ? [] : self::providerRows($class->getMethod($provider));
-            $body = TokenCollector::collect($method->stmts);
-            $fingerprints = [...$fingerprints, ...DatasetRows::fingerprints($method->name->toString(), $body, $rows)];
+            $fingerprints = [
+                ...$fingerprints,
+                ...DatasetRows::fingerprints($method->name->toString(), $method->stmts ?? [], $method->params, $rows),
+            ];
         }
 
         return $fingerprints;

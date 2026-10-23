@@ -7,9 +7,11 @@ namespace Pekral\TestRedundancy\Fingerprint;
 use Pest\Expectation;
 use Pest\Mixins\Expectation as ExpectationMixin;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
@@ -45,7 +47,7 @@ final class TokenCollector
         $nodeFinder = new NodeFinder();
         $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
         $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
-        $keyPaths = self::keyPaths($nodeFinder, $nodes);
+        $paths = self::paths($nodeFinder, $nodes);
         $loopBodies = self::loopBodies($nodeFinder, $nodes);
         $tokens = [];
 
@@ -56,7 +58,7 @@ final class TokenCollector
                 continue;
             }
 
-            $prefixedToken = self::prefix($arrayKeys, $keyPaths, $node, $token) . $token;
+            $prefixedToken = self::prefix($arrayKeys, $paths, $node, $token) . $token;
             $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + 1;
         }
@@ -119,23 +121,58 @@ final class TokenCollector
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @return array<int, list<string>>
      */
-    private static function keyPaths(NodeFinder $nodeFinder, Node|array $nodes): array
+    private static function paths(NodeFinder $nodeFinder, Node|array $nodes): array
     {
-        $keyPaths = [];
+        $paths = [];
+        $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
 
-        foreach ($nodeFinder->findInstanceOf($nodes, ArrayItem::class) as $arrayItem) {
-            $keyToken = $arrayItem->key === null ? null : self::token($arrayItem->key);
+        foreach ($pathNodes as $pathNode) {
+            $segments = $pathNode instanceof ArrayItem ? self::keySegments($nodeFinder, $pathNode) : self::argumentSegments($pathNode);
 
-            if ($keyToken === null) {
-                continue;
-            }
-
-            foreach ($nodeFinder->find($arrayItem->value, static fn (): bool => true) as $node) {
-                $keyPaths[spl_object_id($node)][] = $keyToken;
+            foreach ($segments as $nodeId => $segment) {
+                $paths[$nodeId][] = $segment;
             }
         }
 
-        return $keyPaths;
+        return $paths;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem): array
+    {
+        $keyToken = $arrayItem->key === null ? null : self::token($arrayItem->key);
+
+        if ($keyToken === null) {
+            return [];
+        }
+
+        $segments = [];
+
+        foreach ($nodeFinder->find($arrayItem->value, static fn (): bool => true) as $node) {
+            $segments[spl_object_id($node)] = $keyToken;
+        }
+
+        return $segments;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function argumentSegments(Node $call): array
+    {
+        $callToken = self::token($call);
+        $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
+        $segments = [];
+
+        foreach ($callToken === null ? [] : $arguments as $position => $argument) {
+            if ($argument instanceof Arg) {
+                $segments[spl_object_id($argument->value)] = $callToken . '#' . ($argument->name?->toString() ?? $position);
+            }
+        }
+
+        return $segments;
     }
 
     /**
@@ -195,11 +232,11 @@ final class TokenCollector
 
     /**
      * @param array<int, true> $arrayKeys
-     * @param array<int, list<string>> $keyPaths
+     * @param array<int, list<string>> $paths
      */
-    private static function prefix(array $arrayKeys, array $keyPaths, Node $node, string $token): string
+    private static function prefix(array $arrayKeys, array $paths, Node $node, string $token): string
     {
-        $path = $keyPaths[spl_object_id($node)] ?? null;
+        $path = $paths[spl_object_id($node)] ?? null;
         $isPathedData = $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
 
         return match (true) {

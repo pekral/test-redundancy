@@ -10,6 +10,7 @@ use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
@@ -87,9 +88,17 @@ final readonly class PestFingerprints
         }
 
         $isIt = $call->name instanceof Name && $call->name->toLowerString() === 'it';
-        $body = TokenCollector::sum(TokenCollector::collect(self::argument($call, 1)), $modifierTokens);
+        $test = self::argument($call, 1);
 
-        return DatasetRows::fingerprints($prefix . ($isIt ? 'it ' : '') . $description, $body, $datasetRows);
+        return array_map(
+            static fn (array $tokens): array => TokenCollector::sum($tokens, $modifierTokens),
+            DatasetRows::fingerprints(
+                $prefix . ($isIt ? 'it ' : '') . $description,
+                $test === null ? [] : [$test],
+                $test instanceof FunctionLike ? $test->getParams() : [],
+                $datasetRows,
+            ),
+        );
     }
 
     /**

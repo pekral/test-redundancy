@@ -218,7 +218,10 @@ it('asks for a review of a test whose covering test makes a call it does not', f
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:\'<html><body><h1>Test</h1></body></html>\''])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe([
+            'in:call:put#1/value:\'<html><body><h1>Test</h1></body></html>\'',
+            'in:call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
+        ])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review)
         ->and($reports[0]->candidates[0]->coveringTokensForReview())->toBe(['call:forget']);
 });
@@ -251,7 +254,7 @@ it('asks for a review of a test whose values each appear in a covering test but 
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toHaveCount(2)
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:2'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:dispatch#1/value:2'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -289,7 +292,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'can tags be stored › empty tags',
         'can tags be stored › allowed overlimit tag prefix without suffix',
-        ['value:[]'],
+        ['in:call:canTagsBeStored#1/value:[]'],
         Action::ReviewDatasetRow,
     ],
     'nested empty tags in a dataset row' => [
@@ -346,7 +349,7 @@ it('keeps a dataset row whose literal the covering row has only under an unrelat
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/ToggleTest.php :: it toggles › plain false')
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:false'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:toggle#0/value:false', 'in:call:toBe#0/value:false'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
@@ -399,6 +402,191 @@ it('still deletes a dataset row whose literal sits under the same key as in the 
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 });
 
+it('keeps a dataset row whose literals a sibling row has at swapped positions', function (string $source, array $differsBy): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/NotifyTest.php', $source);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/NotifyTest.php' => [
+        'tests/NotifyTest.php :: it notifies › first' => ['src/Notifier.php:10' => true],
+        'tests/NotifyTest.php :: it notifies › second' => ['src/Notifier.php:10' => true, 'src/Notifier.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/NotifyTest.php :: it notifies › first')
+        ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+})->with([
+    'swapped addresses passed as arguments' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (?string $subNotify, ?string $unsubNotify, Status $status, bool $expected): void {
+                notify($subNotify, $unsubNotify, $status);
+
+                expect(dispatched())->toBe($expected);
+            })->with([
+                'first' => ['owner@example.com', null, Status::SUBSCRIBED, true],
+                'second' => [null, 'owner@example.com', Status::SUBSCRIBED, true],
+            ]);
+            PHP,
+        ['in:function:notify#0/value:\'owner@example.com\'', 'in:function:notify#1/value:null'],
+    ],
+    'swapped addresses passed under keys' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (?string $subNotify, ?string $unsubNotify, Status $status, bool $expected): void {
+                notify(['sub_notify' => $subNotify, 'unsub_notify' => $unsubNotify], $status);
+
+                expect(dispatched())->toBe($expected);
+            })->with([
+                'first' => ['owner@example.com', null, Status::SUBSCRIBED, true],
+                'second' => [null, 'owner@example.com', Status::SUBSCRIBED, true],
+            ]);
+            PHP,
+        ['in:value:\'sub_notify\'/value:\'owner@example.com\'', 'in:value:\'unsub_notify\'/value:null'],
+    ],
+    'swapped booleans' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (bool $subscribed, bool $expected): void {
+                expect(notify($subscribed))->toBe($expected);
+            })->with([
+                'first' => [false, true],
+                'second' => [true, false],
+            ]);
+            PHP,
+        ['in:function:notify#0/value:false', 'in:call:toBe#0/value:true'],
+    ],
+    'swapped values the test reads without the parameter name' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (bool $subscribed, bool $expected): void {
+                expect(notify(...func_get_args()))->toBeTrue();
+            })->with([
+                'first' => [false, true, 1],
+                'second' => [true, false, 2],
+            ]);
+            PHP,
+        ['value:1'],
+    ],
+]);
+
+it('asks to merge a test whose literal arguments its covering test passes at swapped positions', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/FlagsTest.php', <<<'PHP'
+        <?php
+        it('stores an enabled hidden item', function (): void {
+            store(true, false);
+        });
+        it('stores a disabled visible item', function (): void {
+            store(false, true);
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/FlagsTest.php' => [
+        'tests/FlagsTest.php :: it stores an enabled hidden item' => ['src/Flags.php:10' => true],
+        'tests/FlagsTest.php :: it stores a disabled visible item' => ['src/Flags.php:10' => true, 'src/Flags.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:store#0/value:true', 'in:function:store#1/value:false'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('still deletes a test whose values a dataset row passes to the same arguments', function (string $source, string $test, string $covering): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/CalculatorTest.php', $source);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/CalculatorTest.php' => [
+        'tests/CalculatorTest.php :: ' . $test => ['src/Calculator.php:10' => true],
+        'tests/CalculatorTest.php :: ' . $covering => ['src/Calculator.php:10' => true, 'src/Calculator.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/CalculatorTest.php :: ' . $test)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe([])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
+})->with([
+    'pest dataset row' => [
+        <<<'PHP'
+            <?php
+            it('adds', function (int $first, int $second, int $sum): void {
+                expect(add($first, $second))->toBe($sum);
+            })->with(['one and two' => [1, 2, 3]]);
+            it('adds one and two', function (): void {
+                expect(add(1, 2))->toBe(3);
+            });
+            PHP,
+        'it adds one and two',
+        'it adds › one and two',
+    ],
+    'pest dataset row of one value' => [
+        <<<'PHP'
+            <?php
+            it('doubles', function (int $value): void {
+                expect(double($value))->toBe(4);
+            })->with(['two' => 2]);
+            it('doubles two', function (): void {
+                expect(double(2))->toBe(4);
+            });
+            PHP,
+        'it doubles two',
+        'it doubles › two',
+    ],
+    'pest dataset row whose parameter a closure use, a catch and a static declare again' => [
+        <<<'PHP'
+            <?php
+            it('adds', function (int $first, int $sum): void {
+                $add = function () use ($first): int {
+                    try {
+                        return add($first);
+                    } catch (Throwable $first) {
+                        static $first;
+
+                        return 0;
+                    }
+                };
+
+                expect($add())->toBe($sum);
+            })->with(['one' => [1, 2]]);
+            it('adds one', function (): void {
+                $add = function () use ($first): int {
+                    try {
+                        return add(1);
+                    } catch (Throwable $first) {
+                        static $first;
+
+                        return 0;
+                    }
+                };
+
+                expect($add())->toBe(2);
+            });
+            PHP,
+        'it adds one',
+        'it adds › one',
+    ],
+    'phpunit data provider row' => [
+        <<<'PHP'
+            <?php
+            final class CalculatorTest extends TestCase
+            {
+                #[DataProvider('sums')]
+                public function testAdds(int $first, int $second, int $sum): void { self::assertSame($sum, add($first, $second)); }
+                public static function sums(): iterable { yield 'one and two' => [1, 2, 3]; }
+                public function testAddsOneAndTwo(): void { self::assertSame(3, add(1, 2)); }
+            }
+            PHP,
+        'testAddsOneAndTwo',
+        'testAdds › one and two',
+    ],
+]);
+
 it('asks for a review only when a test makes a call or creates an object a different number of times than its covering test', function (
     string $source,
     string $test,
@@ -442,7 +630,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it deactivates a contact unsubscribed from its only subscribed list',
         'it activates an inactive contact still subscribed in another list',
-        ['in:value:\'active\'/value:1', 'call:Connection::factory', 'value:-1'],
+        ['in:value:\'active\'/value:1', 'call:Connection::factory', 'in:function:expectCounterDelta#0/value:-1'],
         Action::Review,
     ],
     'an address stored twice against once' => [
@@ -460,7 +648,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it stores the same address twice',
         'it stores an address once',
-        ['function:store', 'value:\'a@example.com\'', 'value:1'],
+        ['function:store', 'in:function:store#0/value:\'a@example.com\'', 'in:call:toBe#0/value:1'],
         Action::Review,
     ],
     'one import against the three imports in a loop of the issue' => [
@@ -492,7 +680,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports one batch',
         'it imports three batches',
-        ['value:1'],
+        ['in:call:toBe#0/value:1'],
         Action::Review,
     ],
     'the same value twice against two values' => [
@@ -507,7 +695,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it adds one to one',
         'it adds one to two',
-        ['value:1'],
+        ['in:function:add#1/value:1', 'in:call:toBe#0/value:2'],
         Action::MergeIntoDataset,
     ],
     'the three imports in a loop of the issue against one import' => [
@@ -524,7 +712,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports three batches in a loop',
         'it imports one batch',
-        ['function:range', 'value:1', 'value:3', 'loop:call:Batch::import'],
+        ['function:range', 'in:function:range#0/value:1', 'in:function:range#1/value:3', 'loop:call:Batch::import'],
         Action::Review,
     ],
     'three imports in a loop against one import' => [
@@ -543,7 +731,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports three batches in a loop',
         'it imports one batch',
-        ['value:2', 'value:3', 'loop:call:Batch::import'],
+        ['value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:call:toBe#0/value:3'],
         Action::Review,
     ],
 ]);
