@@ -154,7 +154,7 @@ it('runs several test files as concurrent groups and one path in the runner\'s p
 /**
  * @return array<string, string>
  */
-function workerTokensOf(string $project): array
+function takeWorkerTokens(string $project): array
 {
     $tokens = [];
 
@@ -198,7 +198,7 @@ it('balances the concurrent groups by the durations of the last run without chan
     }
 
     $roundRobin = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
-    $roundRobinTokens = workerTokensOf($project);
+    $roundRobinTokens = takeWorkerTokens($project);
     $roundRobinBaseline = (string) file_get_contents($project . '/.test-redundancy/baseline.json');
     $recorded = json_decode((string) file_get_contents($project . '/.test-redundancy/durations.json'), associative: true);
     file_put_contents($project . '/.test-redundancy/durations.json', (string) json_encode([
@@ -208,7 +208,7 @@ it('balances the concurrent groups by the durations of the last run without chan
     ]));
 
     $balanced = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
-    $balancedTokens = workerTokensOf($project);
+    $balancedTokens = takeWorkerTokens($project);
 
     expect(array_keys(is_array($recorded) ? $recorded : []))->toEqualCanonicalizing($testFiles)
         ->and($roundRobinTokens)->toBe(['Alpha' => '1', 'Beta' => '2', 'Gamma' => '1'])

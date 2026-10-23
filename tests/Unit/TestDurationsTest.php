@@ -93,4 +93,4 @@ it('reads a broken or foreign durations file as empty', function (string $conten
     expect(TestDurations::load($directory . '/durations.json')->split(['a', 'b', 'c'], 2))->toBe([['a', 'c'], ['b']]);
 
     removeDirectory($directory);
-})->with(['not json', '"text"', '{"a": "slow", "b": -1, "c": null}']);
+})->with(['not json', '"text"', '{"a": "slow", "b": -1, "c": null}', '{"a": 1e999}']);

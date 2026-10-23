@@ -20,7 +20,7 @@ final readonly class TestDurations
         $secondsByFile = [];
 
         foreach (is_array($values) ? $values : [] as $file => $seconds) {
-            if ((is_int($seconds) || is_float($seconds)) && $seconds >= 0) {
+            if (self::isDuration($seconds)) {
                 $secondsByFile[(string) $file] = (float) $seconds;
             }
         }
@@ -118,6 +118,14 @@ final readonly class TestDurations
         }
 
         return $lightest;
+    }
+
+    /**
+     * @phpstan-assert-if-true int|float $seconds
+     */
+    private static function isDuration(mixed $seconds): bool
+    {
+        return (is_int($seconds) || is_float($seconds)) && is_finite((float) $seconds) && $seconds >= 0;
     }
 
 }
