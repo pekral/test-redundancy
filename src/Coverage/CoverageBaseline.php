@@ -168,7 +168,7 @@ final readonly class CoverageBaseline
     {
         $path = $projectRoot . DIRECTORY_SEPARATOR . $file;
 
-        return is_file($path) ? hash('sha256', (string) file_get_contents($path)) : '';
+        return is_file($path) ? (string) hash_file('sha256', $path) : '';
     }
 
 }
