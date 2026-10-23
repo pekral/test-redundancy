@@ -275,6 +275,33 @@ it('counts a token of a dataset row together with the same token of the test bod
     expect([$row['in:function:add#0/value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
 });
 
+it('counts a literal a test assigns once to a local variable where the test reads the variable', function (string $body, array $expected): void {
+    $fingerprints = fingerprintsOf('<?php it(\'notifies\', function (string $parameter): void { ' . $body . ' });');
+
+    expect($fingerprints['it notifies'])->toEqual($expected);
+})->with([
+    'parameter the test assigns a literal' => ['$parameter = \'a\'; notify($parameter);', ['function:notify' => 1, 'value:\'a\'' => 1]],
+    'variable a closure captures by reference' => [
+        '$email = \'a\'; $notify = function () use (&$email): void { notify($email); };',
+        ['function:notify' => 1, 'value:\'a\'' => 1],
+    ],
+    'variable a closure captures by value' => [
+        '$email = \'a\'; $notify = function () use ($email): void { notify($email); };',
+        ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1],
+    ],
+    'variable assigned a literal once' => ['$email = \'a\'; notify($email);', ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1]],
+    'variable assigned a literal twice' => [
+        '$email = \'a\'; $email = \'b\'; notify($email);',
+        ['function:notify' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
+    ],
+    'variable assigned an object' => ['$contact = new Contact(); notify($contact);', ['function:notify' => 1, 'new:Contact' => 1]],
+    'variable the test appends to' => [
+        '$emails = []; $emails[] = \'a\'; notify($emails);',
+        ['function:notify' => 1, 'value:\'a\'' => 1, 'value:[]' => 1],
+    ],
+    'variable the test never reads' => ['$email = \'a\'; notify();', ['function:notify' => 1, 'value:\'a\'' => 1]],
+]);
+
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
