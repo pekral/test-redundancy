@@ -176,7 +176,7 @@ final class TokenCollector
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
                 $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
-                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion), $segment);
+                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion, isListItem: false), $segment);
             }
         }
 
@@ -186,20 +186,27 @@ final class TokenCollector
     /**
      * @return list<int>
      */
-    private static function argumentValueIds(Expr $value, bool $isAssertion): array
+    private static function argumentValueIds(Expr $value, bool $isAssertion, bool $isListItem): array
     {
-        $passedValues = match (true) {
-            $value instanceof Array_ => array_map(static fn (ArrayItem $item): Expr => $item->value, $value->items),
-            $value instanceof CallLike && !$isAssertion => array_map(
-                static fn (Arg $argument): Expr => $argument->value,
-                array_filter($value->getRawArgs(), static fn (Node $argument): bool => $argument instanceof Arg),
+        $passedItems = match (true) {
+            $value instanceof Array_ => array_filter(
+                $value->items,
+                static fn (ArrayItem $item): bool => $item->key !== null || !$isListItem,
+            ),
+            $value instanceof CallLike && !$isAssertion => array_filter(
+                $value->getRawArgs(),
+                static fn (Node $argument): bool => $argument instanceof Arg,
             ),
             default => [],
         };
 
         $passedValueIds = array_map(
-            static fn (Expr $passedValue): array => self::argumentValueIds($passedValue, $isAssertion),
-            array_values($passedValues),
+            static fn (ArrayItem|Arg $item): array => self::argumentValueIds(
+                $item->value,
+                $isAssertion,
+                isListItem: $item instanceof ArrayItem && $item->key === null,
+            ),
+            array_values($passedItems),
         );
 
         return [spl_object_id($value), ...array_merge([], ...$passedValueIds)];

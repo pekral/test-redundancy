@@ -24,7 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   differs in `differsBy`, so such a row is no longer reported with the action `delete`. An assertion that receives the
   value through another call stays out of the path, so `expect(add(1, 2))` and `$sum = add(1, 2)` keep the same
   tokens. An operand of an operator, a cast or a closure body keeps no call path, so `foo('a' . $suffix)` does not get
-  the token of `foo('a')` (#59).
+  the token of `foo('a')`. A list item inside another list keeps no call path, so `foo([[1]])` does not get the token
+  of `foo(1)` (#59).
 
 ## [0.1.2] - 2026-10-23
 
