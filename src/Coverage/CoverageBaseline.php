@@ -96,7 +96,7 @@ final readonly class CoverageBaseline
      */
     public function unstableAmong(array $lines, string $projectRoot): array
     {
-        if (self::supportHashOf($projectRoot, $this->testFiles) !== $this->supportHash) {
+        if ($this->supportHashDiffers($projectRoot)) {
             return [];
         }
 
@@ -125,6 +125,11 @@ final readonly class CoverageBaseline
         ));
     }
 
+    public function supportChanged(string $projectRoot): bool
+    {
+        return $this->supportHash !== '' && $this->supportHashDiffers($projectRoot);
+    }
+
     /**
      * @throws \JsonException
      */
@@ -143,6 +148,11 @@ final readonly class CoverageBaseline
             'testFiles' => $this->testFiles,
         ];
         file_put_contents($path, json_encode($baseline, JSON_THROW_ON_ERROR));
+    }
+
+    private function supportHashDiffers(string $projectRoot): bool
+    {
+        return self::supportHashOf($projectRoot, $this->testFiles) !== $this->supportHash;
     }
 
     /**

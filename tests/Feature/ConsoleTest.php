@@ -343,7 +343,10 @@ it('reports a lost line as lost when a test support file changed since analyse',
     expect($verify->getStatusCode())->toBe(1)
         ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
         ->and(valueAt($report, 'unstableLines'))->toBe([])
-        ->and(valueAt($report, 'instruction'))->toContain('Restore the test');
+        ->and(valueAt($report, 'instruction'))->toBe(
+            'Coverage dropped, and a test support file changed since analyse, so the lines in "lostLines" may be lost because of that change '
+            . 'and not because a test was removed. Check the changed support file, then run verify again. Run analyse again when the change is intended.',
+        );
 
     removeDirectory($project);
 })->with([
@@ -370,7 +373,8 @@ it('reports every lost line of a baseline written before test support file hashe
 
     expect($verify->getStatusCode())->toBe(1)
         ->and(valueAt($report, 'lostLines'))->toBe(['src/Calculator.php:17', 'src/Calculator.php:18'])
-        ->and(valueAt($report, 'unstableLines'))->toBe([]);
+        ->and(valueAt($report, 'unstableLines'))->toBe([])
+        ->and(valueAt($report, 'instruction'))->toContain('Restore the test');
 
     removeDirectory($project);
 });
