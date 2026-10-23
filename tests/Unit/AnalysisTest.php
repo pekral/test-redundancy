@@ -533,7 +533,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'it registers no tags › tags is an empty array',
         'it registers no tags › tags contains only blank values',
-        ['in:value:\'tags\'/value:[]'],
+        ['in:function:register#0/value:\'name\'/value:\'Test\'', 'in:function:register#0/value:\'tags\'/value:[]'],
         Action::ReviewDatasetRow,
     ],
     'standalone test with empty custom fields' => [
@@ -548,7 +548,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'it stores a contact without custom fields',
         'it stores a contact with custom fields',
-        ['in:value:\'custom_fields\'/value:[]'],
+        ['in:function:store#0/value:\'custom_fields\'/value:[]'],
         Action::MergeIntoDataset,
     ],
 ]);
@@ -599,7 +599,7 @@ it('keeps a dataset row whose empty array the covering row has only under an unr
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/OptionsTest.php :: it stores options › empty a')
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:value:\'a\'/value:[]'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:store#0/value:\'a\'/value:[]'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
@@ -736,7 +736,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             ],
         ),
         'it refuses to drain a pipeline through the recurring queue › multicast',
-        ['key:value:\'parallel\''],
+        ['key:value:\'parallel\'', 'in:function:pipeline#0/value:\'parallel\'/value:1'],
     ],
 ]);
 
@@ -867,6 +867,30 @@ it('asks for a review of a test that passes a list through a local variable or a
         'it loads the subscriber relation with the requested columns',
     ],
 ]);
+
+it('keeps the rows of a dataset that swap the same literals between two arguments apart', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('lists the changed keys', function (array $previous, array $current, array $expected): void {
+                expect(changedKeys($previous, $current))->toBe($expected);
+            })->with([
+                'a key was added' => [['listId' => 1], ['listId' => 1, 'store' => 'shop'], ['store']],
+                'a key was removed' => [['listId' => 1, 'store' => 'shop'], ['listId' => 1], ['store']],
+            ]);
+            PHP,
+        linesByTest: [
+            'it lists the changed keys › a key was added' => ['src/Changes.php:5', 'src/Changes.php:6'],
+            'it lists the changed keys › a key was removed' => ['src/Changes.php:5', 'src/Changes.php:6'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it lists the changed keys › a key was added')
+        ->and($report->candidates[0]->coveredBy)->toBe(['it lists the changed keys › a key was removed'])
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:changedKeys#1/value:\'store\'/value:\'shop\''])
+        ->and($report->candidates[0]->action())->not->toBe(Action::Delete);
+});
 
 it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
     FileReport $report,
@@ -999,7 +1023,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
                 'second' => [null, 'owner@example.com', Status::SUBSCRIBED, true],
             ]);
             PHP,
-        ['in:value:\'sub_notify\'/value:\'owner@example.com\'', 'in:value:\'unsub_notify\'/value:null'],
+        ['in:function:notify#0/value:\'sub_notify\'/value:\'owner@example.com\'', 'in:function:notify#0/value:\'unsub_notify\'/value:null'],
     ],
     'swapped booleans' => [
         <<<'PHP'
@@ -1204,7 +1228,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it deactivates a contact unsubscribed from its only subscribed list',
         'it activates an inactive contact still subscribed in another list',
-        ['in:value:\'active\'/value:1', 'call:Connection::factory', 'in:function:expectCounterDelta#0/value:-1'],
+        ['in:call:create#0/value:\'active\'/value:1', 'call:Connection::factory', 'in:function:expectCounterDelta#0/value:-1'],
         Action::Review,
     ],
     'an address stored twice against once' => [

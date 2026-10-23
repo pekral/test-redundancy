@@ -203,7 +203,7 @@ final class DatasetRows
             || $item->unpack
             || $parameter === null
             || $parameter->variadic
-            || !self::isBindable($item->value);
+            || !(self::isBindable($item->value) || self::isDataMap($item->value));
 
         return self::variableName($isUnbindable ? null : $parameter->var);
     }
@@ -215,6 +215,15 @@ final class DatasetRows
             && array_all($value->items, static fn (ArrayItem $item): bool => $item->key === null && TokenCollector::isData($item->value));
 
         return TokenCollector::isData($value) || $isDataList;
+    }
+
+    private static function isDataMap(Expr $value): bool
+    {
+        return $value instanceof Array_
+            && $value->items !== []
+            && array_all($value->items, static fn (ArrayItem $item): bool => $item->key !== null
+                && TokenCollector::isData($item->key)
+                && TokenCollector::isData($item->value));
     }
 
     private static function variableName(?Node $node): ?string

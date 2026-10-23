@@ -115,33 +115,33 @@ it('tells a literal under one array key from the same literal under another key'
 })->with([
     'boolean under a key' => ['store([\'enabled\' => false]);', [
         'function:store' => 1,
-        'in:value:\'enabled\'/value:false' => 1,
+        'in:function:store#0/value:\'enabled\'/value:false' => 1,
         'key:value:\'enabled\'' => 1,
     ],
     ],
     'boolean under another key' => ['store([\'visible\' => false]);', [
         'function:store' => 1,
-        'in:value:\'visible\'/value:false' => 1,
+        'in:function:store#0/value:\'visible\'/value:false' => 1,
         'key:value:\'visible\'' => 1,
     ],
     ],
     'class constant as a key' => ['store([Status::Active => true]);', [
         'function:store' => 1,
-        'in:const:Status::Active/value:true' => 1,
+        'in:function:store#0/const:Status::Active/value:true' => 1,
         'key:const:Status::Active' => 1,
     ],
     ],
     'constant under a key' => ['store([\'status\' => Status::Active, \'flag\' => null]);', [
         'function:store' => 1,
-        'in:value:\'flag\'/value:null' => 1,
-        'in:value:\'status\'/const:Status::Active' => 1,
+        'in:function:store#0/value:\'flag\'/value:null' => 1,
+        'in:function:store#0/value:\'status\'/const:Status::Active' => 1,
         'key:value:\'flag\'' => 1,
         'key:value:\'status\'' => 1,
     ],
     ],
     'empty array under a key' => ['store([\'tags\' => []]);', [
         'function:store' => 1,
-        'in:value:\'tags\'/value:[]' => 1,
+        'in:function:store#0/value:\'tags\'/value:[]' => 1,
         'key:value:\'tags\'' => 1,
     ],
     ],
@@ -170,11 +170,16 @@ it('tells a literal under one array key from the same literal under another key'
     ],
     'negative number under a key' => ['store([\'balance\' => -5]);', [
         'function:store' => 1,
-        'in:value:\'balance\'/value:-5' => 1,
+        'in:function:store#0/value:\'balance\'/value:-5' => 1,
         'key:value:\'balance\'' => 1,
     ],
     ],
-    'string under a key' => ['store([\'name\' => \'x\']);', ['function:store' => 1, 'key:value:\'name\'' => 1, 'in:value:\'name\'/value:\'x\'' => 1]],
+    'string under a key' => ['store([\'name\' => \'x\']);', [
+        'function:store' => 1,
+        'in:function:store#0/value:\'name\'/value:\'x\'' => 1,
+        'key:value:\'name\'' => 1,
+    ],
+    ],
 ]);
 
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
@@ -262,7 +267,7 @@ it('marks a call or new expression in a loop body, whose number of runs the fing
     ],
     'literals in a loop body' => [
         'foreach ($ids as $id) { store([\'id\' => 5], null); }',
-        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1, 'in:function:store#1/value:null' => 1],
+        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:function:store#0/value:\'id\'/value:5' => 1, 'in:function:store#1/value:null' => 1],
     ],
     'nested loops' => ['foreach ($lists as $list) { foreach ($list as $item) { import(); } }', ['loop:function:import' => 1]],
     'while' => ['while (true) { Batch::import(); }', ['value:true' => 1, 'loop:call:Batch::import' => 1]],
@@ -279,6 +284,27 @@ it('counts a token of a dataset row together with the same token of the test bod
     $row = $fingerprints['it adds › one'];
 
     expect([$row['in:function:add#0/value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
+});
+
+it('gives a map of literals a dataset row passes the argument position of the call it reaches', function (): void {
+    $fingerprints = fingerprintsOf(<<<'PHP'
+        <?php
+        it('lists the changed keys', function (array $previous, array $current): void {
+            changedKeys($previous, $current);
+        })->with([
+            'a key was added' => [['listId' => 1], ['listId' => 1, 'store' => 'shop']],
+            'a key was removed' => [['listId' => 1, 'store' => 'shop'], ['listId' => 1]],
+        ]);
+        PHP);
+
+    expect($fingerprints['it lists the changed keys › a key was added'])->toEqual([
+        'function:changedKeys' => 1,
+        'in:function:changedKeys#0/value:\'listId\'/value:1' => 1,
+        'key:value:\'listId\'' => 2,
+        'in:function:changedKeys#1/value:\'listId\'/value:1' => 1,
+        'in:function:changedKeys#1/value:\'store\'/value:\'shop\'' => 1,
+        'key:value:\'store\'' => 1,
+    ]);
 });
 
 it('counts a literal a test assigns once to a local variable where the test reads the variable', function (string $body, array $expected): void {

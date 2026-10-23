@@ -200,11 +200,9 @@ final class TokenCollector
      */
     private static function argumentValueIds(Expr $argument): array
     {
-        $listItems = $argument instanceof Array_
-            ? array_values(array_filter($argument->items, static fn (ArrayItem $item): bool => $item->key === null))
-            : [];
+        $items = $argument instanceof Array_ ? array_values($argument->items) : [];
 
-        return [spl_object_id($argument), ...array_map(static fn (ArrayItem $item): int => spl_object_id($item->value), $listItems)];
+        return [spl_object_id($argument), ...array_map(static fn (ArrayItem $item): int => spl_object_id($item->value), $items)];
     }
 
     /**
