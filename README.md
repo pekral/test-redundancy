@@ -142,14 +142,33 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
-| `coveringDiffersBy` | The tokens of the covering test that made the action `review`. When `differsBy` holds only data and the candidate differs only in data from one test of the same file, these are the calls, functions and `new` expressions that test has, or has more times, while the candidate lacks them. When `differsBy` is empty, these are the array keys (`key:` tokens) the covering test sets, or sets more times, while the candidate lacks them: a missing key is another input shape. They are also the values the covering test passes, or passes more times, to a call that is not an assertion, such as an argument of the code under test (`in:call:getByListIdAndLastId#4/value:'email'`), while the candidate lacks them: a missing argument value is another input. A value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, is not listed. The `review` steps name them. Empty for every other candidate. |
-| `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, never `delete`, and the steps say so. Empty for every other candidate. |
+| `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). The `review` steps name them. Empty for every other candidate. |
+| `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
-| `action` | `delete` — nothing new, one covering test runs every line of the candidate, and that test sets no array key and passes no value to a call that is not an assertion that the candidate lacks; `merge-into-dataset` — differs only in data from one test of the same file, and that test has no call, function or `new` expression this test lacks or uses fewer times; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, could not be parsed, only the union of the covering tests runs every line of it, or the covering test sets an array key, or passes a value to a call that is not an assertion, that it lacks. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists every rule. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
 | `workflow` | The rules an agent follows for the whole report. |
+
+### When a candidate is `review`, not `delete`
+
+`delete` needs an empty `differsBy` and every one of these conditions:
+
+- **One test runs every line.** One covering test runs every line of the candidate. When only the union of the
+  `coveredBy` tests reaches some lines, they are listed in `unionOnlyLines` and the action is `review`.
+- **No missing array key.** The covering test sets no array key, or sets no key more times, that the candidate lacks.
+  A missing key is another input shape, so the `key:` tokens are listed in `coveringDiffersBy` and the action is
+  `review`.
+- **No missing argument value.** The covering test passes no value, or passes no value more times, to a call that is
+  not an assertion, such as an argument of the code under test (`in:call:getByListIdAndLastId#4/value:'email'`). A
+  missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `review`. A
+  value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, does
+  not count.
+
+`merge-into-dataset` needs a candidate that differs only in data from one test of the same file. When that test has a
+call, function or `new` expression the candidate lacks, or uses it more times, the two tests cannot be rows of one
+test: the tokens are listed in `coveringDiffersBy` and the action is `review`.
 
 ### How `differsBy` names a difference
 

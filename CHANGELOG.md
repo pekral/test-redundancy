@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-23
+
 ### Added
 
 - `unionOnlyLines` in the JSON report and `union only lines` in the text report list the source lines of a candidate
@@ -140,6 +142,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.2...HEAD
+[0.1.2]: https://github.com/pekral/test-redundancy/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/pekral/test-redundancy/compare/0.1...0.1.1
 [0.1]: https://github.com/pekral/test-redundancy/releases/tag/0.1
