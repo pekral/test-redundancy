@@ -204,6 +204,25 @@ it('counts how many times a test uses each token', function (): void {
     ]);
 });
 
+it('marks a call or new expression in a loop body, whose number of runs the fingerprint cannot count', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'do while' => ['do { Batch::import(); } while (false);', ['loop:call:Batch::import' => 1, 'value:false' => 1]],
+    'for' => ['for ($i = 0; $i < 3; $i++) { $importer->import(); }', ['value:0' => 1, 'value:3' => 1, 'loop:call:import' => 1]],
+    'foreach over range' => [
+        'foreach (range(1, 3) as $i) { import(new Batch()); }',
+        ['function:range' => 1, 'value:1' => 1, 'value:3' => 1, 'loop:function:import' => 1, 'loop:new:Batch' => 1],
+    ],
+    'literals in a loop body' => [
+        'foreach ($ids as $id) { store([\'id\' => 5], null); }',
+        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1, 'value:null' => 1],
+    ],
+    'nested loops' => ['foreach ($lists as $list) { foreach ($list as $item) { import(); } }', ['loop:function:import' => 1]],
+    'while' => ['while (true) { Batch::import(); }', ['value:true' => 1, 'loop:call:Batch::import' => 1]],
+]);
+
 it('counts a token of a dataset row together with the same token of the test body and its modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
