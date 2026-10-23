@@ -160,8 +160,8 @@ test lacks.
   listed too. The count is the number of places the token appears in the test source, not the number of runs.
 - **Loops.** A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop carries a
   `loop:` prefix, e.g. `loop:call:Batch::import`. A call made in a loop and the same call made outside a loop are
-  different tokens, so the action is `review`. Two loops never differ in the number of runs, and a callback passed to a
-  function such as `array_map()` is not a loop body.
+  different tokens, so the action is `review`. Two loops differ only in the tokens they carry, never in the number of
+  runs, and a callback passed to a function such as `array_map()` is not a loop body.
 - **Negation.** A call made through Pest's `->not` or `->not()` carries a `not:` prefix, e.g. `not:call:toBeEmpty`.
 - **Property-form assertions.** A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`,
   carries the token of its call form.
@@ -177,11 +177,12 @@ test lacks.
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
   method. A literal, constant or empty array in a row is counted where the test reads that parameter: the row
   `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as `expect(add(1, 2))->toBe(3)`. Any
-  other row value, such as `new Contact()`, is counted once, however many times the test reads the parameter. A row
+  other row value, such as `new Contact()`, is counted once, as the row has it, however many times the test reads the
+  parameter. A row
   value whose parameter the test never reads by its name keeps its token without a path.
-- **Local variables.** A literal, constant or empty array that the test assigns once to a local variable in its own statements is counted
-  where the test reads the variable: `$email = 'a@example.com'; notify($email);` has the same tokens as
-  `notify('a@example.com')`. A variable the test writes more than once keeps its tokens without a path.
+- **Local variables.** A literal, constant or empty array that the test assigns once to a local variable in its own
+  statements is counted where the test reads the variable: `$email = 'a@example.com'; notify($email);` has the same
+  tokens as `notify('a@example.com')`. A variable the test writes more than once keeps its tokens without a path.
 
 ### Verifying that coverage stayed
 

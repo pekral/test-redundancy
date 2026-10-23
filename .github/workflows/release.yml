@@ -35,7 +35,7 @@ jobs:
             # Extract section for this version
             VERSION="${{ steps.version.outputs.version }}"
             # Try to extract the relevant section from CHANGELOG
-            awk "/^## \[.*\] -/ {flag=0} /^## \[.*\] -/ && flag==0 {flag=1; next} flag==1 && /^## / {exit} flag==1" CHANGELOG.md > release_notes_temp.md || true
+            awk -v v="$VERSION" 'index($0, "## [" v "] - ") == 1 {f=1; next} f && /^## \[/ {exit} f && /^\[[^]]+\]: / {exit} f' CHANGELOG.md > release_notes_temp.md || true
             
             if [ -s release_notes_temp.md ]; then
               NOTES=$(cat release_notes_temp.md)
