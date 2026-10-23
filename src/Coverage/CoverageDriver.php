@@ -41,9 +41,6 @@ final class CoverageDriver
     }
 
     /**
-     * pcov instruments every file under its directory, so the directory is the narrowest one that holds all source
-     * directories; the exclusion keeps out what lies under it but outside the source.
-     *
      * @param list<string> $sourcePaths
      * @return list<string>
      */
@@ -61,7 +58,6 @@ final class CoverageDriver
             $exclude .= '|^' . preg_quote(rtrim($parent, '/'), '~') . '/(?!(?:' . implode('|', $subdirectories) . ')/)';
         }
 
-        // PHP reads a -d value through its INI scanner, which turns "\\" into "\" and "\$" into "$" inside the quoted value.
         $iniExclude = str_replace('\\', '\\\\', '~' . $exclude . '~');
 
         return ['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . ($parent ?? $projectRoot), '-d', 'pcov.exclude=' . $iniExclude];
