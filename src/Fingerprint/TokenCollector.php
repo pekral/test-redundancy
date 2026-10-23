@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 use PhpParser\Node;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
@@ -92,7 +93,8 @@ final class TokenCollector
             || ($node instanceof MethodCall && !self::isNegation($node))
             || $node instanceof StaticCall
             || $node instanceof FuncCall
-            || $node instanceof New_;
+            || $node instanceof New_
+            || ($node instanceof Array_ && $node->items === []);
     }
 
     private static function token(Node $node): ?string
@@ -112,6 +114,7 @@ final class TokenCollector
                 : null,
             $node instanceof FuncCall => $node->name instanceof Name ? 'function:' . $node->name->toString() : null,
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
+            $node instanceof Array_ => 'value:[]',
             default => null,
         };
     }

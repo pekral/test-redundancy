@@ -226,6 +226,67 @@ it('asks for a review of a test whose values each appear in a covering test but 
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
+it('keeps a test that adds only an empty array to its covering test', function (string $source, string $test, string $covering, Action $action): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TagsTest.php', $source);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TagsTest.php' => [
+        'tests/TagsTest.php :: ' . $test => ['src/Tags.php:10' => true],
+        'tests/TagsTest.php :: ' . $covering => ['src/Tags.php:10' => true, 'src/Tags.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/TagsTest.php :: ' . $test)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:[]'])
+        ->and($reports[0]->candidates[0]->action())->toBe($action);
+})->with([
+    'empty tags dataset row' => [
+        <<<'PHP'
+            <?php
+            test('can tags be stored', function (array $newTags, bool $expected): void {
+                expect($validator->canTagsBeStored($overLimitLength, $newTags))->toBe($expected);
+            })->with([
+                'allowed overlimit tag prefix without suffix' => [['ShopifY'], true],
+                'empty tags' => [[], true],
+            ]);
+            PHP,
+        'can tags be stored › empty tags',
+        'can tags be stored › allowed overlimit tag prefix without suffix',
+        Action::ReviewDatasetRow,
+    ],
+    'nested empty tags in a dataset row' => [
+        <<<'PHP'
+            <?php
+            it('registers no tags', function (array $data): void {
+                register($data);
+            })->with([
+                'tags key absent' => [['name' => 'Test']],
+                'tags is an empty array' => [['name' => 'Test', 'tags' => []]],
+                'tags contains only blank values' => [['name' => 'Test', 'tags' => ['', ' ']]],
+            ]);
+            PHP,
+        'it registers no tags › tags is an empty array',
+        'it registers no tags › tags contains only blank values',
+        Action::ReviewDatasetRow,
+    ],
+    'standalone test with empty custom fields' => [
+        <<<'PHP'
+            <?php
+            it('stores a contact with custom fields', function (): void {
+                store(['name' => 'Test', 'custom_fields' => ['color' => 'red']]);
+            });
+            it('stores a contact without custom fields', function (): void {
+                store(['name' => 'Test', 'custom_fields' => []]);
+            });
+            PHP,
+        'it stores a contact without custom fields',
+        'it stores a contact with custom fields',
+        Action::MergeIntoDataset,
+    ],
+]);
+
 it('compares with tests of other files from the map', function (): void {
     $map = CoverageMap::fromLinesByTest('abc', [
         'tests/OtherCalculatorTest.php :: divide returns a float' => ['src/Calculator.php:17' => true],
