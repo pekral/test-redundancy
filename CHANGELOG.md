@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- With `pcov`, the coverage run instruments only the `source` directories. `pcov.directory` is the one `source`
+  directory, or the deepest directory that holds all of them, and `pcov.exclude` keeps out `vendor/` and what lies
+  under that directory outside the `source`. Before, `pcov` instrumented every PHP file under the project root, such
+  as the tests, `database/` and `config/`. A `source` directory that does not exist is skipped, and the project root
+  stays the `pcov.directory` when none exists. The recorded lines of the `source` stay the same (#55).
+
 ### Fixed
 
 - A dataset row whose value is a closure or an arrow function carries the token `value:closure:<hash>`, a hash of the
