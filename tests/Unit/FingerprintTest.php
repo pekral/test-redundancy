@@ -330,9 +330,13 @@ it('counts a literal a test assigns once to a local variable where the test read
         '$email = \'a\'; $email = \'b\'; notify($email);',
         ['function:notify' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
     ],
+    'variable assigned a map and read once' => [
+        '$options = [\'a\' => 1]; notify($options);',
+        ['function:notify' => 1, 'key:value:\'a\'' => 1, 'in:function:notify#0/value:\'a\'/value:1' => 1],
+    ],
     'variable assigned an array with a key and read twice' => [
         '$data = [\'id\' => 5]; notify($data); notify($data);',
-        ['function:notify' => 2, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1],
+        ['function:notify' => 2, 'key:value:\'id\'' => 2, 'in:function:notify#0/value:\'id\'/value:5' => 2],
     ],
     'variable assigned an object' => ['$contact = new Contact(); notify($contact);', ['function:notify' => 1, 'new:Contact' => 1]],
     'variable the test appends to' => [

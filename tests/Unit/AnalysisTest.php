@@ -533,7 +533,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'it registers no tags › tags is an empty array',
         'it registers no tags › tags contains only blank values',
-        ['in:function:register#0/value:\'name\'/value:\'Test\'', 'in:function:register#0/value:\'tags\'/value:[]'],
+        ['in:function:register#0/value:\'tags\'/value:[]'],
         Action::ReviewDatasetRow,
     ],
     'standalone test with empty custom fields' => [
@@ -890,6 +890,54 @@ it('keeps the rows of a dataset that swap the same literals between two argument
         ->and($report->candidates[0]->coveredBy)->toBe(['it lists the changed keys › a key was removed'])
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:changedKeys#1/value:\'store\'/value:\'shop\''])
         ->and($report->candidates[0]->action())->not->toBe(Action::Delete);
+});
+
+it('deletes a test that passes a once-assigned local map where its covering test passes the same map inline', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('a', function (): void {
+                $options = ['a' => 1];
+                store($options);
+            });
+            it('b', function (): void {
+                store(['a' => 1]);
+            });
+            PHP,
+        linesByTest: [
+            'it a' => ['src/Store.php:5'],
+            'it b' => ['src/Store.php:5', 'src/Store.php:6'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('registers', function (array $data): void {
+                register($data);
+            })->with([
+                'flat' => [['name' => 'T']],
+                'nested' => [['name' => 'T', 'tags' => ['x']]],
+            ]);
+            PHP,
+        linesByTest: [
+            'it registers › flat' => ['src/Register.php:5'],
+            'it registers › nested' => ['src/Register.php:5', 'src/Register.php:6'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it registers › flat')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->coveringDiffersBy)->toContain('key:value:\'tags\'')
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
 it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
