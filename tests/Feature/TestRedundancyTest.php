@@ -415,7 +415,7 @@ it('skips a test file with a single test case from the coverage run without chan
         ->and($reports[2]->candidates)->toBe([])
         ->and(candidatesOf($reports))->toBe(candidatesOf($withoutSingle))
         ->and(candidatesOf($reports))->toHaveCount(1)
-        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe(['tests/DatasetTest.php', 'tests/PairTest.php'])
+        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe($testFiles)
         ->and(array_keys(decodedJson((string) file_get_contents($project . '/.test-redundancy/durations.json'))))
         ->toEqualCanonicalizing(['tests/DatasetTest.php', 'tests/PairTest.php']);
 });
@@ -425,35 +425,46 @@ it('keeps verify working for every file that had candidates when a single-test f
     $testRedundancy = TestRedundancy::forProject($project, processes: 2);
     $testRedundancy->analyse(['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php'], ['tests']);
     $pair = (string) file_get_contents($project . '/tests/PairTest.php');
+    $withoutDivides = (string) preg_replace("/\n\nit\\('divides'.*?\\}\\);\$/s", '', $pair);
+    $withoutAddsAgain = (string) preg_replace("/it\\('adds again'.*?\\}\\);\n\n/s", '', $pair);
 
     $untouched = $testRedundancy->verify();
+    file_put_contents($project . '/tests/PairTest.php', $withoutDivides);
+    $coveredBySkippedFile = $testRedundancy->verify();
+    file_put_contents($project . '/tests/PairTest.php', $withoutAddsAgain);
+    $candidateRemoved = $testRedundancy->verify();
+    file_put_contents($project . '/tests/PairTest.php', $pair);
     unlink($project . '/tests/SingleTest.php');
     $skippedFileDeleted = $testRedundancy->verify();
-    file_put_contents($project . '/tests/PairTest.php', (string) preg_replace("/it\\('adds again'.*?\\}\\);\n\n/s", '', $pair));
-    $candidateRemoved = $testRedundancy->verify();
-    file_put_contents($project . '/tests/PairTest.php', (string) preg_replace("/\n\nit\\('divides'.*?\\}\\);\$/s", '', $pair));
+    file_put_contents($project . '/tests/PairTest.php', $withoutDivides);
     $coverageDropped = $testRedundancy->verify();
 
     expect($untouched->isOk())->toBeTrue()
         ->and($untouched->baselineLines)->toBe(3)
-        ->and($skippedFileDeleted->missingTestFiles)->toBe([])
-        ->and($skippedFileDeleted->isOk())->toBeTrue()
+        ->and($coveredBySkippedFile->isOk())->toBeTrue()
+        ->and($coveredBySkippedFile->lostLines)->toBe([])
         ->and($candidateRemoved->isOk())->toBeTrue()
         ->and($candidateRemoved->lostLines)->toBe([])
+        ->and($skippedFileDeleted->isOk())->toBeTrue()
+        ->and($skippedFileDeleted->missingTestFiles)->toBe(['tests/SingleTest.php'])
+        ->and($skippedFileDeleted->lostLines)->toBe([])
         ->and($coverageDropped->isOk())->toBeFalse()
-        ->and($coverageDropped->lostLines)->toHaveCount(2);
+        ->and($coverageDropped->lostLines)->toHaveCount(2)
+        ->and($coverageDropped->missingTestFiles)->toBe(['tests/SingleTest.php']);
 });
 
-it('runs nothing and stores an empty baseline when every test file has a single test case', function (): void {
+it('runs a skipped test file in verify and stores it without lines when every test file has a single test case', function (): void {
     $project = singleTestProject();
     $testRedundancy = TestRedundancy::forProject($project, processes: 2);
 
     $reports = $testRedundancy->analyse(['tests/SingleTest.php'], ['tests/SingleTest.php']);
+    $markerAfterAnalyse = is_file($project . '/markers/single');
     $verification = $testRedundancy->verify();
 
-    expect(is_file($project . '/markers/single'))->toBeFalse()
+    expect($markerAfterAnalyse)->toBeFalse()
         ->and($reports)->toEqual([FileReport::skipped('tests/SingleTest.php')])
-        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe([])
+        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe(['tests/SingleTest.php'])
+        ->and(is_file($project . '/markers/single'))->toBeTrue()
         ->and($verification->isOk())->toBeTrue()
         ->and($verification->baselineLines)->toBe(0);
 });

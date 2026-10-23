@@ -296,8 +296,8 @@ the tests change, `verify` runs the same test files again and compares:
 {"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy","unstableLines":[]}
 ```
 
-A test file that `analyse` skipped is not in the baseline: `verify` does not run it, and its deletion is not reported in
-`missingTestFiles`.
+A test file that `analyse` skipped stays in the baseline without lines, so `verify` runs it and reports its deletion in
+`missingTestFiles`. `verify` cannot know the lines that only a deleted skipped file covered, because `analyse` never ran it.
 
 It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
 mapped test file still covers does not count as lost.

@@ -620,7 +620,10 @@ it('keeps a file in the coverage run when it may run more than one test case', f
 })->with([
     'a file that does not parse' => ['<?php it('],
     'a Pest describe block with a dataset' => ['<?php describe(\'g\', function (): void { it(\'a\', fn () => null); })->with([1, 2]);'],
-    'a Pest test beside a loop that generates tests' => ['<?php it(\'a\', fn () => null); foreach ([1, 2] as $value) { it(\'b\' . $value, fn () => null); }'],
+    'a Pest test beside a loop that generates tests' => [
+        '<?php it(\'a\', fn () => null); '
+        . 'foreach ([1, 2] as $value) { it(\'b\' . $value, fn () => null); }',
+    ],
     'a Pest test generated in a loop' => ['<?php foreach ([1, 2] as $value) { it(\'a\' . $value, fn () => null); }'],
     'a Pest test with a computed description' => ['<?php it($description, fn () => null);'],
     'a Pest test with a dataset' => ['<?php it(\'a\', fn (int $value) => null)->with([1, 2]);'],
