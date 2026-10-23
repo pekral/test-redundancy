@@ -176,7 +176,7 @@ final class TokenCollector
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
                 $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
-                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion, isListItem: false), $segment);
+                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion, isArgument: true), $segment);
             }
         }
 
@@ -186,12 +186,12 @@ final class TokenCollector
     /**
      * @return list<int>
      */
-    private static function argumentValueIds(Expr $value, bool $isAssertion, bool $isListItem): array
+    private static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
     {
         $passedItems = match (true) {
             $value instanceof Array_ => array_filter(
                 $value->items,
-                static fn (ArrayItem $item): bool => $item->key !== null || !$isListItem,
+                static fn (ArrayItem $item): bool => $item->key !== null || $isArgument,
             ),
             $value instanceof CallLike && !$isAssertion => array_filter(
                 $value->getRawArgs(),
@@ -201,11 +201,9 @@ final class TokenCollector
         };
 
         $passedValueIds = array_map(
-            static fn (ArrayItem|Arg $item): array => self::argumentValueIds(
-                $item->value,
-                $isAssertion,
-                isListItem: $item instanceof ArrayItem && $item->key === null,
-            ),
+            static fn (ArrayItem|Arg $item): array => $item instanceof ArrayItem && $item->key === null
+                ? [spl_object_id($item->value)]
+                : self::argumentValueIds($item->value, $isAssertion, isArgument: $item instanceof Arg),
             array_values($passedItems),
         );
 
