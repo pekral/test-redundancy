@@ -93,6 +93,20 @@ it('collects the subject of an assertion in the assertion tokens', function (str
         'in:function:add#1/value:2' => 1,
     ],
     ],
+    'actual argument without a token' => ['self::assertSame(foo(), $rows[\'id\']);', [
+        'call:self::assertSame' => 1,
+        'function:foo' => 1,
+        'value:\'id\'' => 1,
+    ],
+    ],
+    'actual argument written twice' => ['$x = 1; $x = bar(); self::assertEquals(new Money(5), $x);', [
+        'call:self::assertEquals' => 1,
+        'function:bar' => 1,
+        'in:new:Money#0/value:5' => 1,
+        'new:Money' => 1,
+        'value:1' => 1,
+    ],
+    ],
     'call passed to expect' => ['expect(app(Templates::class)->create())->toBeGreaterThan(0);', [
         'call:create' => 1,
         'expect:call:create/call:toBeGreaterThan' => 1,

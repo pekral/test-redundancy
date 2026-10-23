@@ -30,10 +30,13 @@ final class AssertionSubject
                 self::expectedValue($assertion->var),
             ],
             ($assertion instanceof MethodCall || $assertion instanceof StaticCall || $assertion instanceof FuncCall)
-                && str_starts_with($method, 'assert') => array_reverse(array_map(
-                    static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
-                    $assertion->getRawArgs(),
-                )),
+                && str_starts_with($method, 'assert') => array_slice(array_values(array_filter(
+                    array_map(
+                        static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
+                        $assertion->getRawArgs(),
+                    ),
+                    static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
+                )), -1),
             default => [],
         };
 
