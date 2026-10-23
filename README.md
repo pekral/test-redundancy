@@ -145,7 +145,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). The `review` steps name them. Empty for every other candidate. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists every rule. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
@@ -153,7 +153,8 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 
 ### When a candidate is `review`, not `delete`
 
-`delete` needs an empty `differsBy` and every one of these conditions:
+`delete` needs an empty `differsBy` and every one of these conditions. The tool checks them in this order: while
+`unionOnlyLines` is not empty, `coveringDiffersBy` stays empty and the steps name only the lines and the covering tests.
 
 - **One test runs every line.** One covering test runs every line of the candidate. When only the union of the
   `coveredBy` tests reaches some lines, they are listed in `unionOnlyLines` and the action is `review`.
@@ -166,9 +167,12 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, does
   not count.
 
-`merge-into-dataset` needs a candidate that differs only in data from one test of the same file. When that test has a
-call, function or `new` expression the candidate lacks, or uses it more times, the two tests cannot be rows of one
-test: the tokens are listed in `coveringDiffersBy` and the action is `review`.
+`merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
+only in data from one test of the same file. When that test has a call, function or `new` expression that the
+candidate lacks, or has it more times than the candidate does, the two tests cannot be rows of one test: the tokens are
+listed in `coveringDiffersBy` and the action is `review`. A candidate whose `differsBy` holds only data against several
+covering tests or against a test of another file is `review` too, and so is a dataset row whose covering test is not a
+row of the same dataset.
 
 ### How `differsBy` names a difference
 
