@@ -627,6 +627,53 @@ it('still deletes a dataset row whose literal sits under the same key as in the 
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 });
 
+it('keeps a dataset row whose closure has another body than the closure of its covering row', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('keeps the plus character', function (callable $encode): void {
+                expect(normalize(urldecode($encode('user+tag@example.com'))))->toBe('user+tag@example.com');
+            })->with([
+                'sent raw' => [static fn (string $email): string => $email],
+                'sent encoded' => [static fn (string $email): string => rawurlencode($email)],
+            ]);
+            PHP,
+        linesByTest: [
+            'it keeps the plus character › sent raw' => ['src/Strings.php:10'],
+            'it keeps the plus character › sent encoded' => ['src/Strings.php:10', 'src/Strings.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testKey)->toBe('tests/TokenTest.php :: it keeps the plus character › sent raw')
+        ->and($report->candidates[0]->differsBy)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy[0] ?? '')->toStartWith('value:closure:')
+        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+});
+
+it('still deletes a dataset row whose closure its covering row has with other formatting', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('keeps the plus character', function (callable $encode): void {
+                expect(normalize($encode('user+tag@example.com')))->toBe('user+tag@example.com');
+            })->with([
+                'sent raw' => [static fn (string $email): string => $email],
+                'sent raw again' => [static fn(string   $email) : string
+                    => $email],
+            ]);
+            PHP,
+        linesByTest: [
+            'it keeps the plus character › sent raw' => ['src/Strings.php:10'],
+            'it keeps the plus character › sent raw again' => ['src/Strings.php:10', 'src/Strings.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
 it('asks for a review of a dataset row that omits an array key its covering row sets', function (
     FileReport $report,
     string $test,
