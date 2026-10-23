@@ -255,7 +255,13 @@ it('asks for a review of a test whose values each appear in a covering test but 
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
-it('keeps a test that adds only an empty array to its covering test', function (string $source, string $test, string $covering, Action $action): void {
+it('keeps a test that adds only an empty array to its covering test', function (
+    string $source,
+    string $test,
+    string $covering,
+    array $differsBy,
+    Action $action,
+): void {
     $project = temporaryDirectory();
     mkdir($project . '/tests');
     file_put_contents($project . '/tests/TagsTest.php', $source);
@@ -268,7 +274,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/TagsTest.php :: ' . $test)
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:[]'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
         ->and($reports[0]->candidates[0]->action())->toBe($action);
 })->with([
     'empty tags dataset row' => [
@@ -283,6 +289,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'can tags be stored › empty tags',
         'can tags be stored › allowed overlimit tag prefix without suffix',
+        ['value:[]'],
         Action::ReviewDatasetRow,
     ],
     'nested empty tags in a dataset row' => [
@@ -298,6 +305,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'it registers no tags › tags is an empty array',
         'it registers no tags › tags contains only blank values',
+        ['in:value:\'tags\'/value:[]'],
         Action::ReviewDatasetRow,
     ],
     'standalone test with empty custom fields' => [
@@ -312,6 +320,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
             PHP,
         'it stores a contact without custom fields',
         'it stores a contact with custom fields',
+        ['in:value:\'custom_fields\'/value:[]'],
         Action::MergeIntoDataset,
     ],
 ]);
@@ -338,6 +347,31 @@ it('keeps a dataset row whose literal the covering row has only under an unrelat
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/ToggleTest.php :: it toggles › plain false')
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:false'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+});
+
+it('keeps a dataset row whose empty array the covering row has only under an unrelated key', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/OptionsTest.php', <<<'PHP'
+        <?php
+        it('stores options', function (array $options): void {
+            expect(store($options))->toBeTrue();
+        })->with([
+            'empty a' => [['a' => []]],
+            'empty b' => [['a' => 1, 'b' => []]],
+        ]);
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/OptionsTest.php' => [
+        'tests/OptionsTest.php :: it stores options › empty a' => ['src/Options.php:10' => true],
+        'tests/OptionsTest.php :: it stores options › empty b' => ['src/Options.php:10' => true, 'src/Options.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/OptionsTest.php :: it stores options › empty a')
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:value:\'a\'/value:[]'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 

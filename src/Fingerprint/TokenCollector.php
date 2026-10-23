@@ -200,7 +200,7 @@ final class TokenCollector
     private static function prefix(array $arrayKeys, array $keyPaths, Node $node, string $token): string
     {
         $path = $keyPaths[spl_object_id($node)] ?? null;
-        $isPathedData = !$node instanceof Array_ && $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
+        $isPathedData = $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
 
         return match (true) {
             isset($arrayKeys[spl_object_id($node)]) => 'key:',
