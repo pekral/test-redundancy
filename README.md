@@ -213,8 +213,9 @@ test lacks.
   `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`. An operand of an operator, a cast or a closure body
   keeps no call path: `store(1 + 2)` has the tokens `value:1` and `value:2`. A list item keeps the call path only as a
   direct item of an argument: `store([1])` has the token `in:function:store#0/value:1`, but `store([[1]])` has
-  `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. A value one list deeper therefore never
-  gets the token of the same value without that list.
+  `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. So `store([[1]])` does not get the token
+  of `store([1])` or `store(1)`, and `store(['tags' => ['a']])` does not get the token of `store(['tags' => 'a'])`. A
+  list passed straight to a call is not visible: `store([1])` has the same token as `store(1)`.
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
   method. A literal, constant, empty array, list or map in a row is counted where the test reads that
   parameter: the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as
