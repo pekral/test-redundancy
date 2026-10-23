@@ -203,27 +203,27 @@ final class DatasetRows
             || $item->unpack
             || $parameter === null
             || $parameter->variadic
-            || !(self::isBindable($item->value) || self::isDataMap($item->value));
+            || !self::isBindable($item->value);
 
         return self::variableName($isUnbindable ? null : $parameter->var);
     }
 
     private static function isBindable(Expr $value): bool
     {
-        $isDataList = $value instanceof Array_
-            && $value->items !== []
-            && array_all($value->items, static fn (ArrayItem $item): bool => $item->key === null && TokenCollector::isData($item->value));
-
-        return TokenCollector::isData($value) || $isDataList;
+        return TokenCollector::isData($value)
+            || ($value instanceof Array_ && $value->items !== [] && (self::isDataList($value) || self::isDataMap($value)));
     }
 
-    private static function isDataMap(Expr $value): bool
+    private static function isDataList(Array_ $value): bool
     {
-        return $value instanceof Array_
-            && $value->items !== []
-            && array_all($value->items, static fn (ArrayItem $item): bool => $item->key !== null
-                && TokenCollector::isData($item->key)
-                && TokenCollector::isData($item->value));
+        return array_all($value->items, static fn (ArrayItem $item): bool => $item->key === null && self::isBindable($item->value));
+    }
+
+    private static function isDataMap(Array_ $value): bool
+    {
+        return array_all($value->items, static fn (ArrayItem $item): bool => $item->key !== null
+            && TokenCollector::isData($item->key)
+            && self::isBindable($item->value));
     }
 
     private static function variableName(?Node $node): ?string

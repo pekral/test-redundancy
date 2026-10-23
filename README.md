@@ -191,8 +191,9 @@ test lacks.
 - **Property-form assertions.** A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`,
   carries the token of its call form.
 - **Array keys and values.** An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key
-  carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `$options = ['enabled' => false]`, so the
-  same literal under another key, or in a list without a key, is a different token.
+  carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the
+  test never passes on, so the same literal under another key, or in a list without a key, is a different token. A map
+  passed to a call also carries the call and the argument position (see *Call arguments*).
 - **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
   too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
@@ -204,24 +205,25 @@ test lacks.
   `in:function:store#0/value:'enabled'/value:false` for `store(['enabled' => false])`, so the same array at swapped
   positions is a different token.
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
-  method. A literal, constant, empty array, list of them or map of them in a row is counted where the test reads that
+  method. A literal, constant, empty array, list or map in a row is counted where the test reads that
   parameter: the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as
   `expect(add(1, 2))->toBe(3)`, the row `[['id', 'tags']]` of `load($columns)` has the same tokens as
   `load(['id', 'tags'])`, and the row `[['id' => 5]]` of `load($options)` has the same tokens as `load(['id' => 5])`.
-  A list is an array whose elements have no key and are each a literal, constant or empty array. A map is an array
-  whose elements all have a key, and each key and value is a literal or constant. Any other row value, such as
-  `new Contact()` or `['id' => [1]]`, is counted once, as the row has it, however many times the test reads the
-  parameter. A row value whose parameter the test never reads by its name keeps its
+  A list is a non-empty array whose elements have no key and are each a literal, constant, empty array, list or map. A
+  map is a non-empty array whose elements all have a key that is a literal or constant, and each value is a literal,
+  constant, empty array, list or map, so lists and maps can nest. Any other row value, such as `new Contact()` or
+  `['id' => $id]`, is counted once, as the row has it, however many times the test reads the parameter. A row value whose parameter the test never reads by its name keeps its
   token without a path. A closure or arrow function that is the row value, or one argument of the row, also carries
   the token `value:closure:<hash>`, a hash of its source as `nikic/php-parser` prints it. Two rows whose closures have
   different bodies, such as `fn (string $email): string => $email` and
   `fn (string $email): string => rawurlencode($email)`, therefore differ in `differsBy`, and the row is not `delete`.
   Two closures that differ only in whitespace or line breaks have the same token. A closure inside an array argument,
   such as `['map' => fn ($x) => $x]`, carries only the tokens of its body.
-- **Local variables.** A literal, constant, empty array or list of them that the test assigns once to a local variable
-  in its own statements is counted where the test reads the variable: `$email = 'a@example.com'; notify($email);` has
-  the same tokens as `notify('a@example.com')`, and `$columns = ['id', 'tags']; load($columns);` has the same tokens
-  as `load(['id', 'tags'])`. A variable the test writes more than once keeps its tokens without a path.
+- **Local variables.** A literal, constant, empty array, list or map (as defined for dataset rows) that the test
+  assigns once to a local variable in its own statements is counted where the test reads the variable:
+  `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,
+  `$columns = ['id', 'tags']; load($columns);` has the same tokens as `load(['id', 'tags'])`, and
+  `$options = ['enabled' => false]; store($options);` has the same tokens as `store(['enabled' => false])`. A variable the test writes more than once keeps its tokens without a path.
 
 ### Verifying that coverage stayed
 
