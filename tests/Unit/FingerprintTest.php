@@ -155,6 +155,52 @@ it('reports what a test asserts beyond the tests that cover it', function (): vo
         ->and($cache->difference('tests/CalculatorTest.php :: it adds one and two', ['tests/CalculatorTest.php :: it is unknown']))->toBeNull();
 });
 
+it('measures what a test asserts beyond each covering test, never beyond their union', function (string $first, string $second): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/DispatchTest.php', <<<'PHP'
+        <?php
+        it('dispatches to the first address', function (): void {
+            dispatch('a', 1, 'z');
+        });
+        it('dispatches to the second address', function (): void {
+            dispatch('b', 2);
+        });
+        it('dispatches the first address with the second value', function (): void {
+            dispatch('a', 2, 'z');
+        });
+        PHP);
+    $cache = new FingerprintCache($project);
+
+    $differsBy = $cache->difference('tests/DispatchTest.php :: it dispatches the first address with the second value', [$first, $second]);
+
+    expect($differsBy)->toBe(['value:2']);
+})->with([
+    'smallest difference first' => [
+        'tests/DispatchTest.php :: it dispatches to the first address',
+        'tests/DispatchTest.php :: it dispatches to the second address',
+    ],
+    'smallest difference last' => [
+        'tests/DispatchTest.php :: it dispatches to the second address',
+        'tests/DispatchTest.php :: it dispatches to the first address',
+    ],
+]);
+
+it('reports every token of a test when no test covers it', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/DispatchTest.php', <<<'PHP'
+        <?php
+        it('dispatches', function (): void {
+            dispatch('a');
+        });
+        PHP);
+
+    $differsBy = new FingerprintCache($project)->difference('tests/DispatchTest.php :: it dispatches', []);
+
+    expect($differsBy)->toEqualCanonicalizing(['function:dispatch', 'value:\'a\'']);
+});
+
 it('fingerprints Pest tests in a namespace, inside describe blocks and with a shared dataset', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
