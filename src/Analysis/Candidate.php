@@ -45,7 +45,7 @@ final readonly class Candidate implements JsonSerializable
     {
         return match (true) {
             $this->differsBy === null => Action::Review,
-            $this->differsBy === [] && $this->unionOnlyLines === [] => Action::Delete,
+            $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => Action::Delete,
             $this->differsBy === [] => Action::Review,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
@@ -59,7 +59,11 @@ final readonly class Candidate implements JsonSerializable
      */
     public function coveringTokensForReview(): array
     {
-        return $this->differsOnlyInDataFromOneTestOfTheSameFile() ? $this->nonDataTokens($this->coveringDiffersBy ?? []) : [];
+        return match (true) {
+            $this->addsNoValueOrCall() => $this->keysOnlyTheCoveringTestSets(),
+            $this->differsOnlyInDataFromOneTestOfTheSameFile() => $this->nonDataTokens($this->coveringDiffersBy ?? []),
+            default => [],
+        };
     }
 
     /**
@@ -111,6 +115,19 @@ final readonly class Candidate implements JsonSerializable
     {
         return array_values(
             array_filter($tokens, static fn (string $token): bool => preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) !== 1),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function keysOnlyTheCoveringTestSets(): array
+    {
+        return array_values(
+            array_filter(
+                $this->coveringDiffersBy ?? [],
+                static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX),
+            ),
         );
     }
 

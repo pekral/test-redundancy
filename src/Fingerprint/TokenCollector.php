@@ -34,6 +34,8 @@ final class TokenCollector
 
     public const string DATA_TOKEN_PATTERN = '/^(in:.*\/)?(key:)?(value|const):/';
 
+    public const string KEY_PREFIX = 'key:';
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
      * @return array<string, int>
@@ -247,7 +249,7 @@ final class TokenCollector
         $isPathedData = $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
 
         return match (true) {
-            isset($arrayKeys[spl_object_id($node)]) => 'key:',
+            isset($arrayKeys[spl_object_id($node)]) => self::KEY_PREFIX,
             $isPathedData => 'in:' . implode('/', $path) . '/',
             default => '',
         };
