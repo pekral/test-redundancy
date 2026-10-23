@@ -140,7 +140,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
-| `differsBy` | The literals, constants, functions, calls and `new` expressions the candidate has and the covering test that lacks the fewest of them lacks. The fingerprint counts each token, so a token the candidate uses more times than the covering test is listed too. The count is the number of places the token appears in the test source, not the number of runs. A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop therefore carries a `loop:` prefix, e.g. `loop:call:Batch::import`: a test that makes the call in a loop and a test that makes it outside a loop differ in that token, and the action is `review`. Two loops differ only in the tokens they carry, never in the number of runs, and a callback passed to a function such as `array_map()` is not a loop body. With several covering tests, `differsBy` is the smallest difference against one of them, never against their union. A call made through Pest's `->not` or `->not()` carries a `not:` prefix, e.g. `not:call:toBeEmpty`. A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`, carries the token of its call form. An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `['enabled' => false]`, so the same literal under another key, or in a list without a key, is a different token. An empty array literal `[]` carries the token `value:[]`, and under an array key it carries the key path as well, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`. A literal, constant or empty array passed straight to a call or a `new` expression carries the call and the argument position as a path prefix, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its name instead of the position, e.g. `in:function:store#enabled/value:true`. A dataset row value is a value of the parameter at the same position of the test closure or method. A row value that is a literal, a constant or an empty array is counted where the test reads that parameter: the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as `expect(add(1, 2))->toBe(3)`. A literal, constant or empty array that the test assigns once to a local variable in its own statements is counted the same way, where the test reads the variable: `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`. A variable the test writes more than once keeps its tokens without a path. Any other row value, such as `new Contact()`, is counted once, as the row has it, however many times the test reads the parameter. A row value whose parameter the test never reads by its name keeps its token without a path. `null` when the test or its dataset row cannot be parsed; the first step then says so. |
+| `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
 | `coveringDiffersBy` | The calls, functions and `new` expressions that made the action `review` although `differsBy` holds only data: the candidate differs only in data from one test of the same file, and that test has them, or has them more times, while the candidate lacks them. The `review` steps name them. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file, and that test has no call, function or `new` expression this test lacks or uses fewer times; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, or could not be parsed. |
@@ -148,6 +148,40 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
 | `workflow` | The rules an agent follows for the whole report. |
+
+### How `differsBy` names a difference
+
+`differsBy` lists the literals, constants, functions, calls and `new` expressions the candidate has and the covering
+test lacks.
+
+- **One covering test, not a union.** With several covering tests, `differsBy` is the smallest difference against one
+  of them.
+- **Counts.** The fingerprint counts each token, so a token the candidate uses more times than the covering test is
+  listed too. The count is the number of places the token appears in the test source, not the number of runs.
+- **Loops.** A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop carries a
+  `loop:` prefix, e.g. `loop:call:Batch::import`. A call made in a loop and the same call made outside a loop are
+  different tokens, so the action is `review`. Two loops never differ in the number of runs, and a callback passed to a
+  function such as `array_map()` is not a loop body.
+- **Negation.** A call made through Pest's `->not` or `->not()` carries a `not:` prefix, e.g. `not:call:toBeEmpty`.
+- **Property-form assertions.** A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`,
+  carries the token of its call form.
+- **Array keys and values.** An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key
+  carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `['enabled' => false]`, so the same
+  literal under another key, or in a list without a key, is a different token.
+- **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
+  too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
+- **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
+  call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
+  `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its
+  name instead of the position, e.g. `in:function:store#enabled/value:true`.
+- **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
+  method. A literal, constant or empty array in a row is counted where the test reads that parameter: the row
+  `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as `expect(add(1, 2))->toBe(3)`. Any
+  other row value, such as `new Contact()`, is counted once, however many times the test reads the parameter. A row
+  value whose parameter the test never reads by its name keeps its token without a path.
+- **Local variables.** A literal, constant or empty array that the test assigns once to a local variable in its own statements is counted
+  where the test reads the variable: `$email = 'a@example.com'; notify($email);` has the same tokens as
+  `notify('a@example.com')`. A variable the test writes more than once keeps its tokens without a path.
 
 ### Verifying that coverage stayed
 
