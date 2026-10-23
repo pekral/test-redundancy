@@ -61,3 +61,17 @@ it('lists the files beside the test files that the tests may depend on', functio
 
     removeDirectory($root);
 });
+
+it('lists no support file of a test file outside the project root', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/project/tests', 0777, recursive: true);
+    mkdir($root . '/outside');
+    touch($root . '/project/tests/Pest.php');
+    touch($root . '/outside/OutsideTest.php');
+    touch($root . '/outside/helper.php');
+
+    expect(TestFiles::supportFiles(['../outside/OutsideTest.php', 'tests/ATest.php'], $root . '/project'))
+        ->toBe(['tests/Pest.php']);
+
+    removeDirectory($root);
+});

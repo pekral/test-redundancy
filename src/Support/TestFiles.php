@@ -61,7 +61,7 @@ final class TestFiles
         foreach ($directories as $directory) {
             $absolutePath = $projectRoot . DIRECTORY_SEPARATOR . $directory;
 
-            if (!is_dir($absolutePath)) {
+            if ($directory === '..' || !is_dir($absolutePath)) {
                 continue;
             }
 
