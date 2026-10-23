@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A literal, constant or empty array passed straight to a call or a `new` expression now carries the call and the
+  argument position in the contract fingerprint (`in:function:store#0/value:true`), or the argument name for a named
+  argument. A dataset row value is counted where the test reads the parameter at its position. Two dataset rows, or two
+  calls, with the same literals at swapped positions, such as `[false, true]` and `[true, false]`, are reported with a
+  non-empty `differsBy` instead of `differsBy: []` and the action `delete`. A test such as `add(1, 2)` covered by the
+  dataset row `[1, 2, 3]` of `add($first, $second)` is still reported with the action `delete` (#37).
 - A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop now carries a
   `loop:` prefix in the contract fingerprint (`loop:call:Batch::import`), because the fingerprint cannot count how many
   times the loop runs. A test that makes the call in a loop against one that makes it once is reported with the action

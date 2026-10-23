@@ -30,14 +30,14 @@ it('collects every node that carries a contract', function (): void {
         'function:expect',
         'call:toBe',
         'function:abs',
-        'value:-5',
-        'value:true',
+        'in:function:abs#0/value:-5',
+        'in:call:toBe#0/value:true',
         'call:Foo::create',
         'new:Bar',
-        'const:Baz::VALUE',
-        'value:null',
-        'value:1.5',
-        'value:\'text\'',
+        'in:call:Foo::create#1/const:Baz::VALUE',
+        'in:call:Foo::create#2/value:null',
+        'in:call:Foo::create#3/value:1.5',
+        'in:call:Foo::create#4/value:\'text\'',
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
@@ -94,7 +94,7 @@ it('tells a literal used as an array key from the same literal used as a value',
     $scalarString = $fingerprints['it normalizes › scalar string'];
     $nestedArray = $fingerprints['it normalizes › nested array'];
 
-    expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(['value:\'x\''])
+    expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(['in:function:normalize#0/value:\'x\'', 'in:call:toBe#0/value:\'x\''])
         ->and(array_keys(array_diff_key($nestedArray, $scalarString)))->toEqualCanonicalizing(
             [
                 'key:value:\'z\'',
@@ -105,7 +105,7 @@ it('tells a literal used as an array key from the same literal used as a value',
             ],
         )
         ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
-        ->toBe(['value:false']);
+        ->toBe(['in:function:normalize#0/value:false', 'in:call:toBe#0/value:false']);
 });
 
 it('tells a literal under one array key from the same literal under another key', function (string $code, array $expected): void {
@@ -148,8 +148,8 @@ it('tells a literal under one array key from the same literal under another key'
     'literal in a call under a key' => ['store([\'limit\' => min(5, 9)]);', [
         'function:min' => 1,
         'function:store' => 1,
-        'in:value:\'limit\'/value:5' => 1,
-        'in:value:\'limit\'/value:9' => 1,
+        'in:value:\'limit\'/function:min#0/value:5' => 1,
+        'in:value:\'limit\'/function:min#1/value:9' => 1,
         'key:value:\'limit\'' => 1,
     ],
     ],
@@ -177,10 +177,41 @@ it('tells a literal under one array key from the same literal under another key'
     'string under a key' => ['store([\'name\' => \'x\']);', ['function:store' => 1, 'key:value:\'name\'' => 1, 'in:value:\'name\'/value:\'x\'' => 1]],
 ]);
 
-it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
-    $statements = new ParserFactory()->createForHostVersion()->parse('<?php store(' . $argument . ');');
+it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 
-    expect(TokenCollector::collect($statements))->toBe(['function:store' => 1, 'value:[]' => $count]);
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'argument of a dynamic call' => ['$store(true);', ['value:true' => 1]],
+    'argument of a method call, a static call and a new expression' => ['$cart->add(1); Cart::make(-2); new Item(Size::Large);', [
+        'call:add' => 1,
+        'call:Cart::make' => 1,
+        'in:call:add#0/value:1' => 1,
+        'in:call:Cart::make#0/value:-2' => 1,
+        'in:new:Item#0/const:Size::Large' => 1,
+        'new:Item' => 1,
+    ],
+    ],
+    'argument under a key' => ['store([\'limit\' => min(5)]);', [
+        'function:min' => 1,
+        'function:store' => 1,
+        'in:value:\'limit\'/function:min#0/value:5' => 1,
+        'key:value:\'limit\'' => 1,
+    ],
+    ],
+    'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
+    'literal inside an argument' => ['store([true], 1 + 2);', ['function:store' => 1, 'value:1' => 1, 'value:2' => 1, 'value:true' => 1]],
+    'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],
+    'positional arguments' => [
+        'store(true, false);',
+        ['function:store' => 1, 'in:function:store#0/value:true' => 1, 'in:function:store#1/value:false' => 1],
+    ],
+]);
+
+it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php $tags = ' . $argument . ';');
+
+    expect(TokenCollector::collect($statements))->toBe(['value:[]' => $count]);
 })->with([
     'nested empty array' => ['[[[]]]', 1],
     'one empty array' => ['[]', 1],
@@ -204,8 +235,9 @@ it('counts how many times a test uses each token', function (): void {
         'call:toBe' => 1,
         'function:expect' => 1,
         'function:add' => 1,
-        'value:1' => 2,
-        'value:2' => 1,
+        'in:function:add#0/value:1' => 1,
+        'in:function:add#1/value:1' => 1,
+        'in:call:toBe#0/value:2' => 1,
     ]);
 });
 
@@ -218,11 +250,17 @@ it('marks a call or new expression in a loop body, whose number of runs the fing
     'for' => ['for ($i = 0; $i < 3; $i++) { $importer->import(); }', ['value:0' => 1, 'value:3' => 1, 'loop:call:import' => 1]],
     'foreach over range' => [
         'foreach (range(1, 3) as $i) { import(new Batch()); }',
-        ['function:range' => 1, 'value:1' => 1, 'value:3' => 1, 'loop:function:import' => 1, 'loop:new:Batch' => 1],
+        [
+            'function:range' => 1,
+            'in:function:range#0/value:1' => 1,
+            'in:function:range#1/value:3' => 1,
+            'loop:function:import' => 1,
+            'loop:new:Batch' => 1,
+        ],
     ],
     'literals in a loop body' => [
         'foreach ($ids as $id) { store([\'id\' => 5], null); }',
-        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1, 'value:null' => 1],
+        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:value:\'id\'/value:5' => 1, 'in:function:store#1/value:null' => 1],
     ],
     'nested loops' => ['foreach ($lists as $list) { foreach ($list as $item) { import(); } }', ['loop:function:import' => 1]],
     'while' => ['while (true) { Batch::import(); }', ['value:true' => 1, 'loop:call:Batch::import' => 1]],
@@ -232,13 +270,13 @@ it('counts a token of a dataset row together with the same token of the test bod
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
         it('adds', function (int $value): void {
-            expect(add($value))->toBe(1);
+            expect(add($value))->toBe(add(1));
         })->with(['one' => [1]])->group('math')->group('math');
         PHP);
 
     $row = $fingerprints['it adds › one'];
 
-    expect([$row['value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
+    expect([$row['in:function:add#0/value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
 });
 
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
@@ -258,7 +296,7 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
 
     expect(array_keys($fingerprints))->toBe(['it adds › small', 'it adds › large', 'rejects', 'it reads a shared dataset'])
         ->and(array_keys($fingerprints['it adds › small']))->toEqualCanonicalizing(
-            ['function:expect', 'call:toBe', 'function:add', 'call:group', 'value:\'math\'', 'value:3'],
+            ['function:expect', 'call:toBe', 'function:add', 'call:group', 'value:\'math\'', 'in:call:toBe#0/value:3'],
         )
         ->and($fingerprints['rejects'])->toHaveKeys(['call:throws', 'const:InvalidArgumentException::class', 'value:\'Broken\'']);
 });
@@ -296,8 +334,8 @@ it('fingerprints PHPUnit tests and their data providers', function (): void {
     expect(array_keys($fingerprints))->toBe(
         ['testGreets › jane', 'testGreets › john', 'testAges › adult', 'greetsAStranger', 'greetsNobody', 'testMissingProvider', 'testDynamicProvider'],
     )
-        ->and(array_keys($fingerprints['testGreets › john']))->toEqualCanonicalizing(['function:greet', 'value:\'John\''])
-        ->and(array_keys($fingerprints['testAges › adult']))->toEqualCanonicalizing(['function:age', 'value:30']);
+        ->and(array_keys($fingerprints['testGreets › john']))->toEqualCanonicalizing(['function:greet', 'in:function:greet#0/value:\'John\''])
+        ->and(array_keys($fingerprints['testAges › adult']))->toEqualCanonicalizing(['function:age', 'in:function:age#0/value:30']);
 });
 
 it('reports what a test asserts beyond the tests that cover it', function (): void {
@@ -305,7 +343,7 @@ it('reports what a test asserts beyond the tests that cover it', function (): vo
     $cache = new FingerprintCache($root);
 
     expect($cache->difference('tests/CalculatorTest.php :: it adds two numbers › negative numbers', ['tests/CalculatorTest.php :: it adds one and two']))
-        ->toBe(['value:-1', 'value:-2', 'value:-3'])
+        ->toBe(['in:call:add#0/value:-1', 'in:call:add#1/value:-2', 'in:call:toBe#0/value:-3'])
         ->and(
             $cache->difference('tests/CalculatorTest.php :: it adds two numbers › small numbers', ['tests/CalculatorTest.php :: it adds one and two']),
         )->toBe(
@@ -334,7 +372,7 @@ it('measures what a test asserts beyond each covering test, never beyond their u
 
     $differsBy = $cache->difference('tests/DispatchTest.php :: it dispatches the first address with the second value', [$first, $second]);
 
-    expect($differsBy)->toBe(['value:2']);
+    expect($differsBy)->toBe(['in:function:dispatch#1/value:2']);
 })->with([
     'smallest difference first' => [
         'tests/DispatchTest.php :: it dispatches to the first address',
@@ -358,7 +396,7 @@ it('reports every token of a test when no test covers it', function (): void {
 
     $differsBy = new FingerprintCache($project)->difference('tests/DispatchTest.php :: it dispatches', []);
 
-    expect($differsBy)->toEqualCanonicalizing(['function:dispatch', 'value:\'a\'']);
+    expect($differsBy)->toEqualCanonicalizing(['function:dispatch', 'in:function:dispatch#0/value:\'a\'']);
 });
 
 it('fingerprints Pest tests in a namespace, inside describe blocks and with a shared dataset', function (): void {
@@ -389,5 +427,5 @@ it('fingerprints Pest tests in a namespace, inside describe blocks and with a sh
         '`adding` → `nested` → deep',
         'it uses an unknown dataset',
     ])
-        ->and($fingerprints['`adding` → it adds › two'])->toHaveKey('value:2');
+        ->and($fingerprints['`adding` → it adds › two'])->toHaveKey('in:function:expect#0/value:2');
 });
