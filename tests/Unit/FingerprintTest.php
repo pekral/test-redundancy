@@ -81,6 +81,16 @@ it('tells a literal used as an array key from the same literal used as a value',
         ->toBe(['value:false']);
 });
 
+it('gives an empty array literal one token, however many or deeply nested empty arrays it holds', function (string $argument): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php store(' . $argument . ');');
+
+    expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing(['function:store', 'value:[]']);
+})->with([
+    'nested empty array' => ['[[[]]]'],
+    'one empty array' => ['[]'],
+    'two empty arrays' => ['[[], []]'],
+]);
+
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
