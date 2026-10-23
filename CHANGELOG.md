@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A dataset row whose value is a closure or an arrow function carries the token `value:closure:<hash>`, a hash of the
+  closure source as `nikic/php-parser` prints it. Two rows whose closures have different bodies differ in `differsBy`,
+  so such a row is no longer reported with the action `delete` against its sibling row. Two closures that differ only
+  in formatting still have the same token (#57).
+
 ## [0.1.2] - 2026-10-23
 
 ### Added

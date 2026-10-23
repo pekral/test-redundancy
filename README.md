@@ -207,7 +207,11 @@ test lacks.
   `load(['id', 'tags'])`. A list is an array whose elements have no key and are each a literal, constant or empty
   array. Any other row value, such as `new Contact()` or `['id' => 5]`, is counted once, as the row has it, however
   many times the test reads the parameter. A row value whose parameter the test never reads by its name keeps its
-  token without a path.
+  token without a path. A closure or arrow function in a row also carries the token `value:closure:<hash>`, a hash of
+  its source as `nikic/php-parser` prints it. Two rows whose closures have different bodies, such as
+  `fn (string $email): string => $email` and `fn (string $email): string => rawurlencode($email)`, therefore differ
+  in `differsBy`, and the row is never `delete`. Two closures that differ only in whitespace or line breaks have the
+  same token.
 - **Local variables.** A literal, constant, empty array or list of them that the test assigns once to a local variable
   in its own statements is counted where the test reads the variable: `$email = 'a@example.com'; notify($email);` has
   the same tokens as `notify('a@example.com')`, and `$columns = ['id', 'tags']; load($columns);` has the same tokens

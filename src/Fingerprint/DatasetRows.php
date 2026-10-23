@@ -10,9 +10,11 @@ use PhpParser\Node\ArrayItem;
 use PhpParser\Node\ClosureUse;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\AssignOp;
 use PhpParser\Node\Expr\AssignRef;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\PostDec;
 use PhpParser\Node\Expr\PostInc;
 use PhpParser\Node\Expr\PreDec;
@@ -28,6 +30,7 @@ use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\Global_;
 use PhpParser\Node\Stmt\Unset_;
 use PhpParser\NodeFinder;
+use PhpParser\PrettyPrinter\Standard;
 
 final class DatasetRows
 {
@@ -78,11 +81,23 @@ final class DatasetRows
         $binder = new ParameterBinder(array_map(static fn (ArrayItem $item): Expr => $item->value, $arguments), droppedAssignments: []);
         $boundBody = $binder->bind($body);
         $boundItems = array_intersect_key($arguments, $binder->boundNames());
+        $unboundItems = array_filter($items, static fn (ArrayItem $item): bool => !in_array($item, $boundItems, strict: true));
 
         return TokenCollector::sum(
             self::bodyTokens($boundBody, $parameters),
-            TokenCollector::collect(array_filter($items, static fn (ArrayItem $item): bool => !in_array($item, $boundItems, strict: true))),
+            TokenCollector::collect($unboundItems),
+            ...array_map(self::closureToken(...), array_values($unboundItems)),
         );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function closureToken(ArrayItem $item): array
+    {
+        return $item->value instanceof Closure || $item->value instanceof ArrowFunction
+            ? ['value:closure:' . hash('xxh3', new Standard()->prettyPrintExpr($item->value)) => 1]
+            : [];
     }
 
     /**
