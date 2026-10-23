@@ -15,9 +15,15 @@ final readonly class Candidate implements JsonSerializable
      * @param list<string> $coveredBy
      * @param list<string>|null $differsBy
      * @param list<string>|null $coveringDiffersBy
+     * @param list<string> $unionOnlyLines
      */
-    public function __construct(public string $testKey, public array $coveredBy, public ?array $differsBy, public ?array $coveringDiffersBy)
-    {
+    public function __construct(
+        public string $testKey,
+        public array $coveredBy,
+        public ?array $differsBy,
+        public ?array $coveringDiffersBy,
+        public array $unionOnlyLines,
+    ) {
     }
 
     public function testCase(): string
@@ -32,14 +38,15 @@ final readonly class Candidate implements JsonSerializable
 
     public function addsNoValueOrCall(): bool
     {
-        return $this->differsBy === [];
+        return $this->differsBy === [] && $this->unionOnlyLines === [];
     }
 
     public function action(): Action
     {
         return match (true) {
             $this->differsBy === null => Action::Review,
-            $this->differsBy === [] => Action::Delete,
+            $this->differsBy === [] && $this->unionOnlyLines === [] => Action::Delete,
+            $this->differsBy === [] => Action::Review,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
             $this->differsOnlyInDataFromOneTestOfTheSameFile() && $this->coveringTokensForReview() === [] => Action::MergeIntoDataset,
@@ -63,6 +70,7 @@ final readonly class Candidate implements JsonSerializable
      *     differsBy: list<string>|null,
      *     steps: list<string>,
      *     test: string,
+     *     unionOnlyLines: list<string>,
      * }
      */
     public function jsonSerialize(): array
@@ -74,6 +82,7 @@ final readonly class Candidate implements JsonSerializable
             'differsBy' => $this->differsBy,
             'steps' => $this->steps(),
             'test' => $this->testCase(),
+            'unionOnlyLines' => $this->unionOnlyLines,
         ];
     }
 
@@ -82,6 +91,10 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
+        if ($this->unionOnlyLines !== []) {
+            return [sprintf(Action::UNION_ONLY_LINES_STEP, '"' . implode('", "', $this->coveredBy) . '"'), Action::VERIFY_STEP];
+        }
+
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
         $steps = $this->action()->steps('"' . implode('", "', $coveringTests) . '"', $this->coveringTokensForReview());
 

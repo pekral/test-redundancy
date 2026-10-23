@@ -79,12 +79,13 @@ final readonly class ReportPrinter
         $coveringTokens = $candidate->coveringTokensForReview();
 
         return sprintf(
-            "%s\n    action: %s\n    covered by:\n      - %s\n    differs by: %s%s",
+            "%s\n    action: %s\n    covered by:\n      - %s\n    differs by: %s%s%s",
             $candidate->testCase(),
             $candidate->action()->value,
             implode("\n      - ", $candidate->coveredBy),
             $candidate->differsBy === null ? self::UNPARSED : implode(', ', $candidate->differsBy),
             $coveringTokens === [] ? '' : "\n    covering differs by: " . implode(', ', $coveringTokens),
+            $candidate->unionOnlyLines === [] ? '' : "\n    union only lines: " . implode(', ', $candidate->unionOnlyLines),
         );
     }
 

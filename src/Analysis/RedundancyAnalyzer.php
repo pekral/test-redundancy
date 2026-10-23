@@ -26,18 +26,21 @@ final readonly class RedundancyAnalyzer
         $fixedTests = $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
         $removed = $this->eliminate($analyzedTests, $fixedTests);
         $kept = array_diff_key($analyzedTests, $removed);
+        $pool = [...$kept, ...$fixedTests];
         $reports = [];
 
         foreach ($testsByFile as $testFile => $tests) {
             $candidates = [];
 
             foreach (array_keys(array_intersect_key($removed, $tests)) as $testKey) {
-                $coveredBy = $this->smallestCover($tests[$testKey], [...$kept, ...$fixedTests]);
+                $coveredBy = $this->smallestCover($tests[$testKey], $pool);
+                $differsBy = $this->fingerprints->difference($testKey, $coveredBy);
                 $candidates[] = new Candidate(
                     $testKey,
                     array_map(static fn (string $covering): string => self::display($covering, $testFile), $coveredBy),
-                    $this->fingerprints->difference($testKey, $coveredBy),
+                    $differsBy,
                     $this->fingerprints->coveringDifference($testKey, $coveredBy),
+                    $differsBy === [] ? $this->linesOnlyTheUnionReaches($testKey, $tests[$testKey], $coveredBy, $pool) : [],
                 );
             }
 
@@ -99,6 +102,23 @@ final readonly class RedundancyAnalyzer
         }
 
         return $cover;
+    }
+
+    /**
+     * @param array<string, true> $lines
+     * @param list<string> $coveredBy
+     * @param array<string, array<string, true>> $pool
+     * @return list<string>
+     */
+    private function linesOnlyTheUnionReaches(string $testKey, array $lines, array $coveredBy, array $pool): array
+    {
+        $missingByMatchingTest = array_map(
+            static fn (string $covering): array => array_keys(array_diff_key($lines, $pool[$covering])),
+            array_filter($coveredBy, fn (string $covering): bool => $this->fingerprints->difference($testKey, [$covering]) === []),
+        );
+        usort($missingByMatchingTest, static fn (array $first, array $second): int => count($first) <=> count($second));
+
+        return $missingByMatchingTest[0] ?? [];
     }
 
     /**

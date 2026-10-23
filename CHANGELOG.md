@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `unionOnlyLines` in the JSON report and `union only lines` in the text report list the source lines of a candidate
+  that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches
+  them (#45).
+
+### Fixed
+
+- A candidate is reported with the action `delete` only when one covering test matches its contract (`differsBy: []`)
+  and runs every source line the candidate runs. When the matching test runs only some of the lines and a second
+  covering test runs the rest, the action is now `review`, and `unionOnlyLines` names the lines the matching test
+  misses. Before, such a candidate got `differsBy: []` and the action `delete`, and deleting it left the lines of the
+  second test without an assertion (#45).
+
 ## [0.1.1] - 2026-10-23
 
 ### Added
