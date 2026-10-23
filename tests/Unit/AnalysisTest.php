@@ -454,8 +454,8 @@ it('still deletes a test that one matching covering test runs completely, whatev
         it('rejects a request without credentials', function (): void {
             authenticate(['secret' => 'configured']);
         });
-        it('rejects a request with a wrong redirect', function (): void {
-            authenticate(['secret' => 'configured'], 'https://other.example.test');
+        it('refuses a request without credentials', function (): void {
+            expect(authenticate(['secret' => 'configured']))->toBeFalse();
         });
         it('rejects every request while no secret is configured', function (): void {
             authenticate(['secret' => '']);
@@ -464,7 +464,7 @@ it('still deletes a test that one matching covering test runs completely, whatev
 
     $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => [
         'tests/TokenTest.php :: it rejects a request without credentials' => ['src/Middleware.php:1' => true, 'src/Middleware.php:2' => true],
-        'tests/TokenTest.php :: it rejects a request with a wrong redirect' => [
+        'tests/TokenTest.php :: it refuses a request without credentials' => [
             'src/Middleware.php:1' => true,
             'src/Middleware.php:2' => true,
             'src/Middleware.php:10' => true,
@@ -478,7 +478,7 @@ it('still deletes a test that one matching covering test runs completely, whatev
     ], map: null);
 
     expect($reports[0]->candidates)->toHaveCount(1)
-        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it rejects a request with a wrong redirect'])
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it refuses a request without credentials'])
         ->and($reports[0]->candidates[0]->unionOnlyLines)->toBe([])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 });
