@@ -429,6 +429,23 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         ['function:store', 'value:\'a@example.com\'', 'value:1'],
         Action::Review,
     ],
+    'one import against the three imports in a loop of the issue' => [
+        <<<'PHP'
+            <?php
+            it('imports three batches in a loop', function (): void {
+                foreach (range(1, 3) as $i) {
+                    Batch::import();
+                }
+            });
+            it('imports one batch', function (): void {
+                Batch::import();
+            });
+            PHP,
+        'it imports one batch',
+        'it imports three batches in a loop',
+        ['call:Batch::import'],
+        Action::Review,
+    ],
     'one imported batch against three' => [
         <<<'PHP'
             <?php
@@ -458,6 +475,23 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         'it adds one to two',
         ['value:1'],
         Action::MergeIntoDataset,
+    ],
+    'the three imports in a loop of the issue against one import' => [
+        <<<'PHP'
+            <?php
+            it('imports three batches in a loop', function (): void {
+                foreach (range(1, 3) as $i) {
+                    Batch::import();
+                }
+            });
+            it('imports one batch', function (): void {
+                Batch::import();
+            });
+            PHP,
+        'it imports three batches in a loop',
+        'it imports one batch',
+        ['function:range', 'value:1', 'value:3', 'loop:call:Batch::import'],
+        Action::Review,
     ],
     'three imports in a loop against one import' => [
         <<<'PHP'
