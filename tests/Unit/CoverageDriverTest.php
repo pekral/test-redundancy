@@ -50,7 +50,7 @@ it('points pcov at the one source directory', function (): void {
 
 it('points pcov at the common parent of several source directories and excludes the rest of it', function (): void {
     $project = projectWithDirectories(['src', 'app', 'tests', 'config']);
-    $exclude = '~/vendor/|^' . preg_quote($project, '~') . '/(?!(?:src|app)/)~';
+    $exclude = str_replace('\\', '\\\\', '~/vendor/|^' . preg_quote($project, '~') . '/(?!(?:src|app)/)~');
 
     expect(pcovArguments($project, ['src/', 'app/']))
         ->toBe(['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . $project, '-d', 'pcov.exclude=' . $exclude]);
@@ -58,7 +58,7 @@ it('points pcov at the common parent of several source directories and excludes 
 
 it('uses the deepest common parent of source directories', function (): void {
     $project = projectWithDirectories(['app/Models', 'app/Http', 'app/Console']);
-    $exclude = '~/vendor/|^' . preg_quote($project . '/app', '~') . '/(?!(?:Models|Http)/)~';
+    $exclude = str_replace('\\', '\\\\', '~/vendor/|^' . preg_quote($project . '/app', '~') . '/(?!(?:Models|Http)/)~');
 
     expect(pcovArguments($project, ['app/Models/', 'app/Http/']))
         ->toBe(['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . $project . '/app', '-d', 'pcov.exclude=' . $exclude]);
@@ -126,7 +126,7 @@ function filesPcovCollects(string $project, array $arguments): array
 }
 
 it('collects the same source files with the narrowed pcov directory as with the whole project', function (): void {
-    $directories = ['src', 'app-v2.x', 'app-v2-x', 'tests', 'config', 'database', 'vendor/package', 'src/vendor'];
+    $directories = ['src', 'app-v2.x', 'app-v2-x', 'app$v2', 'tests', 'config', 'database', 'vendor/package', 'src/vendor'];
     $project = projectWithDirectories($directories);
     $files = array_map(static fn (string $directory): string => $directory . '/unit.php', $directories);
     $files[] = 'unit.php';
@@ -140,7 +140,7 @@ it('collects the same source files with the narrowed pcov directory as with the 
         . "echo json_encode(array_keys(\\pcov\\collect(\\pcov\\all)));\n",
         var_export($files, return: true),
     ));
-    file_put_contents($project . '/' . Configuration::FILE_NAME, (string) json_encode(['source' => ['src', 'app-v2.x']]));
+    file_put_contents($project . '/' . Configuration::FILE_NAME, (string) json_encode(['source' => ['src', 'app-v2.x', 'app$v2']]));
     $configuration = Configuration::load($project);
     $isSource = static fn (string $file): bool => $configuration->isSource($file);
 
@@ -150,7 +150,7 @@ it('collects the same source files with the narrowed pcov directory as with the 
         CoverageDriver::argumentsFor(hasPcov: true, hasXdebug: false, projectRoot: $project, sourcePaths: $configuration->sourcePaths),
     );
 
-    expect(array_values(array_filter($before, $isSource)))->toBe(['app-v2.x/unit.php', 'src/unit.php'])
-        ->and($after)->toBe(['app-v2.x/unit.php', 'src/unit.php'])
+    expect(array_values(array_filter($before, $isSource)))->toBe(['app$v2/unit.php', 'app-v2.x/unit.php', 'src/unit.php'])
+        ->and($after)->toBe(['app$v2/unit.php', 'app-v2.x/unit.php', 'src/unit.php'])
         ->and($before)->toContain('tests/unit.php', 'config/unit.php', 'database/unit.php', 'app-v2-x/unit.php', 'unit.php');
 });

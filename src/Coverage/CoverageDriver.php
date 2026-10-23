@@ -61,7 +61,10 @@ final class CoverageDriver
             $exclude .= '|^' . preg_quote(rtrim($parent, '/'), '~') . '/(?!(?:' . implode('|', $subdirectories) . ')/)';
         }
 
-        return ['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . ($parent ?? $projectRoot), '-d', 'pcov.exclude=~' . $exclude . '~'];
+        // PHP reads a -d value through its INI scanner, which turns "\\" into "\" and "\$" into "$" inside the quoted value.
+        $iniExclude = str_replace('\\', '\\\\', '~' . $exclude . '~');
+
+        return ['-d', 'pcov.enabled=1', '-d', 'pcov.directory=' . ($parent ?? $projectRoot), '-d', 'pcov.exclude=' . $iniExclude];
     }
 
     /**
