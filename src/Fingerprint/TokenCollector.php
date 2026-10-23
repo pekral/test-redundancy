@@ -79,10 +79,7 @@ final class TokenCollector
 
     public static function isArgumentOfCodeUnderTest(string $token): bool
     {
-        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
-            && !str_starts_with($matches[1], 'assert')
-            && !str_starts_with($matches[1], 'expect')
-            && !self::isExpectationMethod($matches[1]);
+        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && !self::isAssertion($matches[1]);
     }
 
     /**
@@ -146,7 +143,9 @@ final class TokenCollector
         $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
 
         foreach ($pathNodes as $pathNode) {
-            $segments = $pathNode instanceof ArrayItem ? self::keySegments($nodeFinder, $pathNode) : self::argumentSegments($pathNode);
+            $segments = $pathNode instanceof ArrayItem
+                ? self::keySegments($nodeFinder, $pathNode)
+                : self::argumentSegments($nodeFinder, $pathNode);
 
             foreach ($segments as $nodeId => $segment) {
                 $paths[$nodeId][] = $segment;
@@ -163,32 +162,23 @@ final class TokenCollector
     {
         $keyToken = $arrayItem->key === null ? null : self::token($arrayItem->key);
 
-        if ($keyToken === null) {
-            return [];
-        }
-
-        $segments = [];
-
-        foreach ($nodeFinder->find($arrayItem->value, static fn (): bool => true) as $node) {
-            $segments[spl_object_id($node)] = $keyToken;
-        }
-
-        return $segments;
+        return $keyToken === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $keyToken);
     }
 
     /**
      * @return array<int, string>
      */
-    private static function argumentSegments(Node $call): array
+    private static function argumentSegments(NodeFinder $nodeFinder, Node $call): array
     {
         $callToken = self::token($call);
         $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
+        $isAssertion = $callToken !== null && self::isAssertion(substr($callToken, (int) strrpos($callToken, ':') + 1));
         $segments = [];
 
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
                 $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
-                $segments += array_fill_keys(self::argumentValueIds($argument->value), $segment);
+                $segments += array_fill_keys(self::argumentValueIds($nodeFinder, $argument->value, $isAssertion), $segment);
             }
         }
 
@@ -196,13 +186,24 @@ final class TokenCollector
     }
 
     /**
-     * @return list<int>
+     * @return array<int>
      */
-    private static function argumentValueIds(Expr $argument): array
+    private static function argumentValueIds(NodeFinder $nodeFinder, Expr $argument, bool $isAssertion): array
     {
-        $items = $argument instanceof Array_ ? array_values($argument->items) : [];
+        $nestedCalls = $isAssertion ? $nodeFinder->findInstanceOf($argument, CallLike::class) : [];
 
-        return [spl_object_id($argument), ...array_map(static fn (ArrayItem $item): int => spl_object_id($item->value), $items)];
+        return array_diff(
+            self::nodeIds($nodeFinder, $argument),
+            ...array_map(static fn (CallLike $call): array => self::nodeIds($nodeFinder, $call), $nestedCalls),
+        );
+    }
+
+    /**
+     * @return array<int>
+     */
+    private static function nodeIds(NodeFinder $nodeFinder, Node $node): array
+    {
+        return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
     }
 
     /**
@@ -295,6 +296,11 @@ final class TokenCollector
             && $propertyFetch->name instanceof Identifier
             && self::isExpectationMethod($propertyFetch->name->toString())
             && self::isExpectationChain($propertyFetch->var);
+    }
+
+    private static function isAssertion(string $method): bool
+    {
+        return str_starts_with($method, 'assert') || str_starts_with($method, 'expect') || self::isExpectationMethod($method);
     }
 
     private static function isExpectationMethod(string $method): bool

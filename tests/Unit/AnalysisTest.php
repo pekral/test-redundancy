@@ -717,7 +717,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             ],
         ),
         'it builds the exportable shape of a mail action carrying variants › mail action without variants',
-        ['key:value:\'variants\''],
+        ['key:value:\'variants\'', 'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\''],
     ],
     'multicast pipeline without the parallel flag' => [
         fn (): FileReport => analyzeTokenTest(
@@ -736,7 +736,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             ],
         ),
         'it refuses to drain a pipeline through the recurring queue › multicast',
-        ['key:value:\'parallel\'', 'in:function:pipeline#0/value:\'parallel\'/value:1'],
+        ['key:value:\'parallel\'', 'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/value:\'parallel\'/value:1'],
     ],
 ]);
 
@@ -914,6 +914,34 @@ it('deletes a test that passes a once-assigned local map where its covering test
         ->and($report->candidates[0]->testCase())->toBe('it a')
         ->and($report->candidates[0]->differsBy)->toBe([])
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('does not delete a dataset row whose value a sibling row passes through one more call', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('decodes stored custom fields', function (string $stored, array $expected): void {
+                expect(decode($stored))->toEqual($expected);
+            })->with([
+                'a json string is decoded' => [json_encode(['test' => true]), ['test' => true]],
+                'a double encoded json string is decoded twice' => [json_encode(json_encode(['test' => true])), ['test' => true]],
+            ]);
+            PHP,
+        linesByTest: [
+            'it decodes stored custom fields › a json string is decoded' => ['src/Decode.php:5', 'src/Decode.php:7', 'src/Decode.php:11'],
+            'it decodes stored custom fields › a double encoded json string is decoded twice' => [
+                'src/Decode.php:5',
+                'src/Decode.php:7',
+                'src/Decode.php:8',
+                'src/Decode.php:11',
+            ],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it decodes stored custom fields › a json string is decoded')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:json_encode#0/value:\'test\'/value:true'])
+        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
 it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
