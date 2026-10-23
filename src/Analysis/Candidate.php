@@ -96,15 +96,30 @@ final readonly class Candidate implements JsonSerializable
     public function steps(): array
     {
         if ($this->unionOnlyLines !== []) {
-            return [sprintf(Action::UNION_ONLY_LINES_STEP, '"' . implode('", "', $this->coveredBy) . '"'), Action::VERIFY_STEP];
+            return [sprintf(Action::UNION_ONLY_LINES_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
+        }
+
+        if ($this->addsNoValueOrCall() && $this->coveringTokensForReview() !== []) {
+            return [
+                sprintf(Action::MISSING_KEY_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringTokensForReview())),
+                Action::VERIFY_STEP,
+            ];
         }
 
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
-        $steps = $this->action()->steps('"' . implode('", "', $coveringTests) . '"', $this->coveringTokensForReview());
+        $steps = $this->action()->steps($this->quoted($coveringTests), $this->coveringTokensForReview());
 
         return $this->differsBy === null
             ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
             : $steps;
+    }
+
+    /**
+     * @param list<string> $testNames
+     */
+    private function quoted(array $testNames): string
+    {
+        return '"' . implode('", "', $testNames) . '"';
     }
 
     /**
