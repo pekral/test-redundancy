@@ -21,7 +21,10 @@ final readonly class TestRunner
 
     private const array CONFIGURATION_FILES = ['phpunit.xml', 'phpunit.xml.dist'];
 
-    private function __construct(private string $projectRoot, private string $binary, private bool $isPest)
+    /**
+     * @param list<string> $sourcePaths
+     */
+    private function __construct(private string $projectRoot, private array $sourcePaths, private string $binary, private bool $isPest)
     {
     }
 
@@ -33,7 +36,7 @@ final readonly class TestRunner
             throw new RuntimeException(sprintf('No test runner found at %s. Install Pest or PHPUnit, or set "runner".', $binary));
         }
 
-        return new self($configuration->projectRoot, $binary, str_ends_with($binary, 'pest'));
+        return new self($configuration->projectRoot, $configuration->sourcePaths, $binary, str_ends_with($binary, 'pest'));
     }
 
     public function rootDirectory(): string
@@ -53,7 +56,7 @@ final readonly class TestRunner
     public function command(array $paths, bool $parallel, int $processes, string $coverageFile, string $junitFile): array
     {
         $binary = $parallel && !$this->isPest ? $this->paratest() : $this->binary;
-        $iniArguments = CoverageDriver::iniArguments($this->projectRoot);
+        $iniArguments = CoverageDriver::iniArguments($this->projectRoot, $this->sourcePaths);
         $workerArguments = ['--processes=' . $processes, '--passthru-php=' . $this->quoted($iniArguments)];
         $parallelArguments = match (true) {
             !$parallel => [],

@@ -20,7 +20,7 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | --- | --- |
 | PHP | `^8.4` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
-| Coverage driver | `pcov` (the tool sets `pcov.directory` to the project root) or `xdebug` |
+| Coverage driver | `pcov` (the tool limits `pcov.directory` to the `source` directories) or `xdebug` |
 | Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel, so PHPUnit 13 needs 13.4+, the oldest version `paratest` supports |
 
 Contributing to this repository needs PHP 8.4+ with `pcov`.

@@ -3,6 +3,7 @@
 declare(strict_types = 1);
 
 use Pekral\TestRedundancy\Analysis\FileReport;
+use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\TestRedundancy;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ProcessFailedException;
@@ -236,3 +237,78 @@ it('fails when the analysed tests fail', function (): void {
 
     removeDirectory($project);
 });
+
+it('records the lines of every existing source directory when pcov is narrowed to them', function (bool $runnerParallel): void {
+    $project = temporaryDirectory();
+    new Filesystem()->mirror(fixturePath('pest'), $project);
+    new Filesystem()->remove($project . '/tests');
+    mkdir($project . '/tests');
+    mkdir($project . '/app');
+    mkdir($project . '/config');
+    mkdir($project . '/database');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src', 'app', 'missing'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+    ]));
+    file_put_contents($project . '/phpunit.xml', str_replace(
+        '<directory>src</directory>',
+        '<directory>src</directory><directory>app</directory><directory>config</directory><directory>database</directory>',
+        (string) file_get_contents($project . '/phpunit.xml'),
+    ));
+    file_put_contents($project . '/app/Pricing.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        function priced(int $amount): int
+        {
+            return $amount * 2;
+        }
+        PHP);
+    file_put_contents($project . '/config/settings.php', "<?php\n\nfunction setting(): int\n{\n    return 7;\n}\n");
+    file_put_contents($project . '/database/Seeder.php', "<?php\n\nfunction seeded(): int\n{\n    return 5;\n}\n");
+    file_put_contents($project . '/tests/MixedTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        require_once __DIR__ . '/../src/Calculator.php';
+        require_once __DIR__ . '/../app/Pricing.php';
+        require_once __DIR__ . '/../config/settings.php';
+        require_once __DIR__ . '/../database/Seeder.php';
+
+        use Fixture\Pest\Calculator;
+
+        test('adds and prices', function (): void {
+            expect((new Calculator())->add(setting(), seeded()))->toBe(12)
+                ->and(priced(2))->toBe(4);
+        });
+        PHP);
+    file_put_contents($project . '/tests/OtherMixedTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        require_once __DIR__ . '/../app/Pricing.php';
+        require_once __DIR__ . '/../database/Seeder.php';
+
+        test('prices the seed', function (): void {
+            expect(priced(seeded()))->toBe(10);
+        });
+        PHP);
+
+    TestRedundancy::forProject($project, processes: 2)->analyse(
+        ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
+        $runnerParallel ? ['tests'] : ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
+    );
+
+    $baseline = CoverageBaseline::load($project . '/.test-redundancy/baseline.json');
+
+    expect($baseline->files['tests/MixedTest.php']['lines'])->toEqualCanonicalizing(['app/Pricing.php:7', 'src/Calculator.php:12'])
+        ->and($baseline->files['tests/OtherMixedTest.php']['lines'])->toBe(['app/Pricing.php:7']);
+
+    removeDirectory($project);
+})->with([
+    'concurrent groups' => [false],
+    'the runner\'s parallel mode' => [true],
+]);

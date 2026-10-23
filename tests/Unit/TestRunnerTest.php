@@ -43,7 +43,7 @@ it('runs Pest in parallel through its own option', function (): void {
             '--configuration=' . $directory . '/phpunit.xml.dist',
             '--parallel',
             '--processes=3',
-            '--passthru-php=\'' . implode('\' \'', CoverageDriver::iniArguments($directory)) . '\'',
+            '--passthru-php=\'' . implode('\' \'', CoverageDriver::iniArguments($directory, Configuration::load($directory)->sourcePaths)) . '\'',
             '--coverage-php=coverage.php',
             '--log-junit=junit.xml',
             '--cache-directory=' . $runner->cacheDirectory(),
