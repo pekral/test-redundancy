@@ -52,6 +52,11 @@ final class FingerprintCache
         return $tokens === null ? null : $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']);
     }
 
+    public function assertsNothing(string $testKey): bool
+    {
+        return array_filter(array_keys($this->of($testKey) ?? []), TokenCollector::isAssertionToken(...)) === [];
+    }
+
     /**
      * @param list<string> $coveringTestKeys
      * @return array{own: array<string, int>, covering: list<array<string, int>>}|null

@@ -24,7 +24,7 @@ function analyzer(): RedundancyAnalyzer
  */
 function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDiffersBy = [], array $unionOnlyLines = []): Candidate
 {
-    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy, $unionOnlyLines);
+    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy, $unionOnlyLines, assertsNothing: false);
 }
 
 /**
@@ -134,7 +134,7 @@ it('names every covering test, or the sibling row, in the first step', function 
 ]);
 
 it('serializes a candidate and a file report for an agent', function (): void {
-    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], [], []);
+    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], [], [], assertsNothing: false);
     $json = decodedJson((string) json_encode(new AgentReport([
         new FileReport('tests/FooTest.php', 2, 5, [$candidate], []),
         new FileReport('tests/BarTest.php', 1, 3, [], []),
@@ -1562,3 +1562,65 @@ it('gives every action concrete steps that end with verify', function (Action $a
     expect($steps)->toHaveCount(3)
         ->and($steps[2])->toBe(Action::VERIFY_STEP);
 })->with(Action::cases());
+
+it('asks for a review of a test without an assertion whose covering test arranges more data without literals', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('approves a domain', function (): void {
+                $domain = createDomain(fake()->domainName());
+
+                approveDomain($domain->name);
+
+                expect($domain->refresh()->provisioning)->toBeFalse();
+            });
+            it('approves a domain that does not exist', function (): void {
+                approveDomain(fake()->domainName());
+            });
+            PHP,
+        linesByTest: [
+            'it approves a domain' => ['src/Domains.php:5', 'src/Domains.php:6'],
+            'it approves a domain that does not exist' => ['src/Domains.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it approves a domain that does not exist')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['function:createDomain', 'call:refresh'])
+        ->and($report->candidates[0]->steps())->toBe([
+            'This test has no assertion, so it asserts only that the code under test throws no exception for its input. '
+                . 'The covering test "it approves a domain" arranges the calls and values in coveringDiffersBy '
+                . '(function:createDomain, call:refresh), and this test does not: '
+                . 'without them, the code under test gets an empty or missing input. '
+                . 'Check whether that empty or missing input is a case of its own, for example a record that does not exist; '
+                . 'keep this test when it is, and delete it only when it is not.',
+            Action::VERIFY_STEP,
+        ]);
+});
+
+it('still deletes a test without an assertion whose covering test only asserts more about the same input', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('approves example.com', function (): void {
+                $approval = approveDomain('example.com');
+
+                expect($approval)->toBe('approved');
+            });
+            it('approves example.com without an error', function (): void {
+                $approval = approveDomain('example.com');
+            });
+            PHP,
+        linesByTest: [
+            'it approves example.com' => ['src/Domains.php:5', 'src/Domains.php:6'],
+            'it approves example.com without an error' => ['src/Domains.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it approves example.com without an error')
+        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['call:toBe', 'function:expect', 'in:call:toBe#0/value:\'approved\''])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});

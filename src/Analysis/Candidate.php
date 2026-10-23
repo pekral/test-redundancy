@@ -23,6 +23,7 @@ final readonly class Candidate implements JsonSerializable
         public ?array $differsBy,
         public ?array $coveringDiffersBy,
         public array $unionOnlyLines,
+        public bool $assertsNothing,
     ) {
     }
 
@@ -140,11 +141,13 @@ final readonly class Candidate implements JsonSerializable
             $this->coveringTokensForReview(),
             static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX),
         );
-        $arguments = array_diff($this->coveringTokensForReview(), $keys);
+        $arguments = array_filter($this->coveringTokensForReview(), TokenCollector::isArgumentOfCodeUnderTest(...));
+        $arrangement = array_diff($this->coveringTokensForReview(), $keys, $arguments);
 
         return [
             ...($keys === [] ? [] : [sprintf(Action::MISSING_KEY_STEP, $coveringTests, implode(', ', $keys))]),
             ...($arguments === [] ? [] : [sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTests, implode(', ', $arguments))]),
+            ...($arrangement === [] ? [] : [sprintf(Action::NO_ASSERTION_STEP, $coveringTests, implode(', ', $arrangement))]),
         ];
     }
 
@@ -156,8 +159,9 @@ final readonly class Candidate implements JsonSerializable
         return array_values(
             array_filter(
                 $this->coveringDiffersBy ?? [],
-                static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX)
-                    || TokenCollector::isArgumentOfCodeUnderTest($token),
+                fn (string $token): bool => $this->assertsNothing
+                    ? !TokenCollector::isAssertionToken($token)
+                    : str_starts_with($token, TokenCollector::KEY_PREFIX) || TokenCollector::isArgumentOfCodeUnderTest($token),
             ),
         );
     }

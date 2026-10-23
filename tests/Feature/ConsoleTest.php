@@ -87,8 +87,8 @@ it('prints a text report for people', function (): void {
 it('prints the covering-side tokens that made the action review in the text report', function (): void {
     $output = new BufferedOutput();
     $candidates = [
-        new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget'], []),
-        new Candidate('tests/FooTest.php :: it adds', ['it subtracts'], ['value:1'], ['value:2'], []),
+        new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget'], [], assertsNothing: false),
+        new Candidate('tests/FooTest.php :: it adds', ['it subtracts'], ['value:1'], ['value:2'], [], assertsNothing: false),
     ];
 
     new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([new FileReport('tests/FooTest.php', 4, 2, $candidates, [])]);
@@ -101,7 +101,14 @@ it('prints the covering-side tokens that made the action review in the text repo
 
 it('prints the lines only the union of the covering tests reaches in the text report', function (): void {
     $output = new BufferedOutput();
-    $candidate = new Candidate('tests/FooTest.php :: it stores', ['it forgets', 'it reads'], [], [], ['src/Foo.php:12', 'src/Foo.php:15']);
+    $candidate = new Candidate(
+        'tests/FooTest.php :: it stores',
+        ['it forgets', 'it reads'],
+        [],
+        [],
+        ['src/Foo.php:12', 'src/Foo.php:15'],
+        assertsNothing: false,
+    );
 
     new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([
         new FileReport('tests/FooTest.php', 3, 2, [$candidate], []),

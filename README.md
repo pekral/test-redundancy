@@ -166,6 +166,13 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `review`. A
   value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, does
   not count.
+- **No missing arrangement for a test without an assertion.** A candidate without an assertion asserts only that the
+  code under test throws no exception for its input. When the covering test has a call, function, `new` expression or
+  value that the candidate lacks, such as `function:createDomain` for a record it creates before the call under test,
+  the candidate can be the only test of an empty or missing input. The tokens are listed in `coveringDiffersBy`, the
+  action is `review`, and the steps ask whether the empty or missing input is a case of its own. An assertion and a
+  value passed only to an assertion do not count, so a covering test that only asserts more about the same input
+  still leaves the candidate `delete`.
 
 `merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
 only in data from one test of the same file. When that test has a call, function or `new` expression that the

@@ -82,6 +82,13 @@ final class TokenCollector
         return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && !self::isAssertion($matches[1]);
     }
 
+    public static function isAssertionToken(string $token): bool
+    {
+        return preg_match(self::DATA_TOKEN_PATTERN, $token) === 1
+            ? preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && self::isAssertion($matches[1])
+            : self::isAssertion(self::calledMethod($token));
+    }
+
     /**
      * @param array<string, int> ...$fingerprints
      * @return array<string, int>
@@ -170,7 +177,7 @@ final class TokenCollector
     {
         $callToken = self::token($call);
         $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
-        $isAssertion = $callToken !== null && self::isAssertion(substr($callToken, (int) strrpos($callToken, ':') + 1));
+        $isAssertion = $callToken !== null && self::isAssertion(self::calledMethod($callToken));
         $segments = [];
 
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
@@ -308,6 +315,11 @@ final class TokenCollector
             && $propertyFetch->name instanceof Identifier
             && self::isExpectationMethod($propertyFetch->name->toString())
             && self::isExpectationChain($propertyFetch->var);
+    }
+
+    private static function calledMethod(string $callToken): string
+    {
+        return substr($callToken, (int) strrpos($callToken, ':') + 1);
     }
 
     private static function isAssertion(string $method): bool
