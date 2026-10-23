@@ -25,6 +25,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reads the key, and say to keep the test when it does. Before, a dataset row without the key got `differsBy: []` and
   the action `delete`. A test such as `add(1, 2)` covered by the dataset row `[1, 2, 3]` is still reported with the
   action `delete`, because positional values carry no `key:` token (#46).
+- A candidate whose covering test passes a value to a call that is not an assertion, such as an argument of the code
+  under test, and the candidate does not pass it, or passes it fewer times, is reported with the action `review`
+  instead of `delete`. `coveringDiffersBy` names the value (`in:call:getByListIdAndLastId#4/value:'email'`), and the
+  steps ask whether the code under test behaves differently without it. An element of a list passed straight to a call
+  now carries the call and the argument position in the contract fingerprint (`in:function:store#0/value:'a'`), so a
+  list without an element is told apart from the full list. A value the covering test passes only to an assertion,
+  such as `toBe`, `assert*` or `expect*`, keeps the action `delete`, so a test such as `add(1, 2)` covered by the
+  dataset row `[1, 2, 3]` is still reported with the action `delete` (#47).
 
 ## [0.1.1] - 2026-10-23
 

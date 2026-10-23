@@ -36,6 +36,8 @@ final class TokenCollector
 
     public const string KEY_PREFIX = 'key:';
 
+    private const string ARGUMENT_PATTERN = '/^in:(?:.*?\/)?(?:not:)?(?:call|function|new):(?:[^\/#]*::)?([^\/#:]+)#\w+\/(?:value|const):/';
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
      * @return array<string, int>
@@ -73,6 +75,14 @@ final class TokenCollector
         $token = self::carriesContract($node) ? self::token($node) : null;
 
         return $token !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
+    }
+
+    public static function isArgumentOfCodeUnderTest(string $token): bool
+    {
+        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
+            && !str_starts_with($matches[1], 'assert')
+            && !str_starts_with($matches[1], 'expect')
+            && !self::isExpectationMethod($matches[1]);
     }
 
     /**
@@ -177,11 +187,24 @@ final class TokenCollector
 
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
-                $segments[spl_object_id($argument->value)] = $callToken . '#' . ($argument->name?->toString() ?? $position);
+                $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
+                $segments += array_fill_keys(self::argumentValueIds($argument->value), $segment);
             }
         }
 
         return $segments;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function argumentValueIds(Expr $argument): array
+    {
+        $listItems = $argument instanceof Array_
+            ? array_values(array_filter($argument->items, static fn (ArrayItem $item): bool => $item->key === null))
+            : [];
+
+        return [spl_object_id($argument), ...array_map(static fn (ArrayItem $item): int => spl_object_id($item->value), $listItems)];
     }
 
     /**
@@ -272,9 +295,13 @@ final class TokenCollector
     {
         return !self::isNegation($propertyFetch)
             && $propertyFetch->name instanceof Identifier
-            && (method_exists(Expectation::class, $propertyFetch->name->toString())
-                || method_exists(ExpectationMixin::class, $propertyFetch->name->toString()))
+            && self::isExpectationMethod($propertyFetch->name->toString())
             && self::isExpectationChain($propertyFetch->var);
+    }
+
+    private static function isExpectationMethod(string $method): bool
+    {
+        return method_exists(Expectation::class, $method) || method_exists(ExpectationMixin::class, $method);
     }
 
     private static function isExpectationChain(Expr $node): bool

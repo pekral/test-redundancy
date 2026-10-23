@@ -60,7 +60,7 @@ final readonly class Candidate implements JsonSerializable
     public function coveringTokensForReview(): array
     {
         return match (true) {
-            $this->addsNoValueOrCall() => $this->keysOnlyTheCoveringTestSets(),
+            $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => $this->nonDataTokens($this->coveringDiffersBy ?? []),
             default => [],
         };
@@ -100,10 +100,7 @@ final readonly class Candidate implements JsonSerializable
         }
 
         if ($this->addsNoValueOrCall() && $this->coveringTokensForReview() !== []) {
-            return [
-                sprintf(Action::MISSING_KEY_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringTokensForReview())),
-                Action::VERIFY_STEP,
-            ];
+            return [...$this->missingInputSteps(), Action::VERIFY_STEP];
         }
 
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
@@ -136,12 +133,31 @@ final readonly class Candidate implements JsonSerializable
     /**
      * @return list<string>
      */
-    private function keysOnlyTheCoveringTestSets(): array
+    private function missingInputSteps(): array
+    {
+        $coveringTests = $this->quoted($this->coveredBy);
+        $keys = array_filter(
+            $this->coveringTokensForReview(),
+            static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX),
+        );
+        $arguments = array_diff($this->coveringTokensForReview(), $keys);
+
+        return [
+            ...($keys === [] ? [] : [sprintf(Action::MISSING_KEY_STEP, $coveringTests, implode(', ', $keys))]),
+            ...($arguments === [] ? [] : [sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTests, implode(', ', $arguments))]),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function inputOnlyTheCoveringTestPasses(): array
     {
         return array_values(
             array_filter(
                 $this->coveringDiffersBy ?? [],
-                static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX),
+                static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX)
+                    || TokenCollector::isArgumentOfCodeUnderTest($token),
             ),
         );
     }

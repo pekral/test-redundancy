@@ -25,6 +25,12 @@ enum Action: string
         . 'for example in an isset() check, a required rule or a short-circuit condition; '
         . 'keep this test when it does, and delete it only when the code never reads them.';
 
+    public const string MISSING_ARGUMENT_STEP = 'The covering test %s passes the values in coveringDiffersBy (%s) '
+        . 'to a call that is not an assertion, and this test does not: without such a value, the code under test gets another input. '
+        . 'Check whether the code under test behaves differently without one of these values, '
+        . 'for example when it adds a missing value itself or falls back to a default; '
+        . 'keep this test when it does, and delete it only when it does not.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 

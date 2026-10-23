@@ -693,6 +693,154 @@ it('asks for a review of a dataset row that omits an array key its covering row 
     ],
 ]);
 
+it('asks for a review of a test that passes the code under test a list without an element its covering test passes', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('forces the email column even when it is omitted from the subscriber columns', function (): void {
+                $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], ['id', 'tags']);
+
+                expect($connections[0]->subscriber->email)->toBe('owner@example.com');
+            });
+            it('does not duplicate the email column when it is already requested', function (): void {
+                $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], ['id', 'email', 'tags']);
+
+                expect($connections[0]->subscriber->email)->toBe('owner@example.com');
+            });
+            it('loads the subscriber relation with the requested columns', function (): void {
+                $connections = repository()->getByListIdAndLastId(1, 0, 10, ['id', 'email'], ['id', 'email', 'tags']);
+
+                expect($connections[0]->subscriber->email)->toBe('owner@example.com')
+                    ->and($connections[0]->subscriber->tags)->toBe('vip');
+            });
+            PHP,
+        linesByTest: [
+            'it forces the email column even when it is omitted from the subscriber columns' => ['src/Repository.php:788', 'src/Repository.php:790'],
+            'it does not duplicate the email column when it is already requested' => ['src/Repository.php:788', 'src/Repository.php:790'],
+            'it loads the subscriber relation with the requested columns' => [
+                'src/Repository.php:788',
+                'src/Repository.php:790',
+                'src/Repository.php:791',
+            ],
+        ],
+    );
+    $candidates = [];
+
+    foreach ($report->candidates as $candidate) {
+        $candidates[$candidate->testCase()] = decodedJson((string) json_encode($candidate));
+    }
+
+    expect($candidates)->toHaveCount(2)
+        ->and(valueAt($candidates, 'it forces the email column even when it is omitted from the subscriber columns'))->toBe([
+            'action' => 'review',
+            'coveredBy' => ['it loads the subscriber relation with the requested columns'],
+            'coveringDiffersBy' => ['in:call:getByListIdAndLastId#4/value:\'email\''],
+            'differsBy' => [],
+            'steps' => [
+                'The covering test "it loads the subscriber relation with the requested columns" passes the values in coveringDiffersBy '
+                    . '(in:call:getByListIdAndLastId#4/value:\'email\') to a call that is not an assertion, and this test does not: '
+                    . 'without such a value, the code under test gets another input. '
+                    . 'Check whether the code under test behaves differently without one of these values, '
+                    . 'for example when it adds a missing value itself or falls back to a default; '
+                    . 'keep this test when it does, and delete it only when it does not.',
+                Action::VERIFY_STEP,
+            ],
+            'test' => 'it forces the email column even when it is omitted from the subscriber columns',
+            'unionOnlyLines' => [],
+        ])
+        ->and(valueAt($candidates, 'it does not duplicate the email column when it is already requested.coveringDiffersBy'))->toBe([])
+        ->and(valueAt($candidates, 'it does not duplicate the email column when it is already requested.action'))->toBe('delete');
+});
+
+it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
+    FileReport $report,
+    string $test,
+    array $coveringDiffersBy,
+): void {
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe($test)
+        ->and($report->candidates[0]->coveringDiffersBy)->toBe($coveringDiffersBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+})->with([
+    'pest expectation of a dataset row' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('adds two numbers', function (int $first, int $second, int $sum): void {
+                    expect(add($first, $second))->toBeInt()->toBe($sum);
+                })->with(['one and two' => [1, 2, 3]]);
+                it('adds one and two', function (): void {
+                    expect(add(1, 2))->toBeInt();
+                });
+                PHP,
+            linesByTest: [
+                'it adds one and two' => ['src/Calculator.php:5'],
+                'it adds two numbers › one and two' => ['src/Calculator.php:5'],
+            ],
+        ),
+        'it adds one and two',
+        ['call:toBe', 'in:call:toBe#0/value:3'],
+    ],
+    'phpunit assertion' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                final class CalculatorTest extends TestCase
+                {
+                    public function testAddsOneAndTwo(): void
+                    {
+                        self::assertIsInt(add(1, 2));
+                    }
+
+                    public function testAddsOneAndTwoToThree(): void
+                    {
+                        $sum = add(1, 2);
+
+                        self::assertIsInt($sum);
+                        self::assertSame(3, $sum);
+                    }
+                }
+                PHP,
+            linesByTest: [
+                'testAddsOneAndTwo' => ['src/Calculator.php:5'],
+                'testAddsOneAndTwoToThree' => ['src/Calculator.php:5', 'src/Calculator.php:6'],
+            ],
+        ),
+        'testAddsOneAndTwo',
+        ['call:self::assertSame', 'in:call:self::assertSame#0/value:3'],
+    ],
+    'phpunit exception expectation' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                final class CalculatorTest extends TestCase
+                {
+                    public function testRejectsADivisionByZero(): void
+                    {
+                        $this->expectException(InvalidArgumentException::class);
+
+                        divide(1, 0);
+                    }
+
+                    public function testRejectsADivisionByZeroWithAMessage(): void
+                    {
+                        $this->expectException(InvalidArgumentException::class);
+                        $this->expectExceptionMessage('Division by zero.');
+
+                        divide(1, 0);
+                    }
+                }
+                PHP,
+            linesByTest: [
+                'testRejectsADivisionByZero' => ['src/Calculator.php:9'],
+                'testRejectsADivisionByZeroWithAMessage' => ['src/Calculator.php:9', 'src/Calculator.php:10'],
+            ],
+        ),
+        'testRejectsADivisionByZero',
+        ['call:expectExceptionMessage', 'in:call:expectExceptionMessage#0/value:\'Division by zero.\''],
+    ],
+]);
+
 it('keeps a dataset row whose literals a sibling row has at swapped positions', function (string $source, array $differsBy): void {
     $project = temporaryDirectory();
     mkdir($project . '/tests');
