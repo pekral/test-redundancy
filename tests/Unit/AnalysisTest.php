@@ -27,6 +27,24 @@ function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array
     return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy, $unionOnlyLines);
 }
 
+/**
+ * @param array<string, list<string>> $linesByTest
+ */
+function analyzeTokenTest(string $source, array $linesByTest): FileReport
+{
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TokenTest.php', $source);
+
+    $coverage = [];
+
+    foreach ($linesByTest as $name => $lines) {
+        $coverage['tests/TokenTest.php :: ' . $name] = array_fill_keys($lines, value: true);
+    }
+
+    return new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => $coverage], map: null)[0];
+}
+
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
     expect($candidate->action())->toBe($action);
 })->with([
@@ -281,23 +299,13 @@ it('asks for a review of a test whose values each appear in a covering test but 
 });
 
 it('asks for a review of a test whose matching covering test does not run every line of it', function (
-    string $source,
+    FileReport $report,
     string $test,
-    array $linesByTest,
     array $unionOnlyLines,
 ): void {
-    $project = temporaryDirectory();
-    mkdir($project . '/tests');
-    file_put_contents($project . '/tests/TokenTest.php', $source);
+    $candidate = $report->candidates[0];
 
-    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => array_combine(
-        array_map(static fn (string $name): string => 'tests/TokenTest.php :: ' . $name, array_keys($linesByTest)),
-        array_map(static fn (array $lines): array => array_fill_keys($lines, value: true), array_values($linesByTest)),
-    ),
-    ], map: null);
-    $candidate = $reports[0]->candidates[0];
-
-    expect($reports[0]->candidates)->toHaveCount(1)
+    expect($report->candidates)->toHaveCount(1)
         ->and($candidate->testCase())->toBe($test)
         ->and($candidate->coveredBy)->toHaveCount(2)
         ->and($candidate->differsBy)->toBe([])
@@ -305,51 +313,71 @@ it('asks for a review of a test whose matching covering test does not run every 
         ->and($candidate->action())->toBe(Action::Review);
 })->with([
     'dataset row' => [
-        <<<'PHP'
-            <?php
-            it('drops a field that arrives without a token', function (array $data): void {
-                normalize($data);
-            })->with([
-                'platform without token' => [['email' => 'user@example.test', 'platform' => 'android']],
-            ]);
-            it('keeps the stored triple when the token is dropped', function (): void {
-                normalize(['email' => 'user@example.test', 'platform' => 'android', 'token' => 'abc']);
-            });
-            it('normalizes the tags of an import source', function (): void {
-                importTags('daily');
-            });
-            PHP,
-        'it drops a field that arrives without a token › platform without token',
-        [
-            'it drops a field that arrives without a token › platform without token' => [
-                'src/Normalizer.php:1',
-                'src/Normalizer.php:5',
-                'src/Normalizer.php:10',
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('drops a field that arrives without a token', function (array $data): void {
+                    normalize($data);
+                })->with([
+                    'platform without token' => [['email' => 'user@example.test', 'platform' => 'android']],
+                ]);
+                it('keeps the stored triple when the token is dropped', function (): void {
+                    normalize(['email' => 'user@example.test', 'platform' => 'android', 'token' => 'abc']);
+                });
+                it('normalizes the tags of an import source', function (): void {
+                    importTags('daily');
+                });
+                PHP,
+            linesByTest: [
+                'it drops a field that arrives without a token › platform without token' => [
+                    'src/Normalizer.php:1',
+                    'src/Normalizer.php:5',
+                    'src/Normalizer.php:10',
+                ],
+                'it keeps the stored triple when the token is dropped' => [
+                    'src/Normalizer.php:1',
+                    'src/Normalizer.php:5',
+                    'src/Normalizer.php:30',
+                ],
+                'it normalizes the tags of an import source' => [
+                    'src/Normalizer.php:1',
+                    'src/Normalizer.php:10',
+                    'src/Normalizer.php:40',
+                ],
             ],
-            'it keeps the stored triple when the token is dropped' => ['src/Normalizer.php:1', 'src/Normalizer.php:5', 'src/Normalizer.php:30'],
-            'it normalizes the tags of an import source' => ['src/Normalizer.php:1', 'src/Normalizer.php:10', 'src/Normalizer.php:40'],
-        ],
+        ),
+        'it drops a field that arrives without a token › platform without token',
         ['src/Normalizer.php:10'],
     ],
     'test without a dataset' => [
-        <<<'PHP'
-            <?php
-            it('rejects a token request that carries no credentials', function (): void {
-                authenticate(['secret' => 'configured']);
-            });
-            it('answers invalid_grant when the redirect uri does not match', function (): void {
-                authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
-            });
-            it('rejects every token request while no secret is configured', function (): void {
-                authenticate(['secret' => '']);
-            });
-            PHP,
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('rejects a token request that carries no credentials', function (): void {
+                    authenticate(['secret' => 'configured']);
+                });
+                it('answers invalid_grant when the redirect uri does not match', function (): void {
+                    authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
+                });
+                it('rejects every token request while no secret is configured', function (): void {
+                    authenticate(['secret' => '']);
+                });
+                PHP,
+            linesByTest: [
+                'it answers invalid_grant when the redirect uri does not match' => [
+                    'src/Middleware.php:31',
+                    'src/Middleware.php:40',
+                    'src/Middleware.php:41',
+                ],
+                'it rejects a token request that carries no credentials' => ['src/Middleware.php:31', 'src/Middleware.php:35'],
+                'it rejects every token request while no secret is configured' => [
+                    'src/Middleware.php:35',
+                    'src/Middleware.php:36',
+                    'src/Middleware.php:37',
+                ],
+            ],
+        ),
         'it rejects a token request that carries no credentials',
-        [
-            'it answers invalid_grant when the redirect uri does not match' => ['src/Middleware.php:31', 'src/Middleware.php:40', 'src/Middleware.php:41'],
-            'it rejects a token request that carries no credentials' => ['src/Middleware.php:31', 'src/Middleware.php:35'],
-            'it rejects every token request while no secret is configured' => ['src/Middleware.php:35', 'src/Middleware.php:36', 'src/Middleware.php:37'],
-        ],
         ['src/Middleware.php:35'],
     ],
 ]);
