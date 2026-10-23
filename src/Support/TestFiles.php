@@ -65,7 +65,14 @@ final class TestFiles
                 continue;
             }
 
-            foreach (Finder::create()->files()->ignoreDotFiles(ignoreDotFiles: false)->in($absolutePath)->notName(self::PATTERN)->sortByName() as $file) {
+            $finder = Finder::create()
+                ->files()
+                ->ignoreDotFiles(ignoreDotFiles: false)
+                ->in($absolutePath)
+                ->notName(self::PATTERN)
+                ->sortByName();
+
+            foreach ($finder as $file) {
                 $supportFiles[] = ProjectPath::relative($file->getPathname(), $projectRoot);
             }
         }
