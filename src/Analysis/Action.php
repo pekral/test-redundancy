@@ -14,6 +14,10 @@ enum Action: string
 
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
+    public const string UNION_ONLY_LINES_STEP = 'No single covering test runs every line of this test: '
+        . 'the lines in unionOnlyLines run only in the union of %s. '
+        . 'Delete this test only when the covering test that matches it also asserts what happens on those lines; otherwise keep it.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 

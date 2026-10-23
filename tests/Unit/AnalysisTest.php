@@ -20,10 +20,11 @@ function analyzer(): RedundancyAnalyzer
  * @param list<string> $coveredBy
  * @param list<string>|null $differsBy
  * @param list<string>|null $coveringDiffersBy
+ * @param list<string> $unionOnlyLines
  */
-function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDiffersBy = []): Candidate
+function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDiffersBy = [], array $unionOnlyLines = []): Candidate
 {
-    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy);
+    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy, $unionOnlyLines);
 }
 
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
@@ -40,6 +41,10 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     ],
     'new call' => [candidate('it works', ['it also works'], ['call:toThrow']), Action::Review],
     'nothing new' => [candidate('it works', ['it also works'], []), Action::Delete],
+    'nothing new, but lines only the union reaches' => [
+        candidate('it works', ['it a', 'it b'], [], unionOnlyLines: ['src/Foo.php:12']),
+        Action::Review,
+    ],
     'one test of the same file' => [candidate('it works', ['it also works'], ['value:1', 'const:Foo::BAR']), Action::MergeIntoDataset],
     'row of another test' => [candidate('it works › empty', ['it also works'], ['value:\'\'']), Action::Review],
     'sibling row' => [candidate('it works › empty', ['it works › blank'], ['value:\'\'']), Action::ReviewDatasetRow],
@@ -75,6 +80,21 @@ it('names the covering-side tokens in the review steps', function (): void {
         ->and($steps[3])->toBe(Action::VERIFY_STEP);
 });
 
+it('names the lines only the union of the covering tests reaches in the report and the steps', function (): void {
+    $candidate = candidate('it works', ['it a', 'it b'], [], unionOnlyLines: ['src/Foo.php:12', 'src/Foo.php:15']);
+    $json = decodedJson((string) json_encode($candidate));
+
+    expect(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'unionOnlyLines'))->toBe(['src/Foo.php:12', 'src/Foo.php:15'])
+        ->and(valueAt($json, 'steps'))->toBe([
+            'No single covering test runs every line of this test: the lines in unionOnlyLines run only in the union of "it a", "it b". '
+                . 'Delete this test only when the covering test that matches it also asserts what happens on those lines; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ])
+        ->and($candidate->addsNoValueOrCall())->toBeFalse()
+        ->and(candidate('it works', ['it a'], [])->addsNoValueOrCall())->toBeTrue();
+});
+
 it('names every covering test, or the sibling row, in the first step', function (Candidate $candidate, string $firstStep): void {
     expect($candidate->steps()[0])->toBe($firstStep);
 })->with([
@@ -83,7 +103,7 @@ it('names every covering test, or the sibling row, in the first step', function 
 ]);
 
 it('serializes a candidate and a file report for an agent', function (): void {
-    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], []);
+    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], [], []);
     $json = decodedJson((string) json_encode(new AgentReport([
         new FileReport('tests/FooTest.php', 2, 5, [$candidate], []),
         new FileReport('tests/BarTest.php', 1, 3, [], []),
@@ -112,6 +132,7 @@ it('serializes a candidate and a file report for an agent', function (): void {
                     'coveredBy' => ['it works › blank'],
                     'coveringDiffersBy' => [],
                     'differsBy' => ['value:\'\''],
+                    'unionOnlyLines' => [],
                 ],
             ],
         ],
@@ -256,6 +277,165 @@ it('asks for a review of a test whose values each appear in a covering test but 
         ->and($reports[0]->candidates[0]->coveredBy)->toHaveCount(2)
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:dispatch#1/value:2'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('asks for a review of a test whose matching covering test does not run every line of it', function (
+    string $source,
+    string $test,
+    array $linesByTest,
+    array $unionOnlyLines,
+): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TokenTest.php', $source);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => array_combine(
+        array_map(static fn (string $name): string => 'tests/TokenTest.php :: ' . $name, array_keys($linesByTest)),
+        array_map(static fn (array $lines): array => array_fill_keys($lines, true), array_values($linesByTest)),
+    ),
+    ], map: null);
+    $candidate = $reports[0]->candidates[0];
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($candidate->testCase())->toBe($test)
+        ->and($candidate->coveredBy)->toHaveCount(2)
+        ->and($candidate->differsBy)->toBe([])
+        ->and($candidate->unionOnlyLines)->toBe($unionOnlyLines)
+        ->and($candidate->action())->toBe(Action::Review);
+})->with([
+    'dataset row' => [
+        <<<'PHP'
+            <?php
+            it('drops a field that arrives without a token', function (array $data): void {
+                normalize($data);
+            })->with([
+                'platform without token' => [['email' => 'user@example.test', 'platform' => 'android']],
+            ]);
+            it('keeps the stored triple when the token is dropped', function (): void {
+                normalize(['email' => 'user@example.test', 'platform' => 'android', 'token' => 'abc']);
+            });
+            it('normalizes the tags of an import source', function (): void {
+                importTags('daily');
+            });
+            PHP,
+        'it drops a field that arrives without a token › platform without token',
+        [
+            'it drops a field that arrives without a token › platform without token' => [
+                'src/Normalizer.php:1',
+                'src/Normalizer.php:5',
+                'src/Normalizer.php:10',
+            ],
+            'it keeps the stored triple when the token is dropped' => ['src/Normalizer.php:1', 'src/Normalizer.php:5', 'src/Normalizer.php:30'],
+            'it normalizes the tags of an import source' => ['src/Normalizer.php:1', 'src/Normalizer.php:10', 'src/Normalizer.php:40'],
+        ],
+        ['src/Normalizer.php:10'],
+    ],
+    'test without a dataset' => [
+        <<<'PHP'
+            <?php
+            it('rejects a token request that carries no credentials', function (): void {
+                authenticate(['secret' => 'configured']);
+            });
+            it('answers invalid_grant when the redirect uri does not match', function (): void {
+                authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
+            });
+            it('rejects every token request while no secret is configured', function (): void {
+                authenticate(['secret' => '']);
+            });
+            PHP,
+        'it rejects a token request that carries no credentials',
+        [
+            'it answers invalid_grant when the redirect uri does not match' => ['src/Middleware.php:31', 'src/Middleware.php:40', 'src/Middleware.php:41'],
+            'it rejects a token request that carries no credentials' => ['src/Middleware.php:31', 'src/Middleware.php:35'],
+            'it rejects every token request while no secret is configured' => ['src/Middleware.php:35', 'src/Middleware.php:36', 'src/Middleware.php:37'],
+        ],
+        ['src/Middleware.php:35'],
+    ],
+]);
+
+it('names the lines of the matching covering test that misses the fewest', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TokenTest.php', <<<'PHP'
+        <?php
+        it('rejects a request without credentials', function (): void {
+            authenticate(['secret' => 'configured']);
+        });
+        it('rejects a request with a wrong redirect', function (): void {
+            authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
+        });
+        it('rejects a request with a wrong code', function (): void {
+            authenticate(['secret' => 'configured', 'code' => 'abc']);
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => [
+        'tests/TokenTest.php :: it rejects a request without credentials' => [
+            'src/Middleware.php:1' => true,
+            'src/Middleware.php:2' => true,
+            'src/Middleware.php:3' => true,
+            'src/Middleware.php:4' => true,
+        ],
+        'tests/TokenTest.php :: it rejects a request with a wrong redirect' => [
+            'src/Middleware.php:1' => true,
+            'src/Middleware.php:2' => true,
+            'src/Middleware.php:10' => true,
+            'src/Middleware.php:11' => true,
+            'src/Middleware.php:12' => true,
+        ],
+        'tests/TokenTest.php :: it rejects a request with a wrong code' => [
+            'src/Middleware.php:1' => true,
+            'src/Middleware.php:3' => true,
+            'src/Middleware.php:4' => true,
+            'src/Middleware.php:20' => true,
+            'src/Middleware.php:21' => true,
+            'src/Middleware.php:22' => true,
+            'src/Middleware.php:23' => true,
+        ],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it rejects a request with a wrong code', 'it rejects a request with a wrong redirect'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe([])
+        ->and($reports[0]->candidates[0]->unionOnlyLines)->toBe(['src/Middleware.php:2']);
+});
+
+it('still deletes a test that one matching covering test runs completely, whatever the other tests cover', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/TokenTest.php', <<<'PHP'
+        <?php
+        it('rejects a request without credentials', function (): void {
+            authenticate(['secret' => 'configured']);
+        });
+        it('rejects a request with a wrong redirect', function (): void {
+            authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
+        });
+        it('rejects every request while no secret is configured', function (): void {
+            authenticate(['secret' => '']);
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => [
+        'tests/TokenTest.php :: it rejects a request without credentials' => ['src/Middleware.php:1' => true, 'src/Middleware.php:2' => true],
+        'tests/TokenTest.php :: it rejects a request with a wrong redirect' => [
+            'src/Middleware.php:1' => true,
+            'src/Middleware.php:2' => true,
+            'src/Middleware.php:10' => true,
+        ],
+        'tests/TokenTest.php :: it rejects every request while no secret is configured' => [
+            'src/Middleware.php:2' => true,
+            'src/Middleware.php:20' => true,
+            'src/Middleware.php:21' => true,
+        ],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it rejects a request with a wrong redirect'])
+        ->and($reports[0]->candidates[0]->unionOnlyLines)->toBe([])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 });
 
 it('keeps a test that adds only an empty array to its covering test', function (

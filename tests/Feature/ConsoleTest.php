@@ -87,8 +87,8 @@ it('prints a text report for people', function (): void {
 it('prints the covering-side tokens that made the action review in the text report', function (): void {
     $output = new BufferedOutput();
     $candidates = [
-        new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget']),
-        new Candidate('tests/FooTest.php :: it adds', ['it subtracts'], ['value:1'], ['value:2']),
+        new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget'], []),
+        new Candidate('tests/FooTest.php :: it adds', ['it subtracts'], ['value:1'], ['value:2'], []),
     ];
 
     new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([new FileReport('tests/FooTest.php', 4, 2, $candidates, [])]);
@@ -97,6 +97,20 @@ it('prints the covering-side tokens that made the action review in the text repo
 
     expect($display)->toContain("differs by: value:1\n    covering differs by: call:forget")
         ->and(substr_count($display, 'covering differs by'))->toBe(1);
+});
+
+it('prints the lines only the union of the covering tests reaches in the text report', function (): void {
+    $output = new BufferedOutput();
+    $candidate = new Candidate('tests/FooTest.php :: it stores', ['it forgets', 'it reads'], [], [], ['src/Foo.php:12', 'src/Foo.php:15']);
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([
+        new FileReport('tests/FooTest.php', 3, 2, [$candidate], []),
+    ]);
+
+    $display = $output->fetch();
+
+    expect($display)->toContain("differs by: \n    union only lines: src/Foo.php:12, src/Foo.php:15")
+        ->and($display)->not->toContain('No new value or call');
 });
 
 it('reports when no test file changed', function (): void {
