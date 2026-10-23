@@ -107,12 +107,13 @@ final class DatasetRows
      */
     private static function bodyTokens(array $body, array $parameters): array
     {
-        $assignments = self::literalAssignments($body, $parameters);
-        $values = array_map(static fn (Assign $assignment): Expr => $assignment->expr, $assignments);
-        $binder = new ParameterBinder($values, array_values($assignments));
+        $assignments = self::onceAssignments($body, $parameters);
+        $assignedValues = array_map(static fn (Assign $assignment): Expr => $assignment->expr, $assignments);
+        $values = array_filter($assignedValues, self::isBindable(...));
+        $binder = new ParameterBinder($values, array_values(array_intersect_key($assignments, $values)));
 
         return TokenCollector::sum(
-            TokenCollector::collect($binder->bind($body)),
+            TokenCollector::collect($binder->bind($body), $assignedValues),
             TokenCollector::collect(array_values(array_diff_key($values, $binder->boundNames()))),
         );
     }
@@ -122,13 +123,13 @@ final class DatasetRows
      * @param array<\PhpParser\Node\Param> $parameters
      * @return array<string, \PhpParser\Node\Expr\Assign>
      */
-    private static function literalAssignments(array $body, array $parameters): array
+    private static function onceAssignments(array $body, array $parameters): array
     {
         $writes = self::writeCounts([...$parameters, ...$body]);
         $assignments = [];
 
         foreach (self::testStatements($body) as $statement) {
-            $assignment = self::literalAssignment($statement);
+            $assignment = self::assignment($statement);
             $name = $assignment === null ? null : self::variableName($assignment->var);
 
             if ($assignment !== null && $name !== null && $writes[$name] === 1) {
@@ -151,11 +152,11 @@ final class DatasetRows
         ));
     }
 
-    private static function literalAssignment(Node $statement): ?Assign
+    private static function assignment(Node $statement): ?Assign
     {
         $expression = $statement instanceof Expression ? $statement->expr : null;
 
-        return $expression instanceof Assign && self::isBindable($expression->expr) ? $expression : null;
+        return $expression instanceof Assign ? $expression : null;
     }
 
     /**

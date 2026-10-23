@@ -28,10 +28,10 @@ it('collects every node that carries a contract', function (): void {
 
     expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing([
         'function:expect',
-        'call:toBe',
+        'expect:function:abs/call:toBe',
         'function:abs',
         'in:function:abs#0/value:-5',
-        'in:call:toBe#0/value:true',
+        'in:expect:function:abs/call:toBe#0/value:true',
         'call:Foo::create',
         'new:Bar',
         'in:call:Foo::create#1/const:Baz::VALUE',
@@ -79,6 +79,54 @@ it('collects no property fetch that runs no Pest assertion', function (): void {
     expect(TokenCollector::collect($statements))->toBe(['function:expect' => 2]);
 });
 
+it('collects the subject of an assertion in the assertion tokens', function (string $body, array $expected): void {
+    $fingerprints = fingerprintsOf('<?php it(\'asserts\', function (): void { ' . $body . ' });');
+
+    expect($fingerprints['it asserts'])->toEqual($expected);
+})->with([
+    'actual argument of a PHPUnit assertion' => ['self::assertSame(3, add(1, 2), \'sum\');', [
+        'expect:function:add/call:self::assertSame' => 1,
+        'function:add' => 1,
+        'in:expect:function:add/call:self::assertSame#0/value:3' => 1,
+        'in:expect:function:add/call:self::assertSame#2/value:\'sum\'' => 1,
+        'in:function:add#0/value:1' => 1,
+        'in:function:add#1/value:2' => 1,
+    ],
+    ],
+    'call passed to expect' => ['expect(app(Templates::class)->create())->toBeGreaterThan(0);', [
+        'call:create' => 1,
+        'expect:call:create/call:toBeGreaterThan' => 1,
+        'function:app' => 1,
+        'function:expect' => 1,
+        'in:expect:call:create/call:toBeGreaterThan#0/value:0' => 1,
+        'in:function:app#0/const:Templates::class' => 1,
+    ],
+    ],
+    'local variable the test assigns once' => ['$sum = add(1, 2); expect($sum)->toBe(3);', [
+        'expect:function:add/call:toBe' => 1,
+        'function:add' => 1,
+        'function:expect' => 1,
+        'in:expect:function:add/call:toBe#0/value:3' => 1,
+        'in:function:add#0/value:1' => 1,
+        'in:function:add#1/value:2' => 1,
+    ],
+    ],
+    'property passed to expect' => ['expect($template->order)->toBeGreaterThan(0);', [
+        'expect:property:order/call:toBeGreaterThan' => 1,
+        'function:expect' => 1,
+        'in:expect:property:order/call:toBeGreaterThan#0/value:0' => 1,
+    ],
+    ],
+    'value passed to and' => ['expect($user)->toBeTrue()->and(load())->not->toBeEmpty();', [
+        'call:and' => 1,
+        'call:toBeTrue' => 1,
+        'expect:function:load/not:call:toBeEmpty' => 1,
+        'function:expect' => 1,
+        'function:load' => 1,
+    ],
+    ],
+]);
+
 it('tells a literal used as an array key from the same literal used as a value', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
@@ -94,7 +142,9 @@ it('tells a literal used as an array key from the same literal used as a value',
     $scalarString = $fingerprints['it normalizes › scalar string'];
     $nestedArray = $fingerprints['it normalizes › nested array'];
 
-    expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(['in:function:normalize#0/value:\'x\'', 'in:call:toBe#0/value:\'x\''])
+    expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(
+        ['in:function:normalize#0/value:\'x\'', 'in:expect:function:normalize/call:toBe#0/value:\'x\''],
+    )
         ->and(array_keys(array_diff_key($nestedArray, $scalarString)))->toEqualCanonicalizing(
             [
                 'key:value:\'z\'',
@@ -102,12 +152,12 @@ it('tells a literal used as an array key from the same literal used as a value',
                 'key:value:\'x\'',
                 'in:function:normalize#0/value:\'z\'/value:\'y\'/value:1',
                 'in:function:normalize#0/value:\'z\'/value:\'x\'/value:2',
-                'in:call:toBe#0/value:\'z\'/value:\'y\'/value:1',
-                'in:call:toBe#0/value:\'z\'/value:\'x\'/value:2',
+                'in:expect:function:normalize/call:toBe#0/value:\'z\'/value:\'y\'/value:1',
+                'in:expect:function:normalize/call:toBe#0/value:\'z\'/value:\'x\'/value:2',
             ],
         )
         ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
-        ->toBe(['in:function:normalize#0/value:false', 'in:call:toBe#0/value:false']);
+        ->toBe(['in:function:normalize#0/value:false', 'in:expect:function:normalize/call:toBe#0/value:false']);
 });
 
 it('tells a literal under one array key from the same literal under another key', function (string $code, array $expected): void {
@@ -230,10 +280,10 @@ it('carries every enclosing call in the call path of a value', function (string 
     ],
     ],
     'value in a call an assertion receives' => ['expect(add(1, 2))->toBe(3);', [
-        'call:toBe' => 1,
+        'expect:function:add/call:toBe' => 1,
         'function:add' => 1,
         'function:expect' => 1,
-        'in:call:toBe#0/value:3' => 1,
+        'in:expect:function:add/call:toBe#0/value:3' => 1,
         'in:function:add#0/value:1' => 1,
         'in:function:add#1/value:2' => 1,
     ],
@@ -264,12 +314,12 @@ it('counts how many times a test uses each token', function (): void {
         'call:Lists::factory' => 2,
         'function:import' => 1,
         'new:Batch' => 2,
-        'call:toBe' => 1,
+        'expect:function:add/call:toBe' => 1,
         'function:expect' => 1,
         'function:add' => 1,
         'in:function:add#0/value:1' => 1,
         'in:function:add#1/value:1' => 1,
-        'in:call:toBe#0/value:2' => 1,
+        'in:expect:function:add/call:toBe#0/value:2' => 1,
     ]);
 });
 
@@ -388,7 +438,14 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
 
     expect(array_keys($fingerprints))->toBe(['it adds › small', 'it adds › large', 'rejects', 'it reads a shared dataset'])
         ->and(array_keys($fingerprints['it adds › small']))->toEqualCanonicalizing(
-            ['function:expect', 'call:toBe', 'function:add', 'call:group', 'value:\'math\'', 'in:call:toBe#0/value:3'],
+            [
+                'function:expect',
+                'expect:function:add/call:toBe',
+                'function:add',
+                'call:group',
+                'value:\'math\'',
+                'in:expect:function:add/call:toBe#0/value:3',
+            ],
         )
         ->and($fingerprints['rejects'])->toHaveKeys(['call:throws', 'const:InvalidArgumentException::class', 'value:\'Broken\'']);
 });
@@ -435,7 +492,7 @@ it('reports what a test asserts beyond the tests that cover it', function (): vo
     $cache = new FingerprintCache($root);
 
     expect($cache->difference('tests/CalculatorTest.php :: it adds two numbers › negative numbers', ['tests/CalculatorTest.php :: it adds one and two']))
-        ->toBe(['in:call:add#0/value:-1', 'in:call:add#1/value:-2', 'in:call:toBe#0/value:-3'])
+        ->toBe(['in:call:add#0/value:-1', 'in:call:add#1/value:-2', 'in:expect:call:add/call:toBe#0/value:-3'])
         ->and(
             $cache->difference('tests/CalculatorTest.php :: it adds two numbers › small numbers', ['tests/CalculatorTest.php :: it adds one and two']),
         )->toBe(

@@ -40,9 +40,10 @@ final class TokenCollector
 
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
      * @return array<string, int>
      */
-    public static function collect(null|Node|array $nodes): array
+    public static function collect(null|Node|array $nodes, array $assignedValues = []): array
     {
         if ($nodes === null) {
             return [];
@@ -51,12 +52,12 @@ final class TokenCollector
         $nodeFinder = new NodeFinder();
         $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
         $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
-        $paths = self::paths($nodeFinder, $nodes);
+        $paths = self::paths($nodeFinder, $nodes, $assignedValues);
         $loopBodies = self::loopBodies($nodeFinder, $nodes);
         $tokens = [];
 
         foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
-            $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::token($node);
+            $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::tokenWithSubject($node, $assignedValues);
 
             if ($token === null) {
                 continue;
@@ -142,15 +143,18 @@ final class TokenCollector
 
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
      * @return array<int, list<string>>
      */
-    private static function paths(NodeFinder $nodeFinder, Node|array $nodes): array
+    private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues): array
     {
         $paths = [];
         $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
 
         foreach ($pathNodes as $pathNode) {
-            $segments = $pathNode instanceof ArrayItem ? self::keySegments($nodeFinder, $pathNode) : self::argumentSegments($pathNode);
+            $segments = $pathNode instanceof ArrayItem
+                ? self::keySegments($nodeFinder, $pathNode)
+                : self::argumentSegments($pathNode, $assignedValues);
 
             foreach ($segments as $nodeId => $segment) {
                 $paths[$nodeId][] = $segment;
@@ -171,11 +175,12 @@ final class TokenCollector
     }
 
     /**
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
      * @return array<int, string>
      */
-    private static function argumentSegments(Node $call): array
+    private static function argumentSegments(Node $call, array $assignedValues): array
     {
-        $callToken = self::token($call);
+        $callToken = self::tokenWithSubject($call, $assignedValues);
         $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
         $isAssertion = $callToken !== null && self::isAssertion(self::calledMethod($callToken));
         $segments = [];
@@ -281,6 +286,30 @@ final class TokenCollector
     }
 
     /**
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     */
+    private static function tokenWithSubject(Node $node, array $assignedValues): ?string
+    {
+        $token = self::token($node);
+        $subjectTokens = $token === null ? [] : array_filter(
+            array_map(self::subjectToken(...), AssertionSubject::candidates($node, self::calledMethod($token), $assignedValues)),
+            static fn (?string $subjectToken): bool => $subjectToken !== null,
+        );
+        $subject = $subjectTokens === [] ? '' : 'expect:' . reset($subjectTokens) . '/';
+
+        return $token === null ? null : $subject . $token;
+    }
+
+    private static function subjectToken(Expr $subject): ?string
+    {
+        $token = $subject instanceof PropertyFetch && $subject->name instanceof Identifier
+            ? 'property:' . $subject->name->toString()
+            : self::token($subject);
+
+        return $token === null || preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 ? null : $token;
+    }
+
+    /**
      * @param array<int, true> $arrayKeys
      * @param array<int, list<string>> $paths
      */
@@ -314,7 +343,7 @@ final class TokenCollector
         return !self::isNegation($propertyFetch)
             && $propertyFetch->name instanceof Identifier
             && self::isExpectationMethod($propertyFetch->name->toString())
-            && self::isExpectationChain($propertyFetch->var);
+            && AssertionSubject::isExpectationChain($propertyFetch->var);
     }
 
     private static function calledMethod(string $callToken): string
@@ -330,15 +359,6 @@ final class TokenCollector
     private static function isExpectationMethod(string $method): bool
     {
         return method_exists(Expectation::class, $method) || method_exists(ExpectationMixin::class, $method);
-    }
-
-    private static function isExpectationChain(Expr $node): bool
-    {
-        return match (true) {
-            $node instanceof FuncCall => $node->name instanceof Name && $node->name->toLowerString() === 'expect',
-            $node instanceof MethodCall, $node instanceof PropertyFetch => self::isExpectationChain($node->var),
-            default => false,
-        };
     }
 
     private static function isNegation(Expr $node): bool
