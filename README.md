@@ -106,7 +106,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "action": "merge-into-dataset",
           "coveredBy": ["it adds two numbers › negative numbers"],
           "coveringDiffersBy": [],
-          "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:call:toBe#0/value:5"],
+          "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:expect:call:add/call:toBe#0/value:5"],
           "steps": [
             "Turn \"it adds two numbers › negative numbers\" into one test with a dataset and add a row with the values in differsBy.",
             "Delete this test.",
@@ -197,6 +197,21 @@ test lacks.
 - **Negation.** A call made through Pest's `->not` or `->not()` carries a `not:` prefix, e.g. `not:call:toBeEmpty`.
 - **Property-form assertions.** A Pest assertion written as a property, e.g. `->toBeEmpty` or `->not->toBeEmpty`,
   carries the token of its call form.
+- **Assertion subjects.** An assertion carries the value it checks, its subject, as an `expect:` prefix. The same
+  assertion on two different subjects therefore gives two different tokens, and the candidate is not `delete`.
+  `expect($templates->create())->toBeGreaterThan(0)` has the tokens `expect:call:create/call:toBeGreaterThan` and
+  `in:expect:call:create/call:toBeGreaterThan#0/value:0`, and `expect($template->order)->toBeGreaterThan(0)` has
+  `expect:property:order/call:toBeGreaterThan` and `in:expect:property:order/call:toBeGreaterThan#0/value:0`.
+  - The subject of a Pest expectation is the value passed to the nearest `->and()` before the call, or else to
+    `expect()`. Every call of the expectation chain carries it, `->and()` and `->each` included.
+  - The subject of a PHPUnit `assert*` call is its last argument that is not a literal or a constant:
+    `self::assertSame(3, add(1, 2))` has the token `expect:function:add/call:self::assertSame`.
+  - A property carries the token `property:<name>`. A call, a function call and a `new` expression carry their own
+    token.
+  - A variable that the test assigns once in its own statements stands for the value assigned to it:
+    `$sum = add(1, 2); expect($sum)->toBe(3);` has the same assertion tokens as `expect(add(1, 2))->toBe(3)`.
+  - A literal, a constant, any other variable, a closure and any other expression give no subject. The assertion then
+    keeps its token without the prefix, e.g. `call:toBe`.
 - **Array keys and values.** An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key
   carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the
   test never passes on, so the same literal under another key, or in a list without a key, is a different token. A map

@@ -232,8 +232,35 @@ it('asks for a review of a test whose covering test asserts the negated result',
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it reads the stored value'])
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['call:toBeEmpty'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['expect:call:read/call:toBeEmpty'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('asks for a review of a test whose covering test makes the same assertion on another subject', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('creates a template', function (): void {
+                expect(app(Templates::class)->create())->toBeGreaterThan(0);
+            });
+            it('orders the saved templates', function (): void {
+                app(Templates::class)->create();
+                Template::all()->each(static fn (Template $template) => expect($template->order)->toBeGreaterThan(0));
+            });
+            PHP,
+        linesByTest: [
+            'it creates a template' => ['src/Templates.php:7', 'src/Templates.php:8', 'src/Templates.php:9'],
+            'it orders the saved templates' => ['src/Templates.php:7', 'src/Templates.php:8', 'src/Templates.php:9', 'src/Template.php:12'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it creates a template')
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'expect:call:create/call:toBeGreaterThan',
+            'in:expect:call:create/call:toBeGreaterThan#0/value:0',
+        ])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
 it('asks for a review of a test whose covering test makes a call it does not', function (): void {
@@ -272,7 +299,7 @@ it('asks for a review of a test whose covering test makes a call it does not', f
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe([
             'in:call:put#1/value:\'<html><body><h1>Test</h1></body></html>\'',
-            'in:call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
+            'in:expect:call:get/call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
         ])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review)
         ->and($reports[0]->candidates[0]->coveringTokensForReview())->toBe(['call:forget']);
@@ -574,7 +601,7 @@ it('keeps a dataset row whose literal the covering row has only under an unrelat
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/ToggleTest.php :: it toggles › plain false')
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:toggle#0/value:false', 'in:call:toBe#0/value:false'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:toggle#0/value:false', 'in:expect:function:toggle/call:toBe#0/value:false'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
@@ -1092,7 +1119,7 @@ it('still deletes a test whose covering test passes a value it lacks only to an 
             ],
         ),
         'it adds one and two',
-        ['call:toBe', 'in:call:toBe#0/value:3'],
+        ['expect:function:add/call:toBe', 'in:expect:function:add/call:toBe#0/value:3'],
     ],
     'phpunit assertion' => [
         fn (): FileReport => analyzeTokenTest(
@@ -1120,7 +1147,7 @@ it('still deletes a test whose covering test passes a value it lacks only to an 
             ],
         ),
         'testAddsOneAndTwo',
-        ['call:self::assertSame', 'in:call:self::assertSame#0/value:3'],
+        ['expect:function:add/call:self::assertSame', 'in:expect:function:add/call:self::assertSame#0/value:3'],
     ],
     'phpunit exception expectation' => [
         fn (): FileReport => analyzeTokenTest(
@@ -1208,7 +1235,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
                 'second' => [true, false],
             ]);
             PHP,
-        ['in:function:notify#0/value:false', 'in:call:toBe#0/value:true'],
+        ['in:function:notify#0/value:false', 'in:expect:function:notify/call:toBe#0/value:true'],
     ],
     'swapped values the test reads without the parameter name' => [
         <<<'PHP'
@@ -1419,7 +1446,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it stores the same address twice',
         'it stores an address once',
-        ['function:store', 'in:function:store#0/value:\'a@example.com\'', 'in:call:toBe#0/value:1'],
+        ['function:store', 'in:function:store#0/value:\'a@example.com\'', 'in:expect:function:stored/call:toBe#0/value:1'],
         Action::Review,
     ],
     'one import against the three imports in a loop of the issue' => [
@@ -1451,7 +1478,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports one batch',
         'it imports three batches',
-        ['in:call:toBe#0/value:1'],
+        ['in:expect:function:import/call:toBe#0/value:1'],
         Action::Review,
     ],
     'the contact of a dataset row the test reads twice against a contact a test creates once' => [
@@ -1484,7 +1511,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it adds one to one',
         'it adds one to two',
-        ['in:function:add#1/value:1', 'in:call:toBe#0/value:2'],
+        ['in:function:add#1/value:1', 'in:expect:function:add/call:toBe#0/value:2'],
         Action::MergeIntoDataset,
     ],
     'the three imports in a loop of the issue against one import' => [
@@ -1520,7 +1547,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports three batches in a loop',
         'it imports one batch',
-        ['value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:call:toBe#0/value:3'],
+        ['value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:expect:function:imported/call:toBe#0/value:3'],
         Action::Review,
     ],
     'two contacts against the one contact of a dataset row the test reads twice' => [
@@ -1621,6 +1648,8 @@ it('still deletes a test without an assertion whose covering test only asserts m
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it approves example.com without an error')
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['call:toBe', 'function:expect', 'in:call:toBe#0/value:\'approved\''])
+        ->and($report->candidates[0]->coveringDiffersBy)->toBe(
+            ['expect:function:approveDomain/call:toBe', 'function:expect', 'in:expect:function:approveDomain/call:toBe#0/value:\'approved\''],
+        )
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
 });

@@ -27,6 +27,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the token of `foo('a')`. A list item keeps the call path only as a direct item of an argument, so `foo([[1]])` does
   not get the token of `foo(1)`, and `foo(['a' => [1]])` (`in:value:'a'/value:1`) does not get the token of
   `foo(['a' => 1])` (#59).
+- An assertion now carries its subject in the contract fingerprint: the value passed to `expect()` or `->and()`, or the
+  last argument of a PHPUnit `assert*` call that is not a literal or a constant, such as
+  `expect:call:create/call:toBeGreaterThan` and `in:expect:call:create/call:toBeGreaterThan#0/value:0`. Two tests that
+  make the same assertion on different subjects differ in `differsBy`, so such a test is no longer reported with the
+  action `delete`. A variable the test assigns once stands for its value, so `$sum = add(1, 2); expect($sum)` and
+  `expect(add(1, 2))` keep the same tokens (#61).
 
 ## [0.1.2] - 2026-10-23
 
