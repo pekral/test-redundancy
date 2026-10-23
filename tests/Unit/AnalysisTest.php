@@ -408,7 +408,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it deactivates a contact unsubscribed from its only subscribed list',
         'it activates an inactive contact still subscribed in another list',
-        ['in:value:\'active\'/value:1', 'value:-1'],
+        ['in:value:\'active\'/value:1', 'call:Connection::factory', 'value:-1'],
         Action::Review,
     ],
     'an address stored twice against once' => [
@@ -458,6 +458,25 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         'it adds one to two',
         ['value:1'],
         Action::MergeIntoDataset,
+    ],
+    'three imports in a loop against one import' => [
+        <<<'PHP'
+            <?php
+            it('imports three batches in a loop', function (): void {
+                foreach ([1, 2, 3] as $id) {
+                    Batch::import($id);
+                }
+                expect(imported())->toBe(3);
+            });
+            it('imports one batch', function (): void {
+                Batch::import(1);
+                expect(imported())->toBe(1);
+            });
+            PHP,
+        'it imports three batches in a loop',
+        'it imports one batch',
+        ['value:2', 'value:3', 'loop:call:Batch::import'],
+        Action::Review,
     ],
 ]);
 

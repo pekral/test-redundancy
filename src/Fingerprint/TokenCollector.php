@@ -21,6 +21,10 @@ use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt\Do_;
+use PhpParser\Node\Stmt\For_;
+use PhpParser\Node\Stmt\Foreach_;
+use PhpParser\Node\Stmt\While_;
 use PhpParser\NodeFinder;
 
 final class TokenCollector
@@ -42,6 +46,7 @@ final class TokenCollector
         $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
         $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
         $keyPaths = self::keyPaths($nodeFinder, $nodes);
+        $loopBodies = self::loopBodies($nodeFinder, $nodes);
         $tokens = [];
 
         foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
@@ -52,6 +57,7 @@ final class TokenCollector
             }
 
             $prefixedToken = self::prefix($arrayKeys, $keyPaths, $node, $token) . $token;
+            $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + 1;
         }
 
@@ -132,6 +138,25 @@ final class TokenCollector
         return $keyPaths;
     }
 
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @return array<int, true>
+     */
+    private static function loopBodies(NodeFinder $nodeFinder, Node|array $nodes): array
+    {
+        $loopBodies = [];
+
+        foreach ([Do_::class, For_::class, Foreach_::class, While_::class] as $loopClass) {
+            foreach ($nodeFinder->findInstanceOf($nodes, $loopClass) as $loop) {
+                foreach ($nodeFinder->find($loop->stmts, static fn (): bool => true) as $node) {
+                    $loopBodies[spl_object_id($node)] = true;
+                }
+            }
+        }
+
+        return $loopBodies;
+    }
+
     private static function carriesContract(Node $node): bool
     {
         return $node instanceof Scalar
@@ -182,6 +207,14 @@ final class TokenCollector
             $isPathedData => 'in:' . implode('/', $path) . '/',
             default => '',
         };
+    }
+
+    /**
+     * @param array<int, true> $loopBodies
+     */
+    private static function loopPrefix(array $loopBodies, Node $node, string $token): string
+    {
+        return isset($loopBodies[spl_object_id($node)]) && preg_match(self::DATA_TOKEN_PATTERN, $token) !== 1 ? 'loop:' : '';
     }
 
     private static function negation(Expr $receiver): string
