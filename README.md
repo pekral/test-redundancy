@@ -169,8 +169,10 @@ of the test files that covered it changed, its source file did not change and no
 in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such
 a test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
 also covered, a line of a source file that changed since `analyse`, and every lost line after a support file was
-changed, added or deleted stay in `lostLines`, and `verify` exits with `1`. When a changed support file is the reason, the
-`instruction` tells the agent to check that file or to run `analyse` again, not to restore a test. A baseline written before source file hashes
+changed, added or deleted stay in `lostLines`, and `verify` exits with `1`. When a changed support file is the reason and no
+baseline test file is missing, the `instruction` tells the agent to check that file or to run `analyse` again, not to
+restore a test. When a baseline test file is missing too, the `instruction` still tells the agent to restore the test and
+adds that a changed support file may also be the reason. A baseline written before source file hashes
 or support file hashes existed reports every lost line in `lostLines`; run `analyse` again to restore the distinction.
 
 ### How to read a candidate

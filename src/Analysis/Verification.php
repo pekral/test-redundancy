@@ -20,6 +20,9 @@ final readonly class Verification implements JsonSerializable
         . 'so the lines in "lostLines" may be lost because of that change and not because a test was removed. '
         . 'Check the changed support file, then run verify again. Run analyse again when the change is intended.';
 
+    private const string SUPPORT_ALSO_CHANGED = ' A test support file also changed since analyse, '
+        . 'so a line in "lostLines" may also be lost because of that change.';
+
     /**
      * @param list<string> $lostLines
      * @param list<string> $missingTestFiles
@@ -58,7 +61,8 @@ final readonly class Verification implements JsonSerializable
     private function instruction(): string
     {
         return match (true) {
-            !$this->isOk() && $this->supportChanged => self::SUPPORT_CHANGED,
+            !$this->isOk() && $this->supportChanged && $this->missingTestFiles === [] => self::SUPPORT_CHANGED,
+            !$this->isOk() && $this->supportChanged => self::RESTORE . self::SUPPORT_ALSO_CHANGED,
             !$this->isOk() && $this->unstable !== [] => self::RESTORE
                 . ' Do not restore a test for "unstableLines": no test covering those lines changed.',
             !$this->isOk() => self::RESTORE,
