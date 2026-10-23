@@ -10,7 +10,7 @@ final class ContractFingerprints
 {
 
     /**
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     public static function of(string $testFile): array
     {

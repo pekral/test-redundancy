@@ -26,7 +26,7 @@ final class TokenCollector
 
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
-     * @return array<string, true>
+     * @return array<string, int>
      */
     public static function collect(null|Node|array $nodes): array
     {
@@ -42,12 +42,32 @@ final class TokenCollector
         foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
             $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::token($node);
 
-            if ($token !== null) {
-                $tokens[self::keyPrefix($arrayKeys, $node) . $token] = true;
+            if ($token === null) {
+                continue;
             }
+
+            $prefixedToken = self::keyPrefix($arrayKeys, $node) . $token;
+            $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + 1;
         }
 
         return $tokens;
+    }
+
+    /**
+     * @param array<string, int> ...$fingerprints
+     * @return array<string, int>
+     */
+    public static function sum(array ...$fingerprints): array
+    {
+        $sum = [];
+
+        foreach ($fingerprints as $fingerprint) {
+            foreach ($fingerprint as $token => $count) {
+                $sum[$token] = ($sum[$token] ?? 0) + $count;
+            }
+        }
+
+        return $sum;
     }
 
     /**

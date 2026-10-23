@@ -11,9 +11,9 @@ final class DatasetRows
 {
 
     /**
-     * @param array<string, true> $body
+     * @param array<string, int> $body
      * @param array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null> $rows
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     public static function fingerprints(string $testCase, array $body, array $rows): array
     {
@@ -28,7 +28,10 @@ final class DatasetRows
                 continue;
             }
 
-            $fingerprints[$testCase . TestKey::DATASET_SEPARATOR . $row->key->value] = $body + TokenCollector::collect($row->value);
+            $fingerprints[$testCase . TestKey::DATASET_SEPARATOR . $row->key->value] = TokenCollector::sum(
+                $body,
+                TokenCollector::collect($row->value),
+            );
         }
 
         return $fingerprints;

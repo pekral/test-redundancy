@@ -33,7 +33,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `review` instead of `delete` (#15).
 - An empty array literal `[]` now carries the token `value:[]` in the contract fingerprint, so a test or dataset row
   that differs from its covering test only by passing `[]` is reported with `differsBy: ["value:[]"]` instead of
-  `differsBy: []` and the action `delete`. Any number of empty or nested empty arrays adds the token once (#16).
+  `differsBy: []` and the action `delete` (#16).
+- The contract fingerprint counts each token instead of storing it once. A candidate whose covering test makes a call,
+  function call or `new` expression more or fewer times than the candidate, for example creates two records where the
+  candidate creates one, is reported with the action `review` instead of `merge-into-dataset`. A token the candidate
+  uses more times than the covering test appears in `differsBy`, so a test that differs only by repeating a value is
+  no longer reported as `delete`. The count is the number of places the token appears in the test source, so a call
+  inside a loop body counts once (#17).
 
 ## [0.1] - 2026-10-22
 
