@@ -28,6 +28,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a Pest dataset, `tests/Pest.php`, a base test case, a trait or a fixture. `analyse` stores a digest of these files in
   the baseline. A baseline written before this change has no digest, so `verify` reports every lost line of it in
   `lostLines` (#20).
+- `differsBy` is the smallest difference against one covering test, not against the union of all covering tests.
+  A candidate whose values each appear in some covering test, but never together in one, is reported with the action
+  `review` instead of `delete` (#15).
 
 ## [0.1] - 2026-10-22
 

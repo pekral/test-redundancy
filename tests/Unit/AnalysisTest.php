@@ -194,6 +194,38 @@ it('asks for a review of a test whose covering test makes a call it does not', f
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
+it('asks for a review of a test whose values each appear in a covering test but never together', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/DispatchTest.php', <<<'PHP'
+        <?php
+        it('dispatches to the first address', function (): void {
+            dispatch('a', 1, 'z');
+        });
+        it('dispatches to the second address', function (): void {
+            dispatch('b', 2);
+        });
+        it('dispatches the first address with the second value', function (): void {
+            dispatch('a', 2, 'z');
+        });
+        PHP);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/DispatchTest.php' => [
+        'tests/DispatchTest.php :: it dispatches to the first address' => ['src/Notifier.php:10' => true, 'src/Notifier.php:30' => true],
+        'tests/DispatchTest.php :: it dispatches to the second address' => ['src/Notifier.php:20' => true, 'src/Notifier.php:40' => true],
+        'tests/DispatchTest.php :: it dispatches the first address with the second value' => [
+            'src/Notifier.php:10' => true,
+            'src/Notifier.php:20' => true,
+        ],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->coveredBy)->toHaveCount(2)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['value:2'])
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
+});
+
 it('compares with tests of other files from the map', function (): void {
     $map = CoverageMap::fromLinesByTest('abc', [
         'tests/OtherCalculatorTest.php :: divide returns a float' => ['src/Calculator.php:17' => true],
