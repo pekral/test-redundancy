@@ -113,9 +113,24 @@ it('tells a literal under one array key from the same literal under another key'
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
-    'boolean under a key' => ['store([\'enabled\' => false]);', ['function:store' => 1, 'key:value:\'enabled\'' => 1, 'in:value:\'enabled\'/value:false' => 1]],
-    'boolean under another key' => ['store([\'visible\' => false]);', ['function:store' => 1, 'key:value:\'visible\'' => 1, 'in:value:\'visible\'/value:false' => 1]],
-    'class constant as a key' => ['store([Status::Active => true]);', ['function:store' => 1, 'key:const:Status::Active' => 1, 'in:const:Status::Active/value:true' => 1]],
+    'boolean under a key' => ['store([\'enabled\' => false]);', [
+        'function:store' => 1,
+        'in:value:\'enabled\'/value:false' => 1,
+        'key:value:\'enabled\'' => 1,
+    ],
+    ],
+    'boolean under another key' => ['store([\'visible\' => false]);', [
+        'function:store' => 1,
+        'in:value:\'visible\'/value:false' => 1,
+        'key:value:\'visible\'' => 1,
+    ],
+    ],
+    'class constant as a key' => ['store([Status::Active => true]);', [
+        'function:store' => 1,
+        'in:const:Status::Active/value:true' => 1,
+        'key:const:Status::Active' => 1,
+    ],
+    ],
     'constant under a key' => ['store([\'status\' => Status::Active, \'flag\' => null]);', [
         'function:store' => 1,
         'in:value:\'flag\'/value:null' => 1,
@@ -148,7 +163,12 @@ it('tells a literal under one array key from the same literal under another key'
         'key:value:\'user\'' => 1,
     ],
     ],
-    'negative number under a key' => ['store([\'balance\' => -5]);', ['function:store' => 1, 'key:value:\'balance\'' => 1, 'in:value:\'balance\'/value:-5' => 1]],
+    'negative number under a key' => ['store([\'balance\' => -5]);', [
+        'function:store' => 1,
+        'in:value:\'balance\'/value:-5' => 1,
+        'key:value:\'balance\'' => 1,
+    ],
+    ],
     'string under a key' => ['store([\'name\' => \'x\']);', ['function:store' => 1, 'key:value:\'name\'' => 1, 'in:value:\'name\'/value:\'x\'' => 1]],
 ]);
 
