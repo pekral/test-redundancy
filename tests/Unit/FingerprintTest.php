@@ -160,7 +160,7 @@ it('tells a literal under one array key from the same literal under another key'
         'key:value:\'tags\'' => 1,
     ],
     ],
-    'literal in a list without a key' => ['store([false, false]);', ['function:store' => 1, 'value:false' => 2]],
+    'literal in a list without a key' => ['store([false, false]);', ['function:store' => 1, 'in:function:store#0/value:false' => 2]],
     'literal under nested keys' => ['store([\'user\' => [\'active\' => true]]);', [
         'function:store' => 1,
         'in:value:\'user\'/value:\'active\'/value:true' => 1,
@@ -200,7 +200,13 @@ it('gives a literal passed straight to a call the position of its argument', fun
     ],
     ],
     'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
-    'literal inside an argument' => ['store([true], 1 + 2);', ['function:store' => 1, 'value:1' => 1, 'value:2' => 1, 'value:true' => 1]],
+    'literal inside an argument' => ['store([true], 1 + 2);', [
+        'function:store' => 1,
+        'in:function:store#0/value:true' => 1,
+        'value:1' => 1,
+        'value:2' => 1,
+    ],
+    ],
     'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],
 ]);
 
