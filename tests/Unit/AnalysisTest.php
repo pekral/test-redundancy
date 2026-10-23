@@ -1005,17 +1005,24 @@ it('does not delete a test whose covering test passes its literal inside a neste
     'list in a list in a call' => ['bar(1)', 'bar([[1]])', ['in:function:foo#0/function:bar#0/value:1']],
     'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
     'list in a list under a key' => ['[\'a\' => 1]', '[\'a\' => [[1]]]', ['in:function:foo#0/value:\'a\'/value:1']],
+    'list under a key' => ['[\'a\' => 1]', '[\'a\' => [1]]', ['in:function:foo#0/value:\'a\'/value:1']],
+    'list under a key against a map' => ['[\'a\' => [1]]', '[\'a\' => 1]', ['in:value:\'a\'/value:1']],
+    'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/value:\'a\'/value:1']],
 ]);
 
-it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (): void {
+it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (
+    string $row,
+    string $nestedRow,
+    array $differsBy,
+): void {
     $report = analyzeTokenTest(
-        source: <<<'PHP'
+        source: <<<PHP
             <?php
-            it('foos', function (mixed $value): void {
-                expect(foo($value))->toBeTrue();
+            it('foos', function (mixed \$value): void {
+                expect(foo(\$value))->toBeTrue();
             })->with([
-                'flat' => [1],
-                'nested' => [[[1]]],
+                'flat' => [{$row}],
+                'nested' => [{$nestedRow}],
             ]);
             PHP,
         linesByTest: [
@@ -1026,9 +1033,13 @@ it('does not delete a dataset row whose sibling row passes its value inside a ne
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it foos › flat')
-        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/value:1'])
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
         ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
-});
+})->with([
+    'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
+    'list under a key' => ['[\'a\' => 1]', '[\'a\' => [1]]', ['in:function:foo#0/value:\'a\'/value:1']],
+    'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/value:\'a\'/value:1']],
+]);
 
 it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
     $report = analyzeTokenTest(
