@@ -31,6 +31,13 @@ enum Action: string
         . 'for example when it adds a missing value itself or falls back to a default; '
         . 'keep this test when it does, and delete it only when it does not.';
 
+    public const string NO_ASSERTION_STEP = 'This test has no assertion, '
+        . 'so it asserts only that the code under test throws no exception for its input. '
+        . 'The covering test %s arranges the calls and values in coveringDiffersBy (%s), and this test does not: '
+        . 'without them, the code under test gets an empty or missing input. '
+        . 'Check whether that empty or missing input is a case of its own, for example a record that does not exist; '
+        . 'keep this test when it is, and delete it only when it is not.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 
