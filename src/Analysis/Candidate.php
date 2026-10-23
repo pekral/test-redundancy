@@ -40,23 +40,37 @@ final readonly class Candidate implements JsonSerializable
         return match (true) {
             $this->differsBy === null => Action::Review,
             $this->differsBy === [] => Action::Delete,
-            !$this->isDataOnly($this->differsBy) => Action::Review,
+            $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
-            !$this->isDatasetRow()
-                && $this->isCoveredByOneTestOfTheSameFile()
-                && $this->isDataOnly($this->coveringDiffersBy ?? []) => Action::MergeIntoDataset,
+            $this->differsOnlyInDataFromOneTestOfTheSameFile() && $this->coveringTokensForReview() === [] => Action::MergeIntoDataset,
             default => Action::Review,
         };
     }
 
     /**
-     * @return array{action: string, coveredBy: list<string>, differsBy: list<string>|null, steps: list<string>, test: string}
+     * @return list<string>
+     */
+    public function coveringTokensForReview(): array
+    {
+        return $this->differsOnlyInDataFromOneTestOfTheSameFile() ? $this->nonDataTokens($this->coveringDiffersBy ?? []) : [];
+    }
+
+    /**
+     * @return array{
+     *     action: string,
+     *     coveredBy: list<string>,
+     *     coveringDiffersBy: list<string>,
+     *     differsBy: list<string>|null,
+     *     steps: list<string>,
+     *     test: string,
+     * }
      */
     public function jsonSerialize(): array
     {
         return [
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
+            'coveringDiffersBy' => $this->coveringTokensForReview(),
             'differsBy' => $this->differsBy,
             'steps' => $this->steps(),
             'test' => $this->testCase(),
@@ -69,7 +83,7 @@ final readonly class Candidate implements JsonSerializable
     public function steps(): array
     {
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
-        $steps = $this->action()->steps('"' . implode('", "', $coveringTests) . '"');
+        $steps = $this->action()->steps('"' . implode('", "', $coveringTests) . '"', $this->coveringTokensForReview());
 
         return $this->differsBy === null
             ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
@@ -78,16 +92,22 @@ final readonly class Candidate implements JsonSerializable
 
     /**
      * @param list<string> $tokens
+     * @return list<string>
      */
-    private function isDataOnly(array $tokens): bool
+    private function nonDataTokens(array $tokens): array
     {
-        foreach ($tokens as $token) {
-            if (preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) !== 1) {
-                return false;
-            }
-        }
+        return array_values(
+            array_filter($tokens, static fn (string $token): bool => preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) !== 1),
+        );
+    }
 
-        return true;
+    private function differsOnlyInDataFromOneTestOfTheSameFile(): bool
+    {
+        return $this->differsBy !== null
+            && $this->differsBy !== []
+            && $this->nonDataTokens($this->differsBy) === []
+            && !$this->isDatasetRow()
+            && $this->isCoveredByOneTestOfTheSameFile();
     }
 
     private function isCoveredByOneTestOfTheSameFile(): bool

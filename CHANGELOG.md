@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `coveringDiffersBy` in the JSON report and `covering differs by` in the text report list the calls, functions and
+  `new` expressions of the covering test that made the action `review` although `differsBy` holds only data, for
+  example `call:forget`. The `review` steps name them (#27).
+
 ### Fixed
 
 - `verify` no longer lists a line in `lostLines` and says to restore a test when no covering test file changed. `analyse`

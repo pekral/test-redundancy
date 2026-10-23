@@ -2,7 +2,13 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Analysis\Candidate;
+use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Console\Application;
+use Pekral\TestRedundancy\Console\ReportPrinter;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -76,6 +82,21 @@ it('prints a text report for people', function (): void {
         ->toContain('Dataset rows to review')
         ->toContain('action: merge-into-dataset')
         ->toContain('Every test case covers a line no other test case covers.');
+});
+
+it('prints the covering-side tokens that made the action review in the text report', function (): void {
+    $output = new BufferedOutput();
+    $candidates = [
+        new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget']),
+        new Candidate('tests/FooTest.php :: it adds', ['it subtracts'], ['value:1'], ['value:2']),
+    ];
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([new FileReport('tests/FooTest.php', 4, 2, $candidates, [])]);
+
+    $display = $output->fetch();
+
+    expect($display)->toContain("differs by: value:1\n    covering differs by: call:forget")
+        ->and(substr_count($display, 'covering differs by'))->toBe(1);
 });
 
 it('reports when no test file changed', function (): void {
