@@ -88,7 +88,8 @@ it('names the lines only the union of the covering tests reaches in the report a
         ->and(valueAt($json, 'unionOnlyLines'))->toBe(['src/Foo.php:12', 'src/Foo.php:15'])
         ->and(valueAt($json, 'steps'))->toBe([
             'No single covering test runs every line of this test: the lines in unionOnlyLines run only in the union of "it a", "it b". '
-                . 'Delete this test only when the covering test that matches it also asserts what happens on those lines; otherwise keep it.',
+                . 'Check whether a covering test that runs those lines asserts what this test asserts about them; '
+                . 'delete this test only when one does, otherwise keep it.',
             Action::VERIFY_STEP,
         ])
         ->and($candidate->addsNoValueOrCall())->toBeFalse()
@@ -291,7 +292,7 @@ it('asks for a review of a test whose matching covering test does not run every 
 
     $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => array_combine(
         array_map(static fn (string $name): string => 'tests/TokenTest.php :: ' . $name, array_keys($linesByTest)),
-        array_map(static fn (array $lines): array => array_fill_keys($lines, true), array_values($linesByTest)),
+        array_map(static fn (array $lines): array => array_fill_keys($lines, value: true), array_values($linesByTest)),
     ),
     ], map: null);
     $candidate = $reports[0]->candidates[0];
@@ -361,6 +362,9 @@ it('names the lines of the matching covering test that misses the fewest', funct
         it('rejects a request without credentials', function (): void {
             authenticate(['secret' => 'configured']);
         });
+        it('rejects every request while no secret is configured', function (): void {
+            authenticate(['secret' => '']);
+        });
         it('rejects a request with a wrong redirect', function (): void {
             authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
         });
@@ -370,35 +374,36 @@ it('names the lines of the matching covering test that misses the fewest', funct
         PHP);
 
     $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => [
-        'tests/TokenTest.php :: it rejects a request without credentials' => [
-            'src/Middleware.php:1' => true,
-            'src/Middleware.php:2' => true,
-            'src/Middleware.php:3' => true,
-            'src/Middleware.php:4' => true,
-        ],
-        'tests/TokenTest.php :: it rejects a request with a wrong redirect' => [
-            'src/Middleware.php:1' => true,
-            'src/Middleware.php:2' => true,
-            'src/Middleware.php:10' => true,
-            'src/Middleware.php:11' => true,
-            'src/Middleware.php:12' => true,
-        ],
-        'tests/TokenTest.php :: it rejects a request with a wrong code' => [
-            'src/Middleware.php:1' => true,
-            'src/Middleware.php:3' => true,
-            'src/Middleware.php:4' => true,
-            'src/Middleware.php:20' => true,
-            'src/Middleware.php:21' => true,
-            'src/Middleware.php:22' => true,
-            'src/Middleware.php:23' => true,
-        ],
+        'tests/TokenTest.php :: it rejects a request without credentials' => array_fill_keys(
+            array_map(static fn (int $line): string => 'src/Middleware.php:' . $line, range(1, 7)),
+            value: true,
+        ),
+        'tests/TokenTest.php :: it rejects every request while no secret is configured' => array_fill_keys(
+            ['src/Middleware.php:1', 'src/Middleware.php:2', 'src/Middleware.php:3', 'src/Middleware.php:4', 'src/Middleware.php:90'],
+            value: true,
+        ),
+        'tests/TokenTest.php :: it rejects a request with a wrong redirect' => array_fill_keys(
+            ['src/Middleware.php:5', 'src/Middleware.php:6', 'src/Middleware.php:91'],
+            value: true,
+        ),
+        'tests/TokenTest.php :: it rejects a request with a wrong code' => array_fill_keys(
+            ['src/Middleware.php:3', 'src/Middleware.php:4', 'src/Middleware.php:7', 'src/Middleware.php:92'],
+            value: true,
+        ),
     ],
     ], map: null);
+    $candidate = $reports[0]->candidates[0];
 
     expect($reports[0]->candidates)->toHaveCount(1)
-        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it rejects a request with a wrong code', 'it rejects a request with a wrong redirect'])
-        ->and($reports[0]->candidates[0]->differsBy)->toBe([])
-        ->and($reports[0]->candidates[0]->unionOnlyLines)->toBe(['src/Middleware.php:2']);
+        ->and($candidate->testCase())->toBe('it rejects a request without credentials')
+        ->and($candidate->coveredBy)->toBe([
+            'it rejects every request while no secret is configured',
+            'it rejects a request with a wrong redirect',
+            'it rejects a request with a wrong code',
+        ])
+        ->and($candidate->differsBy)->toBe([])
+        ->and($candidate->unionOnlyLines)->toBe(['src/Middleware.php:1', 'src/Middleware.php:2', 'src/Middleware.php:5', 'src/Middleware.php:6'])
+        ->and($candidate->action())->toBe(Action::Review);
 });
 
 it('still deletes a test that one matching covering test runs completely, whatever the other tests cover', function (): void {
