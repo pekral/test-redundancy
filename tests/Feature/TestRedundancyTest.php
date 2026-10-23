@@ -142,12 +142,19 @@ it('runs several test files as concurrent groups and one path in the runner\'s p
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
     ]));
     $testFiles = ['tests/CalculatorTest.php', 'tests/OtherCalculatorTest.php'];
+    file_put_contents($project . '/tests/OtherCalculatorTest.php', <<<'PHP'
+
+
+        test('divide returns another float', function (): void {
+            expect((new Calculator())->divide(9, 3))->toBe(3.0);
+        });
+        PHP, FILE_APPEND);
 
     $concurrent = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
     $parallel = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
 
     expect(candidatesOf($concurrent))->toBe(candidatesOf($parallel))
-        ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 1]);
+        ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 2]);
 
     removeDirectory($project);
 });
@@ -193,6 +200,10 @@ it('balances the concurrent groups by the durations of the last run without chan
             test('adds in {$name}', function (): void {
                 file_put_contents(__DIR__ . '/../tokens/{$name}', (string) getenv('TEST_TOKEN'));
 
+                expect((new Calculator())->add(1, 2))->toBe(3);
+            });
+
+            test('adds again in {$name}', function (): void {
                 expect((new Calculator())->add(1, 2))->toBe(3);
             });
             PHP);
@@ -283,6 +294,10 @@ it('records the lines of every existing source directory when pcov is narrowed t
             expect((new Calculator())->add(setting(), seeded()))->toBe(12)
                 ->and(priced(2))->toBe(4);
         });
+
+        test('adds and prices once more', function (): void {
+            expect(priced(2))->toBe(4);
+        });
         PHP);
     file_put_contents($project . '/tests/OtherMixedTest.php', <<<'PHP'
         <?php
@@ -293,6 +308,10 @@ it('records the lines of every existing source directory when pcov is narrowed t
         require_once __DIR__ . '/../database/Seeder.php';
 
         test('prices the seed', function (): void {
+            expect(priced(seeded()))->toBe(10);
+        });
+
+        test('prices the seed once more', function (): void {
             expect(priced(seeded()))->toBe(10);
         });
         PHP);
@@ -312,3 +331,144 @@ it('records the lines of every existing source directory when pcov is narrowed t
     'concurrent groups' => [false],
     'the runner\'s parallel mode' => [true],
 ]);
+
+/**
+ * @return array<string, string>
+ */
+function singleTestFiles(): array
+{
+    return [
+        'DatasetTest' => <<<'PHP'
+            it('adds a dataset row', function (int $first): void {
+                touch(__DIR__ . '/../markers/dataset');
+
+                expect((new Calculator())->add($first, 1))->toBe($first + 1);
+            })->with(['five' => [5]]);
+            PHP,
+        'PairTest' => <<<'PHP'
+            it('adds', function (): void {
+                expect((new Calculator())->add(1, 2))->toBe(3);
+            });
+
+            it('adds again', function (): void {
+                expect((new Calculator())->add(1, 2))->toBe(3);
+            });
+
+            it('divides', function (): void {
+                expect((new Calculator())->divide(6, 3))->toBe(2.0);
+            });
+            PHP,
+        'SingleTest' => <<<'PHP'
+            it('divides once', function (): void {
+                touch(__DIR__ . '/../markers/single');
+
+                expect((new Calculator())->divide(8, 2))->toBe(4.0);
+            });
+            PHP,
+    ];
+}
+
+function singleTestProject(): string
+{
+    $project = gitRepository();
+    new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    new Filesystem()->remove([$project . '/tests', $project . '/build']);
+    mkdir($project . '/tests');
+    mkdir($project . '/markers');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'source' => ['src'],
+    ]));
+
+    foreach (singleTestFiles() as $name => $tests) {
+        file_put_contents($project . '/tests/' . $name . '.php', <<<PHP
+            <?php
+
+            declare(strict_types = 1);
+
+            require_once __DIR__ . '/../src/Calculator.php';
+
+            use Fixture\Pest\Calculator;
+
+            {$tests}
+            PHP);
+    }
+
+    return $project;
+}
+
+it('skips a test file with a single test case from the coverage run without changing the candidates', function (): void {
+    $project = singleTestProject();
+    $testFiles = ['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php'];
+    $withoutSingle = TestRedundancy::forProject($project, processes: 2)
+        ->analyse(['tests/DatasetTest.php', 'tests/PairTest.php'], ['tests/DatasetTest.php', 'tests/PairTest.php']);
+    unlink($project . '/markers/dataset');
+
+    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
+
+    expect(is_file($project . '/markers/single'))->toBeFalse()
+        ->and(is_file($project . '/markers/dataset'))->toBeTrue()
+        ->and(array_map(fn (FileReport $report): string => $report->testFile, $reports))->toBe($testFiles)
+        ->and(array_map(fn (FileReport $report): bool => $report->skipped, $reports))->toBe([false, false, true])
+        ->and($reports[2])->toEqual(FileReport::skipped('tests/SingleTest.php'))
+        ->and($reports[2]->testCases)->toBe(1)
+        ->and($reports[2]->candidates)->toBe([])
+        ->and(candidatesOf($reports))->toBe(candidatesOf($withoutSingle))
+        ->and(candidatesOf($reports))->toHaveCount(1)
+        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe(['tests/DatasetTest.php', 'tests/PairTest.php'])
+        ->and(array_keys(decodedJson((string) file_get_contents($project . '/.test-redundancy/durations.json'))))
+        ->toEqualCanonicalizing(['tests/DatasetTest.php', 'tests/PairTest.php']);
+});
+
+it('keeps verify working for every file that had candidates when a single-test file is skipped', function (): void {
+    $project = singleTestProject();
+    $testRedundancy = TestRedundancy::forProject($project, processes: 2);
+    $testRedundancy->analyse(['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php'], ['tests']);
+    $pair = (string) file_get_contents($project . '/tests/PairTest.php');
+
+    $untouched = $testRedundancy->verify();
+    unlink($project . '/tests/SingleTest.php');
+    $skippedFileDeleted = $testRedundancy->verify();
+    file_put_contents($project . '/tests/PairTest.php', (string) preg_replace("/it\\('adds again'.*?\\}\\);\n\n/s", '', $pair));
+    $candidateRemoved = $testRedundancy->verify();
+    file_put_contents($project . '/tests/PairTest.php', (string) preg_replace("/\n\nit\\('divides'.*?\\}\\);\$/s", '', $pair));
+    $coverageDropped = $testRedundancy->verify();
+
+    expect($untouched->isOk())->toBeTrue()
+        ->and($untouched->baselineLines)->toBe(3)
+        ->and($skippedFileDeleted->missingTestFiles)->toBe([])
+        ->and($skippedFileDeleted->isOk())->toBeTrue()
+        ->and($candidateRemoved->isOk())->toBeTrue()
+        ->and($candidateRemoved->lostLines)->toBe([])
+        ->and($coverageDropped->isOk())->toBeFalse()
+        ->and($coverageDropped->lostLines)->toHaveCount(2);
+});
+
+it('runs nothing and stores an empty baseline when every test file has a single test case', function (): void {
+    $project = singleTestProject();
+    $testRedundancy = TestRedundancy::forProject($project, processes: 2);
+
+    $reports = $testRedundancy->analyse(['tests/SingleTest.php'], ['tests/SingleTest.php']);
+    $verification = $testRedundancy->verify();
+
+    expect(is_file($project . '/markers/single'))->toBeFalse()
+        ->and($reports)->toEqual([FileReport::skipped('tests/SingleTest.php')])
+        ->and(CoverageBaseline::load($project . '/.test-redundancy/baseline.json')->testFiles)->toBe([])
+        ->and($verification->isOk())->toBeTrue()
+        ->and($verification->baselineLines)->toBe(0);
+});
+
+it('runs a test file with a single test case when it is compared across files', function (): void {
+    $project = singleTestProject();
+    runIn($project, ['git', 'add', '.']);
+    runIn($project, ['git', 'commit', '--quiet', '-m', 'fixture']);
+    $testRedundancy = TestRedundancy::forProject($project, processes: 2);
+
+    $testRedundancy->buildMap(['tests/PairTest.php', 'tests/SingleTest.php'], static function (): void {
+    });
+    $reports = $testRedundancy->analyseAcross(['tests/SingleTest.php'], $testRedundancy->loadMap());
+
+    expect(is_file($project . '/markers/single'))->toBeTrue()
+        ->and($reports[0]->skipped)->toBeFalse()
+        ->and(candidatesOf($reports))->toBe(['tests/SingleTest.php :: it divides once' => 'review']);
+});

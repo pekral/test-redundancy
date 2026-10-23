@@ -102,7 +102,7 @@ final class AnalyseCommand extends Command
     private function warnAboutFilesWithoutSourceLines(array $reports, SymfonyStyle $io): void
     {
         foreach ($reports as $report) {
-            if ($report->testCases > 0 && $report->coveredLines === 0) {
+            if (!$report->skipped && $report->testCases > 0 && $report->coveredLines === 0) {
                 $io->getErrorStyle()->warning(sprintf(
                     '%s covers no line under the configured source paths. Check "source" in %s.',
                     $report->testFile,

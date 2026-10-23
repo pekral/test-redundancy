@@ -146,6 +146,7 @@ it('serializes a candidate and a file report for an agent', function (): void {
         'testCases' => 4,
         'candidates' => 1,
         'testsWithoutSourceLines' => 1,
+        'skippedFiles' => 0,
         'byAction' => ['delete' => 0, 'merge-into-dataset' => 0, 'review-dataset-row' => 1, 'review' => 0],
         'seconds' => 4,
         'staleMap' => ['commit' => 'abc123', 'changedSourceFiles' => ['src/Foo.php']],
@@ -1652,4 +1653,17 @@ it('still deletes a test without an assertion whose covering test only asserts m
             ['expect:function:approveDomain/call:toBe', 'function:expect', 'in:expect:function:approveDomain/call:toBe#0/value:\'approved\''],
         )
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('counts a skipped file in the summary and leaves it out of the files', function (): void {
+    $json = decodedJson((string) json_encode(new AgentReport([
+        FileReport::skipped('tests/OneTest.php'),
+        new FileReport('tests/FooTest.php', 2, 5, [], []),
+    ], 1, staleMap: null)));
+
+    expect(valueAt($json, 'summary.testFiles'))->toBe(2)
+        ->and(valueAt($json, 'summary.testCases'))->toBe(3)
+        ->and(valueAt($json, 'summary.skippedFiles'))->toBe(1)
+        ->and(valueAt($json, 'summary.testsWithoutSourceLines'))->toBe(0)
+        ->and($json['files'])->toBe([]);
 });

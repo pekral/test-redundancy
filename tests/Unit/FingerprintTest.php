@@ -592,3 +592,63 @@ it('fingerprints Pest tests in a namespace, inside describe blocks and with a sh
     ])
         ->and($fingerprints['`adding` → it adds › two'])->toHaveKey('in:function:expect#0/value:2');
 });
+
+function declaresSingleTestCase(string $code): bool
+{
+    $project = temporaryDirectory();
+    file_put_contents($project . '/ProbeTest.php', $code);
+
+    return ContractFingerprints::declaresSingleTestCase($project . '/ProbeTest.php');
+}
+
+it('recognises a file that declares exactly one test case and no dataset', function (string $code): void {
+    expect(declaresSingleTestCase($code))->toBeTrue();
+})->with([
+    'a Pest it' => ['<?php it(\'works\', function (): void { expect(1)->toBe(1); });'],
+    'a Pest test inside describe' => ['<?php describe(\'group\', function (): void { it(\'works\', fn () => expect(1)->toBe(1)); });'],
+    'a Pest test that reads the test case' => ['<?php it(\'works\', function (): void { test()->assertTrue(true); });'],
+    'a Pest test with modifiers' => ['<?php test(\'works\', fn () => expect(1)->toBe(1))->group(\'fast\')->skip(false);'],
+    'a PHPUnit method with the Test attribute' => ['<?php class ProbeTest { #[Test] public function works(): void {} }'],
+    'a PHPUnit test method' => ['<?php class ProbeTest { public function testWorks(): void {} public function helper(): void {} }'],
+    'a PHPUnit test that expects a mock call with arguments' => [
+        '<?php class ProbeTest { public function testWorks(): void { $mock->shouldReceive("run")->with(1)->once(); mock(Foo::class)->with(2); } }',
+    ],
+]);
+
+it('keeps a file in the coverage run when it may run more than one test case', function (string $code): void {
+    expect(declaresSingleTestCase($code))->toBeFalse();
+})->with([
+    'a file that does not parse' => ['<?php it('],
+    'a Pest describe block with a dataset' => ['<?php describe(\'g\', function (): void { it(\'a\', fn () => null); })->with([1, 2]);'],
+    'a Pest test beside a loop that generates tests' => ['<?php it(\'a\', fn () => null); foreach ([1, 2] as $value) { it(\'b\' . $value, fn () => null); }'],
+    'a Pest test generated in a loop' => ['<?php foreach ([1, 2] as $value) { it(\'a\' . $value, fn () => null); }'],
+    'a Pest test with a computed description' => ['<?php it($description, fn () => null);'],
+    'a Pest test with a dataset' => ['<?php it(\'a\', fn (int $value) => null)->with([1, 2]);'],
+    'a Pest test with a dataset it cannot resolve' => ['<?php it(\'a\', fn (int $value) => null)->with(fn () => [1, 2]);'],
+    'a Pest test with a shared dataset' => ['<?php it(\'a\', fn (int $value) => null)->with(\'numbers\');'],
+    'a Pest test with one dataset row' => ['<?php it(\'a\', fn (int $value) => null)->with([\'one\' => [1]]);'],
+    'a PHPUnit test with an external data provider' => [
+        '<?php class ProbeTest { #[DataProviderExternal(Rows::class, \'rows\')] public function testA(int $value): void {} }',
+    ],
+    'a PHPUnit test with the DataProvider attribute' => [
+        '<?php class ProbeTest { #[DataProvider(\'rows\')] public function testA(int $value): void {} '
+        . 'public static function rows(): array { return [[1], [2]]; } }',
+    ],
+    'a PHPUnit test with the dataProvider tag' => [
+        '<?php class ProbeTest { /** @dataProvider rows */ public function testA(int $value): void {} '
+        . 'public static function rows(): array { return [[1], [2]]; } }',
+    ],
+    'a PHPUnit test with the TestWith attribute' => [
+        '<?php class ProbeTest { #[TestWith([1])] #[TestWith([2])] public function testA(int $value): void {} }',
+    ],
+    'a PHPUnit test with the testWith tag' => ['<?php class ProbeTest { /** @testWith [1] */ public function testA(int $value): void {} }'],
+    'a repeated Pest test' => ['<?php it(\'a\', fn () => null)->repeat(3);'],
+    'no test case' => ['<?php $value = 1;'],
+    'two Pest tests' => ['<?php it(\'a\', fn () => null); it(\'b\', fn () => null);'],
+    'two Pest tests with one description' => ['<?php it(\'a\', fn () => null); it(\'a\', fn () => null);'],
+    'two PHPUnit test methods' => ['<?php class ProbeTest { public function testA(): void {} public function testB(): void {} }'],
+]);
+
+it('keeps a file that does not exist in the coverage run', function (): void {
+    expect(ContractFingerprints::declaresSingleTestCase(temporaryDirectory() . '/MissingTest.php'))->toBeFalse();
+});

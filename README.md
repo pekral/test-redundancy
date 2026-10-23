@@ -90,7 +90,9 @@ same suite. One folder or file runs in the runner's own parallel mode — `pest 
 `phpunit` — with the coverage settings passed to every worker through `--passthru-php` and the project's
 `phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`.
 Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
-each with its own `TEST_TOKEN`. Every run stores the time of each test file from its JUnit log in
+each with its own `TEST_TOKEN`. When a single folder holds test files that
+[`analyse` skips](#test-files-with-a-single-test-case), the remaining files run as such groups too.
+Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
 group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
 stored time the files are split round-robin. The split changes how long the run takes. For tests that share no state inside one process it never changes the report or the baseline; a test whose coverage depends on what an earlier test file in the same group already ran, such as a static cache, can cover other lines in another group.
@@ -130,6 +132,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
     "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 },
     "candidates": 3,
     "seconds": 0,
+    "skippedFiles": 1,
     "staleMap": null,
     "testCases": 7,
     "testFiles": 2,
@@ -142,7 +145,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 
 | Field | Meaning |
 | --- | --- |
-| `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file. |
+| `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file, and `summary.testCases` every test case, a skipped file included. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
@@ -153,6 +156,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
+| `summary.skippedFiles` | The number of test files `analyse` did not run, because each declares one test case and no dataset — see [Test files with a single test case](#test-files-with-a-single-test-case). They count in `summary.testFiles` and `summary.testCases` as one test case each and have no candidate. |
 | `workflow` | The rules an agent follows for the whole report. |
 
 ### When a candidate is `review`, not `delete`
@@ -263,6 +267,25 @@ test lacks.
   `$columns = ['id', 'tags']; load($columns);` has the same tokens as `load(['id', 'tags'])`, and
   `$options = ['enabled' => false]; store($options);` has the same tokens as `store(['enabled' => false])`. A variable the test writes more than once keeps its tokens without a path.
 
+### Test files with a single test case
+
+Without `--across`, `analyse` compares a test case only with the other test cases of the same file, so a file with one
+test case can never hold a candidate. `analyse` therefore does not run such a file. It counts the test cases of each
+file before the coverage run with the same `nikic/php-parser` fingerprints as the rest of the report, and skips a file
+only when all of these hold:
+
+- The file declares exactly one Pest `it()` / `test()` or one PHPUnit test method.
+- No dataset reaches it: no `->with()`, no `->repeat()`, no `#[DataProvider]`, `#[DataProviderExternal]`, `#[TestWith]`,
+  `@dataProvider` or `@testWith`. A named or shared dataset, a dataset the parser cannot resolve, and a `describe()`
+  block with a dataset all keep the file in the run, because the number of runs is known only at run time.
+- The parser resolves every `it()` / `test()` call. A test that a loop generates, a test with a description that is not a
+  string literal, two tests with the same description, and a file that does not parse keep the file in the run.
+
+A skipped file stays in the report: it counts in `summary.testFiles` and `summary.testCases` as one test case, it is
+counted in `summary.skippedFiles`, and it has no candidate, no `coveredLines` and no `testsWithoutSourceLines`, because
+it did not run. The candidates of every other file are the same as when the file runs. `--across` and `map` run every
+file, because there a single test case is compared with the test cases of other files.
+
 ### Verifying that coverage stayed
 
 `analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). Add
@@ -272,6 +295,9 @@ the tests change, `verify` runs the same test files again and compares:
 ```json
 {"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy","unstableLines":[]}
 ```
+
+A test file that `analyse` skipped is not in the baseline: `verify` does not run it, and its deletion is not reported in
+`missingTestFiles`.
 
 It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
 mapped test file still covers does not count as lost.

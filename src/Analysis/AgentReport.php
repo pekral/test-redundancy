@@ -58,6 +58,7 @@ final readonly class AgentReport implements JsonSerializable
             'byAction' => $byAction,
             'candidates' => count($candidates),
             'seconds' => $this->seconds,
+            'skippedFiles' => count(array_filter($this->reports, static fn (FileReport $report): bool => $report->skipped)),
             'staleMap' => $this->staleMap,
             'testCases' => array_sum(array_map(static fn (FileReport $report): int => $report->testCases, $this->reports)),
             'testFiles' => count($this->reports),

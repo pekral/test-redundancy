@@ -19,6 +19,9 @@ final readonly class ReportPrinter
     private const string REVIEW_RULE = 'Coverage cannot see what a test asserts. '
         . 'Delete a candidate only when a covering test asserts the same input and result.';
 
+    private const string SKIPPED = 'Skipped: the file declares one test case and no dataset, '
+        . 'so no other test case of the file can cover it.';
+
     private const string UNPARSED = 'unknown (the test or a dataset row could not be parsed)';
 
     private const string DATASET_ROWS = 'Dataset rows to review (same lines, different data — check the input class)';
@@ -48,6 +51,13 @@ final readonly class ReportPrinter
     private function printReport(FileReport $report): void
     {
         $this->io->section($report->testFile);
+
+        if ($report->skipped) {
+            $this->io->text(self::SKIPPED);
+
+            return;
+        }
+
         $this->io->definitionList(
             ['Test cases' => (string) $report->testCases],
             ['Covered lines' => (string) $report->coveredLines],
