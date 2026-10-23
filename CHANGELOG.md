@@ -44,6 +44,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   now carries the same token as its call form (`call:toBeEmpty`, `not:call:toBeEmpty`) in the contract fingerprint.
   Only a property fetch on an `expect()` chain whose name is a method of Pest's `Expectation` is collected; a plain
   object property and a higher-order property such as `expect($user)->name` carry no token (#21).
+- A boolean, string, number or constant used as the value of an array key now carries the path of its keys in the
+  contract fingerprint (`in:value:'enabled'/value:false`). A dataset row that passes the same literal without that key,
+  or under another key, is reported with a non-empty `differsBy` and the action `review-dataset-row` or `review`
+  instead of `differsBy: []` and the action `delete` (#25). An empty array literal under a key keeps the token `value:[]`.
 
 ## [0.1] - 2026-10-22
 

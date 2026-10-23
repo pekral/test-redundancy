@@ -96,11 +96,61 @@ it('tells a literal used as an array key from the same literal used as a value',
 
     expect(array_keys(array_diff_key($scalarString, $nestedArray)))->toBe(['value:\'x\''])
         ->and(array_keys(array_diff_key($nestedArray, $scalarString)))->toEqualCanonicalizing(
-            ['key:value:\'z\'', 'key:value:\'y\'', 'key:value:\'x\'', 'value:1', 'value:2'],
+            [
+                'key:value:\'z\'',
+                'key:value:\'y\'',
+                'key:value:\'x\'',
+                'in:value:\'z\'/value:\'y\'/value:1',
+                'in:value:\'z\'/value:\'x\'/value:2',
+            ],
         )
         ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
         ->toBe(['value:false']);
 });
+
+it('tells a literal under one array key from the same literal under another key', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'boolean under a key' => ['store([\'enabled\' => false]);', ['function:store' => 1, 'key:value:\'enabled\'' => 1, 'in:value:\'enabled\'/value:false' => 1]],
+    'boolean under another key' => ['store([\'visible\' => false]);', ['function:store' => 1, 'key:value:\'visible\'' => 1, 'in:value:\'visible\'/value:false' => 1]],
+    'class constant as a key' => ['store([Status::Active => true]);', ['function:store' => 1, 'key:const:Status::Active' => 1, 'in:const:Status::Active/value:true' => 1]],
+    'constant under a key' => ['store([\'status\' => Status::Active, \'flag\' => null]);', [
+        'function:store' => 1,
+        'in:value:\'flag\'/value:null' => 1,
+        'in:value:\'status\'/const:Status::Active' => 1,
+        'key:value:\'flag\'' => 1,
+        'key:value:\'status\'' => 1,
+    ],
+    ],
+    'empty array under a key' => ['store([\'tags\' => []]);', ['function:store' => 1, 'key:value:\'tags\'' => 1, 'value:[]' => 1]],
+    'literal in a call under a key' => ['store([\'limit\' => min(5, 9)]);', [
+        'function:min' => 1,
+        'function:store' => 1,
+        'in:value:\'limit\'/value:5' => 1,
+        'in:value:\'limit\'/value:9' => 1,
+        'key:value:\'limit\'' => 1,
+    ],
+    ],
+    'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
+        'function:store' => 1,
+        'in:value:\'tags\'/value:\'a\'' => 1,
+        'in:value:\'tags\'/value:\'b\'' => 1,
+        'key:value:\'tags\'' => 1,
+    ],
+    ],
+    'literal in a list without a key' => ['store([false, false]);', ['function:store' => 1, 'value:false' => 2]],
+    'literal under nested keys' => ['store([\'user\' => [\'active\' => true]]);', [
+        'function:store' => 1,
+        'in:value:\'user\'/value:\'active\'/value:true' => 1,
+        'key:value:\'active\'' => 1,
+        'key:value:\'user\'' => 1,
+    ],
+    ],
+    'negative number under a key' => ['store([\'balance\' => -5]);', ['function:store' => 1, 'key:value:\'balance\'' => 1, 'in:value:\'balance\'/value:-5' => 1]],
+    'string under a key' => ['store([\'name\' => \'x\']);', ['function:store' => 1, 'key:value:\'name\'' => 1, 'in:value:\'name\'/value:\'x\'' => 1]],
+]);
 
 it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php store(' . $argument . ');');

@@ -26,6 +26,8 @@ use PhpParser\NodeFinder;
 final class TokenCollector
 {
 
+    public const string DATA_TOKEN_PATTERN = '/^(in:.*\/)?(key:)?(value|const):/';
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
      * @return array<string, int>
@@ -39,6 +41,7 @@ final class TokenCollector
         $nodeFinder = new NodeFinder();
         $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
         $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
+        $keyPaths = self::keyPaths($nodeFinder, $nodes);
         $tokens = [];
 
         foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
@@ -48,7 +51,7 @@ final class TokenCollector
                 continue;
             }
 
-            $prefixedToken = self::keyPrefix($arrayKeys, $node) . $token;
+            $prefixedToken = self::prefix($arrayKeys, $keyPaths, $node, $token) . $token;
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + 1;
         }
 
@@ -106,6 +109,29 @@ final class TokenCollector
         return $arrayKeys;
     }
 
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @return array<int, list<string>>
+     */
+    private static function keyPaths(NodeFinder $nodeFinder, Node|array $nodes): array
+    {
+        $keyPaths = [];
+
+        foreach ($nodeFinder->findInstanceOf($nodes, ArrayItem::class) as $arrayItem) {
+            $keyToken = $arrayItem->key === null ? null : self::token($arrayItem->key);
+
+            if ($keyToken === null) {
+                continue;
+            }
+
+            foreach ($nodeFinder->find($arrayItem->value, static fn (): bool => true) as $node) {
+                $keyPaths[spl_object_id($node)][] = $keyToken;
+            }
+        }
+
+        return $keyPaths;
+    }
+
     private static function carriesContract(Node $node): bool
     {
         return $node instanceof Scalar
@@ -144,10 +170,15 @@ final class TokenCollector
 
     /**
      * @param array<int, true> $arrayKeys
+     * @param array<int, list<string>> $keyPaths
      */
-    private static function keyPrefix(array $arrayKeys, Node $node): string
+    private static function prefix(array $arrayKeys, array $keyPaths, Node $node, string $token): string
     {
-        return isset($arrayKeys[spl_object_id($node)]) ? 'key:' : '';
+        return match (true) {
+            isset($arrayKeys[spl_object_id($node)]) => 'key:',
+            !$node instanceof Array_ && isset($keyPaths[spl_object_id($node)]) && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 => 'in:' . implode('/', $keyPaths[spl_object_id($node)]) . '/',
+            default => '',
+        };
     }
 
     private static function negation(Expr $receiver): string
