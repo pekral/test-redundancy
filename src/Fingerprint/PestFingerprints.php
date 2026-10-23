@@ -33,7 +33,7 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     public static function of(array $statements): array
     {
@@ -44,7 +44,7 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     private function walk(array $statements, string $prefix): array
     {
@@ -60,7 +60,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     private function expression(Node $expression, string $prefix): array
     {
@@ -75,7 +75,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     private function test(Node $expression, string $prefix): array
     {
@@ -87,13 +87,13 @@ final readonly class PestFingerprints
         }
 
         $isIt = $call->name instanceof Name && $call->name->toLowerString() === 'it';
-        $body = TokenCollector::collect(self::argument($call, 1)) + $modifierTokens;
+        $body = TokenCollector::sum(TokenCollector::collect(self::argument($call, 1)), $modifierTokens);
 
         return DatasetRows::fingerprints($prefix . ($isIt ? 'it ' : '') . $description, $body, $datasetRows);
     }
 
     /**
-     * @return array{0: \PhpParser\Node\Expr\FuncCall|null, 1: array<\PhpParser\Node\ArrayItem|null>, 2: array<string, true>}
+     * @return array{0: \PhpParser\Node\Expr\FuncCall|null, 1: array<\PhpParser\Node\ArrayItem|null>, 2: array<string, int>}
      */
     private function unwrapChain(Node $expression): array
     {
@@ -106,7 +106,11 @@ final readonly class PestFingerprints
             if ($method === 'with') {
                 $datasetRows = $this->datasetRows(self::argument($expression, 0));
             } elseif ($method !== null) {
-                $modifierTokens += TokenCollector::collect($expression->args) + ['call:' . $method => true];
+                $modifierTokens = TokenCollector::sum(
+                    $modifierTokens,
+                    TokenCollector::collect($expression->args),
+                    ['call:' . $method => 1],
+                );
             }
 
             $expression = $expression->var;

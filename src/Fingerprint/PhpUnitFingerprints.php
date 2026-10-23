@@ -17,7 +17,7 @@ final class PhpUnitFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     public static function of(array $statements): array
     {
@@ -31,7 +31,7 @@ final class PhpUnitFingerprints
     }
 
     /**
-     * @return array<string, array<string, true>>
+     * @return array<string, array<string, int>>
      */
     private static function tests(Class_ $class): array
     {

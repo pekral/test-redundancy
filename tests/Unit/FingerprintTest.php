@@ -8,7 +8,7 @@ use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use PhpParser\ParserFactory;
 
 /**
- * @return array<string, array<string, true>>
+ * @return array<string, array<string, int>>
  */
 function fingerprintsOf(string $code): array
 {
@@ -81,15 +81,50 @@ it('tells a literal used as an array key from the same literal used as a value',
         ->toBe(['value:false']);
 });
 
-it('gives an empty array literal one token, however many or deeply nested empty arrays it holds', function (string $argument): void {
+it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php store(' . $argument . ');');
 
-    expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing(['function:store', 'value:[]']);
+    expect(TokenCollector::collect($statements))->toBe(['function:store' => 1, 'value:[]' => $count]);
 })->with([
-    'nested empty array' => ['[[[]]]'],
-    'one empty array' => ['[]'],
-    'two empty arrays' => ['[[], []]'],
+    'nested empty array' => ['[[[]]]', 1],
+    'one empty array' => ['[]', 1],
+    'two empty arrays' => ['[[], []]', 2],
 ]);
+
+it('counts how many times a test uses each token', function (): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse(<<<'PHP'
+        <?php
+        $list = Lists::factory()->create();
+        $otherList = Lists::factory()->create();
+        import(new Batch(), new Batch());
+        expect(add(1, 1))->toBe(2);
+        PHP);
+
+    expect(TokenCollector::collect($statements))->toBe([
+        'call:create' => 2,
+        'call:Lists::factory' => 2,
+        'function:import' => 1,
+        'new:Batch' => 2,
+        'call:toBe' => 1,
+        'function:expect' => 1,
+        'function:add' => 1,
+        'value:1' => 2,
+        'value:2' => 1,
+    ]);
+});
+
+it('counts a token of a dataset row together with the same token of the test body and its modifiers', function (): void {
+    $fingerprints = fingerprintsOf(<<<'PHP'
+        <?php
+        it('adds', function (int $value): void {
+            expect(add($value))->toBe(1);
+        })->with(['one' => [1]])->group('math')->group('math');
+        PHP);
+
+    $row = $fingerprints['it adds › one'];
+
+    expect([$row['value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
+});
 
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'

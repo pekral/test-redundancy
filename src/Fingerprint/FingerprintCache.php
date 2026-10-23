@@ -9,7 +9,7 @@ use Pekral\TestRedundancy\Support\TestKey;
 final class FingerprintCache
 {
 
-    /** @var array<string, array<string, array<string, true>>> */
+    /** @var array<string, array<string, array<string, int>>> */
     private array $byFile = [];
 
     public function __construct(private readonly string $projectRoot)
@@ -31,7 +31,7 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $difference = array_keys(array_diff_key($tokens['own'], $covering));
+            $difference = $this->exceeding($tokens['own'], $covering);
 
             if ($smallest === null || count($difference) < count($smallest)) {
                 $smallest = $difference;
@@ -49,12 +49,12 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : array_keys(array_diff_key(array_replace([], ...$tokens['covering']), $tokens['own']));
+        return $tokens === null ? null : $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']);
     }
 
     /**
      * @param list<string> $coveringTestKeys
-     * @return array{own: array<string, true>, covering: list<array<string, true>>}|null
+     * @return array{own: array<string, int>, covering: list<array<string, int>>}|null
      */
     private function tokens(string $testKey, array $coveringTestKeys): ?array
     {
@@ -80,7 +80,19 @@ final class FingerprintCache
     }
 
     /**
-     * @return array<string, true>|null
+     * @param array<string, int> $tokens
+     * @param array<string, int> $other
+     * @return list<string>
+     */
+    private function exceeding(array $tokens, array $other): array
+    {
+        return array_keys(
+            array_filter($tokens, static fn (int $count, string $token): bool => $count > ($other[$token] ?? 0), ARRAY_FILTER_USE_BOTH),
+        );
+    }
+
+    /**
+     * @return array<string, int>|null
      */
     private function of(string $testKey): ?array
     {

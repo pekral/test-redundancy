@@ -287,6 +287,102 @@ it('keeps a test that adds only an empty array to its covering test', function (
     ],
 ]);
 
+it('asks for a review only when a test makes a call or creates an object a different number of times than its covering test', function (
+    string $source,
+    string $test,
+    string $covering,
+    array $differsBy,
+    Action $action,
+): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/CountTest.php', $source);
+
+    $reports = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/CountTest.php' => [
+        'tests/CountTest.php :: ' . $test => ['src/Subscription.php:10' => true],
+        'tests/CountTest.php :: ' . $covering => ['src/Subscription.php:10' => true, 'src/Subscription.php:20' => true],
+    ],
+    ], map: null);
+
+    expect($reports[0]->candidates)->toHaveCount(1)
+        ->and($reports[0]->candidates[0]->testKey)->toBe('tests/CountTest.php :: ' . $test)
+        ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($reports[0]->candidates[0]->action())->toBe($action);
+})->with([
+    'a contact on one list against a contact on two lists' => [
+        <<<'PHP'
+            <?php
+            it('deactivates a contact unsubscribed from its only subscribed list', function (): void {
+                $list = Lists::factory()->create();
+                $subscriber = Subscriber::factory()->create(['active' => 1]);
+                Connection::factory()->create(['email' => $subscriber->email, 'list_id' => $list->id]);
+                expectCounterDelta(-1);
+            });
+            it('activates an inactive contact still subscribed in another list', function (): void {
+                $list = Lists::factory()->create();
+                $otherList = Lists::factory()->create();
+                $subscriber = Subscriber::factory()->create(['active' => 0]);
+                foreach ([$list, $otherList] as $subscribedList) {
+                    Connection::factory()->create(['email' => $subscriber->email, 'list_id' => $subscribedList->id]);
+                }
+                expectCounterDelta(1);
+            });
+            PHP,
+        'it deactivates a contact unsubscribed from its only subscribed list',
+        'it activates an inactive contact still subscribed in another list',
+        ['value:-1'],
+        Action::Review,
+    ],
+    'an address stored twice against once' => [
+        <<<'PHP'
+            <?php
+            it('stores the same address twice', function (): void {
+                store('a@example.com');
+                store('a@example.com');
+                expect(stored())->toBe(1);
+            });
+            it('stores an address once', function (): void {
+                store('a@example.com');
+                expect(stored())->toBe(2);
+            });
+            PHP,
+        'it stores the same address twice',
+        'it stores an address once',
+        ['function:store', 'value:\'a@example.com\'', 'value:1'],
+        Action::Review,
+    ],
+    'one imported batch against three' => [
+        <<<'PHP'
+            <?php
+            it('imports one batch', function (): void {
+                expect(import([new Batch()]))->toBe(1);
+            });
+            it('imports three batches', function (): void {
+                expect(import([new Batch(), new Batch(), new Batch()]))->toBe(3);
+            });
+            PHP,
+        'it imports one batch',
+        'it imports three batches',
+        ['value:1'],
+        Action::Review,
+    ],
+    'the same value twice against two values' => [
+        <<<'PHP'
+            <?php
+            it('adds one to one', function (): void {
+                expect(add(1, 1))->toBe(2);
+            });
+            it('adds one to two', function (): void {
+                expect(add(1, 2))->toBe(3);
+            });
+            PHP,
+        'it adds one to one',
+        'it adds one to two',
+        ['value:1'],
+        Action::MergeIntoDataset,
+    ],
+]);
+
 it('compares with tests of other files from the map', function (): void {
     $map = CoverageMap::fromLinesByTest('abc', [
         'tests/OtherCalculatorTest.php :: divide returns a float' => ['src/Calculator.php:17' => true],
