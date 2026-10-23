@@ -83,9 +83,9 @@ it('hashes a support file whose name is not valid UTF-8', function (): void {
     touch($root . "/tests/fixtures/caf\xE9.txt");
 
     $testsByFile = ['tests/ATest.php' => ['tests/ATest.php :: it a' => ['src/A.php:1' => true]]];
-    $baseline = CoverageBaseline::fromTestsByFile($testsByFile, false, $root);
+    $baseline = CoverageBaseline::fromTestsByFile($testsByFile, across: false, projectRoot: $root);
     file_put_contents($root . "/tests/fixtures/caf\xE9.txt", 'changed');
-    $changed = CoverageBaseline::fromTestsByFile($testsByFile, false, $root);
+    $changed = CoverageBaseline::fromTestsByFile($testsByFile, across: false, projectRoot: $root);
 
     expect($baseline->supportHash)->not->toBe('')
         ->and($changed->supportHash)->not->toBe($baseline->supportHash);
