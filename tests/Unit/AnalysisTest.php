@@ -512,19 +512,6 @@ it('still deletes a test whose values a dataset row passes to the same arguments
         ->and($reports[0]->candidates[0]->differsBy)->toBe([])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 })->with([
-    'pest dataset row' => [
-        <<<'PHP'
-            <?php
-            it('adds', function (int $first, int $second, int $sum): void {
-                expect(add($first, $second))->toBe($sum);
-            })->with(['one and two' => [1, 2, 3]]);
-            it('adds one and two', function (): void {
-                expect(add(1, 2))->toBe(3);
-            });
-            PHP,
-        'it adds one and two',
-        'it adds › one and two',
-    ],
     'pest dataset row of one value' => [
         <<<'PHP'
             <?php

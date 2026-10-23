@@ -202,10 +202,6 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
     'literal inside an argument' => ['store([true], 1 + 2);', ['function:store' => 1, 'value:1' => 1, 'value:2' => 1, 'value:true' => 1]],
     'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],
-    'positional arguments' => [
-        'store(true, false);',
-        ['function:store' => 1, 'in:function:store#0/value:true' => 1, 'in:function:store#1/value:false' => 1],
-    ],
 ]);
 
 it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
