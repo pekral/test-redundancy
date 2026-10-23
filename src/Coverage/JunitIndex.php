@@ -15,9 +15,9 @@ final readonly class JunitIndex
     /**
      * @param array<string, string> $fileByClass
      * @param array<string, string> $descriptionByEvaluable
-     * @param array<string, true> $testKeys
+     * @param array<string, float> $testSeconds
      */
-    private function __construct(private array $fileByClass, private array $descriptionByEvaluable, private array $testKeys)
+    private function __construct(private array $fileByClass, private array $descriptionByEvaluable, private array $testSeconds)
     {
     }
 
@@ -32,7 +32,7 @@ final readonly class JunitIndex
         libxml_use_internal_errors($previousErrorHandling);
         $fileByClass = [];
         $descriptionByEvaluable = [];
-        $testKeys = [];
+        $testSeconds = [];
 
         $testCases = $report === false ? null : $report->xpath('//testcase');
 
@@ -46,10 +46,11 @@ final readonly class JunitIndex
             }
 
             $descriptionByEvaluable[$class . '::' . PestName::evaluable($description)] = $description;
-            $testKeys[TestKey::make($fileByClass[$class] ?? $class, $description)] = true;
+            $testKey = TestKey::make($fileByClass[$class] ?? $class, $description);
+            $testSeconds[$testKey] = ($testSeconds[$testKey] ?? 0.0) + (float) $testCase['time'];
         }
 
-        return new self($fileByClass, $descriptionByEvaluable, $testKeys);
+        return new self($fileByClass, $descriptionByEvaluable, $testSeconds);
     }
 
     /**
@@ -64,7 +65,22 @@ final readonly class JunitIndex
             $covered[explode(TestKey::DATASET_SEPARATOR, $coveredTestKey, 2)[0]] = true;
         }
 
-        return array_keys(array_diff_key($this->testKeys, $covered));
+        return array_keys(array_diff_key($this->testSeconds, $covered));
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    public function secondsByFile(): array
+    {
+        $secondsByFile = [];
+
+        foreach ($this->testSeconds as $testKey => $seconds) {
+            $file = TestKey::file($testKey);
+            $secondsByFile[$file] = ($secondsByFile[$file] ?? 0.0) + $seconds;
+        }
+
+        return array_intersect_key($secondsByFile, array_flip($this->fileByClass));
     }
 
     public function fileOf(string $class): string

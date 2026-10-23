@@ -151,6 +151,74 @@ it('runs several test files as concurrent groups and one path in the runner\'s p
     removeDirectory($project);
 });
 
+/**
+ * @return array<string, string>
+ */
+function workerTokensOf(string $project): array
+{
+    $tokens = [];
+
+    foreach (['Alpha', 'Beta', 'Gamma'] as $name) {
+        $tokens[$name] = (string) file_get_contents($project . '/tokens/' . $name);
+        unlink($project . '/tokens/' . $name);
+    }
+
+    return $tokens;
+}
+
+it('balances the concurrent groups by the durations of the last run without changing the result', function (): void {
+    $project = temporaryDirectory();
+    new Filesystem()->mirror(fixturePath('pest'), $project);
+    new Filesystem()->remove($project . '/tests');
+    mkdir($project . '/tests');
+    mkdir($project . '/tokens');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+    ]));
+    $testFiles = [];
+
+    foreach (['Alpha', 'Beta', 'Gamma'] as $name) {
+        $testFiles[] = 'tests/' . $name . 'Test.php';
+        file_put_contents($project . '/tests/' . $name . 'Test.php', <<<PHP
+            <?php
+
+            declare(strict_types = 1);
+
+            require_once __DIR__ . '/../src/Calculator.php';
+
+            use Fixture\Pest\Calculator;
+
+            test('adds in {$name}', function (): void {
+                file_put_contents(__DIR__ . '/../tokens/{$name}', (string) getenv('TEST_TOKEN'));
+
+                expect((new Calculator())->add(1, 2))->toBe(3);
+            });
+            PHP);
+    }
+
+    $roundRobin = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $roundRobinTokens = workerTokensOf($project);
+    $roundRobinBaseline = (string) file_get_contents($project . '/.test-redundancy/baseline.json');
+    $recorded = json_decode((string) file_get_contents($project . '/.test-redundancy/durations.json'), associative: true);
+    file_put_contents($project . '/.test-redundancy/durations.json', (string) json_encode([
+        $testFiles[0] => 10.0,
+        $testFiles[1] => 5.0,
+        $testFiles[2] => 5.0,
+    ]));
+
+    $balanced = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $balancedTokens = workerTokensOf($project);
+
+    expect(array_keys(is_array($recorded) ? $recorded : []))->toEqualCanonicalizing($testFiles)
+        ->and($roundRobinTokens)->toBe(['Alpha' => '1', 'Beta' => '2', 'Gamma' => '1'])
+        ->and($balancedTokens)->toBe(['Alpha' => '1', 'Beta' => '2', 'Gamma' => '2'])
+        ->and($balanced)->toEqual($roundRobin)
+        ->and((string) file_get_contents($project . '/.test-redundancy/baseline.json'))->toBe($roundRobinBaseline);
+
+    removeDirectory($project);
+});
+
 it('fails when the analysed tests fail', function (): void {
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('phpunit'), $project);

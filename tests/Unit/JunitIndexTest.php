@@ -66,3 +66,23 @@ it('reads a missing or broken JUnit log as empty', function (): void {
     expect(JunitIndex::fromFile('/missing/junit.xml', '/project', [])->fileOf('Foo'))->toBe('Foo')
         ->and(junitIndex('not xml', '/project')->fileOf('Foo'))->toBe('Foo');
 });
+
+it('sums the test case time per test file', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    touch($root . '/tests/BarTest.php');
+    $index = junitIndex(<<<XML
+        <testsuites>
+            <testcase name="it a" file="tests/FooTest.php::it a" class="Foo" time="0.25"/>
+            <testcase name="it b with data set &quot;x&quot;" file="tests/FooTest.php::it b" class="Foo" time="1.5"/>
+            <testcase name="it c" file="{$root}/tests/BarTest.php" class="Bar" time="2"/>
+            <testcase name="it d" file="" class="Baz" time="9"/>
+            <testcase name="it e" file="tests/BarTest.php" class="Bar"/>
+        </testsuites>
+        XML, $root);
+
+    expect($index->secondsByFile())->toBe(['tests/FooTest.php' => 1.75, 'tests/BarTest.php' => 2.0]);
+
+    removeDirectory($root);
+});

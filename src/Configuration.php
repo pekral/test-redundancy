@@ -21,6 +21,8 @@ final readonly class Configuration
 
     private const string BASELINE_FILE_NAME = 'baseline.json';
 
+    private const string DURATIONS_FILE_NAME = 'durations.json';
+
     /**
      * @param list<string> $sourcePaths
      * @param array<string, string> $environment
@@ -89,6 +91,11 @@ final readonly class Configuration
     public function absoluteBaselinePath(): string
     {
         return dirname($this->absoluteMapPath()) . DIRECTORY_SEPARATOR . self::BASELINE_FILE_NAME;
+    }
+
+    public function absoluteDurationsPath(): string
+    {
+        return dirname($this->absoluteMapPath()) . DIRECTORY_SEPARATOR . self::DURATIONS_FILE_NAME;
     }
 
     public function absoluteMapPath(): string

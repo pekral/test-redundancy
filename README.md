@@ -90,7 +90,11 @@ same suite. One folder or file runs in the runner's own parallel mode — `pest 
 `phpunit` — with the coverage settings passed to every worker through `--passthru-php` and the project's
 `phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`.
 Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
-each with its own `TEST_TOKEN`. Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
+each with its own `TEST_TOKEN`. Every run stores the time of each test file from its JUnit log in
+`.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
+group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
+stored time the files are split round-robin. The split changes how long the run takes, never the report or the baseline.
+Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
 between runs. `vendor/bin/test-redundancy analyse --help` lists every option.
 
 ### The JSON report
@@ -262,7 +266,7 @@ test lacks.
 ### Verifying that coverage stayed
 
 `analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). Add
-`.test-redundancy/` to `.gitignore`; the map, the baseline and the runner cache are local state. After
+`.test-redundancy/` to `.gitignore`; the map, the baseline, the file durations and the runner cache are local state. After
 the tests change, `verify` runs the same test files again and compares:
 
 ```json
