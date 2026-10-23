@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use Pest\Expectation;
+use Pest\Mixins\Expectation as ExpectationMixin;
 use PhpParser\Node;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
@@ -111,6 +113,7 @@ final class TokenCollector
             || $node instanceof ConstFetch
             || $node instanceof ClassConstFetch
             || ($node instanceof MethodCall && !self::isNegation($node))
+            || ($node instanceof PropertyFetch && self::callsExpectationMethod($node))
             || $node instanceof StaticCall
             || $node instanceof FuncCall
             || $node instanceof New_
@@ -126,7 +129,7 @@ final class TokenCollector
             $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
                 ? sprintf('const:%s::%s', $node->class->toString(), $node->name->toString())
                 : null,
-            $node instanceof MethodCall => $node->name instanceof Identifier
+            $node instanceof MethodCall, $node instanceof PropertyFetch => $node->name instanceof Identifier
                 ? self::negation($node->var) . 'call:' . $node->name->toString()
                 : null,
             $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
@@ -150,6 +153,24 @@ final class TokenCollector
     private static function negation(Expr $receiver): string
     {
         return self::isNegation($receiver) ? 'not:' : '';
+    }
+
+    private static function callsExpectationMethod(PropertyFetch $propertyFetch): bool
+    {
+        return !self::isNegation($propertyFetch)
+            && $propertyFetch->name instanceof Identifier
+            && (method_exists(Expectation::class, $propertyFetch->name->toString())
+                || method_exists(ExpectationMixin::class, $propertyFetch->name->toString()))
+            && self::isExpectationChain($propertyFetch->var);
+    }
+
+    private static function isExpectationChain(Expr $node): bool
+    {
+        return match (true) {
+            $node instanceof FuncCall => $node->name instanceof Name && $node->name->toLowerString() === 'expect',
+            $node instanceof MethodCall, $node instanceof PropertyFetch => self::isExpectationChain($node->var),
+            default => false,
+        };
     }
 
     private static function isNegation(Expr $node): bool

@@ -58,6 +58,27 @@ it('collects the Pest negation as part of the call it negates', function (): voi
     ]);
 });
 
+it('collects a Pest assertion written as a property like its call form', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toBe($expected);
+})->with([
+    'assertion' => ['expect($value)->toBeEmpty;', ['call:toBeEmpty' => 1, 'function:expect' => 1]],
+    'assertion after and' => ['\\expect($value)->and($other)->toBeTrue;', ['call:toBeTrue' => 1, 'call:and' => 1, 'function:expect' => 1]],
+    'assertion on a higher-order property' => ['expect($user)->name->toBeString;', ['call:toBeString' => 1, 'function:expect' => 1]],
+    'assertion on each item' => ['expect($items)->each->toBeInt;', ['call:toBeInt' => 1, 'call:each' => 1, 'function:expect' => 1]],
+    'negated assertion' => ['expect($value)->not->toBeEmpty;', ['not:call:toBeEmpty' => 1, 'function:expect' => 1]],
+]);
+
+it('collects no property fetch that runs no Pest assertion', function (): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse(
+        '<?php $user->name; $this->toBeEmpty; $users->each->toBeEmpty; $factory($value)->toBeEmpty; '
+        . 'expect($user)->name->email; expect($user)->{$name};',
+    );
+
+    expect(TokenCollector::collect($statements))->toBe(['function:expect' => 2]);
+});
+
 it('tells a literal used as an array key from the same literal used as a value', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
