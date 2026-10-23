@@ -100,8 +100,10 @@ it('tells a literal used as an array key from the same literal used as a value',
                 'key:value:\'z\'',
                 'key:value:\'y\'',
                 'key:value:\'x\'',
-                'in:value:\'z\'/value:\'y\'/value:1',
-                'in:value:\'z\'/value:\'x\'/value:2',
+                'in:function:normalize#0/value:\'z\'/value:\'y\'/value:1',
+                'in:function:normalize#0/value:\'z\'/value:\'x\'/value:2',
+                'in:call:toBe#0/value:\'z\'/value:\'y\'/value:1',
+                'in:call:toBe#0/value:\'z\'/value:\'x\'/value:2',
             ],
         )
         ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
@@ -148,22 +150,22 @@ it('tells a literal under one array key from the same literal under another key'
     'literal in a call under a key' => ['store([\'limit\' => min(5, 9)]);', [
         'function:min' => 1,
         'function:store' => 1,
-        'in:value:\'limit\'/function:min#0/value:5' => 1,
-        'in:value:\'limit\'/function:min#1/value:9' => 1,
+        'in:function:store#0/value:\'limit\'/function:min#0/value:5' => 1,
+        'in:function:store#0/value:\'limit\'/function:min#1/value:9' => 1,
         'key:value:\'limit\'' => 1,
     ],
     ],
     'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
         'function:store' => 1,
-        'in:value:\'tags\'/value:\'a\'' => 1,
-        'in:value:\'tags\'/value:\'b\'' => 1,
+        'in:function:store#0/value:\'tags\'/value:\'a\'' => 1,
+        'in:function:store#0/value:\'tags\'/value:\'b\'' => 1,
         'key:value:\'tags\'' => 1,
     ],
     ],
     'literal in a list without a key' => ['store([false, false]);', ['function:store' => 1, 'in:function:store#0/value:false' => 2]],
     'literal under nested keys' => ['store([\'user\' => [\'active\' => true]]);', [
         'function:store' => 1,
-        'in:value:\'user\'/value:\'active\'/value:true' => 1,
+        'in:function:store#0/value:\'user\'/value:\'active\'/value:true' => 1,
         'key:value:\'active\'' => 1,
         'key:value:\'user\'' => 1,
     ],
@@ -200,7 +202,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'argument under a key' => ['store([\'limit\' => min(5)]);', [
         'function:min' => 1,
         'function:store' => 1,
-        'in:value:\'limit\'/function:min#0/value:5' => 1,
+        'in:function:store#0/value:\'limit\'/function:min#0/value:5' => 1,
         'key:value:\'limit\'' => 1,
     ],
     ],
@@ -208,11 +210,33 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'literal inside an argument' => ['store([true], 1 + 2);', [
         'function:store' => 1,
         'in:function:store#0/value:true' => 1,
-        'value:1' => 1,
-        'value:2' => 1,
+        'in:function:store#1/value:1' => 1,
+        'in:function:store#1/value:2' => 1,
     ],
     ],
     'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],
+]);
+
+it('carries every enclosing call in the call path of a value', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'map in a call passed to the same call' => ['json_encode(json_encode([\'test\' => true]));', [
+        'function:json_encode' => 2,
+        'in:function:json_encode#0/function:json_encode#0/value:\'test\'/value:true' => 1,
+        'key:value:\'test\'' => 1,
+    ],
+    ],
+    'value in a call an assertion receives' => ['expect(add(1, 2))->toBe(3);', [
+        'call:toBe' => 1,
+        'function:add' => 1,
+        'function:expect' => 1,
+        'in:call:toBe#0/value:3' => 1,
+        'in:function:add#0/value:1' => 1,
+        'in:function:add#1/value:2' => 1,
+    ],
+    ],
 ]);
 
 it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {

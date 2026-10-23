@@ -18,6 +18,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   map the test assigns once to a local variable and reads, so a local map and the same map inline still have the same
   tokens. A list or map nested in a row list or map binds too. Two rows that swap the same maps between two arguments
   differ in `differsBy`, so such a row is no longer reported with the action `delete` against its sibling row (#58).
+- A value inside an argument now carries every enclosing call and array key in the contract fingerprint, such as
+  `in:function:json_encode#0/function:json_encode#0/value:'test'/value:true` for
+  `json_encode(json_encode(['test' => true]))`. A dataset row whose value its sibling row passes through one more call
+  differs in `differsBy`, so such a row is no longer reported with the action `delete`. An assertion that receives the
+  value through another call stays out of the path, so `expect(add(1, 2))` and `$sum = add(1, 2)` keep the same
+  tokens (#59).
 
 ## [0.1.2] - 2026-10-23
 
