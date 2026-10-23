@@ -19,6 +19,12 @@ enum Action: string
         . 'Check whether a covering test that runs those lines asserts what this test asserts about them; '
         . 'delete this test only when one does, otherwise keep it.';
 
+    public const string MISSING_KEY_STEP = 'The covering test %s sets the array keys in coveringDiffersBy (%s), and this test does not: '
+        . 'without such a key, the input has another shape. '
+        . 'Check whether the code under test reads one of these keys, '
+        . 'for example in an isset() check, a required rule or a short-circuit condition; '
+        . 'keep this test when it does, and delete it only when the code never reads them.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 

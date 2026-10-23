@@ -98,6 +98,18 @@ it('names the covering-side tokens in the review steps', function (): void {
         ->and($steps[3])->toBe(Action::VERIFY_STEP);
 });
 
+it('asks whether the code under test reads the array key only the covering test sets', function (): void {
+    $steps = candidate('it drains › multicast', ['it drains › parallel'], [], ['key:value:\'parallel\'', 'value:1'])->steps();
+
+    expect($steps)->toBe([
+        'The covering test "it drains › parallel" sets the array keys in coveringDiffersBy (key:value:\'parallel\'), and this test does not: '
+            . 'without such a key, the input has another shape. '
+            . 'Check whether the code under test reads one of these keys, for example in an isset() check, a required rule or a short-circuit condition; '
+            . 'keep this test when it does, and delete it only when the code never reads them.',
+        Action::VERIFY_STEP,
+    ]);
+});
+
 it('names the lines only the union of the covering tests reaches in the report and the steps', function (): void {
     $candidate = candidate('it works', ['it a', 'it b'], [], unionOnlyLines: ['src/Foo.php:12', 'src/Foo.php:15']);
     $json = decodedJson((string) json_encode($candidate));
