@@ -496,7 +496,11 @@ it('asks to merge a test whose literal arguments its covering test passes at swa
         ->and($reports[0]->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
-it('still deletes a test whose values a dataset row passes to the same arguments', function (string $source, string $test, string $covering): void {
+it('still deletes a test whose values a dataset row or a local variable passes to the same arguments', function (
+    string $source,
+    string $test,
+    string $covering,
+): void {
     $project = temporaryDirectory();
     mkdir($project . '/tests');
     file_put_contents($project . '/tests/CalculatorTest.php', $source);
@@ -512,6 +516,20 @@ it('still deletes a test whose values a dataset row passes to the same arguments
         ->and($reports[0]->candidates[0]->differsBy)->toBe([])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 })->with([
+    'pest dataset row against a test that holds the value in a local variable' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (string $email): void {
+                notify($email);
+            })->with(['the owner' => ['owner@example.com']]);
+            it('notifies the owner', function (): void {
+                $email = 'owner@example.com';
+                notify($email);
+            });
+            PHP,
+        'it notifies the owner',
+        'it notifies › the owner',
+    ],
     'pest dataset row of one value' => [
         <<<'PHP'
             <?php
@@ -571,6 +589,20 @@ it('still deletes a test whose values a dataset row passes to the same arguments
             PHP,
         'testAddsOneAndTwo',
         'testAdds › one and two',
+    ],
+    'test that holds the value in a local variable against a test that passes it inline' => [
+        <<<'PHP'
+            <?php
+            it('notifies the owner', function (): void {
+                $email = 'owner@example.com';
+                notify($email);
+            });
+            it('notifies the owner inline', function (): void {
+                notify('owner@example.com');
+            });
+            PHP,
+        'it notifies the owner',
+        'it notifies the owner inline',
     ],
 ]);
 
@@ -670,6 +702,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         ['in:call:toBe#0/value:1'],
         Action::Review,
     ],
+    'the contact of a dataset row the test reads twice against a contact a test creates once' => [
+        <<<'PHP'
+            <?php
+            it('subscribes', function (Contact $contact): void {
+                subscribe($contact);
+                expect(subscribed($contact))->toBeTrue();
+            })->with(['a contact' => [new Contact()]]);
+            it('subscribes a contact', function (): void {
+                $contact = new Contact();
+                subscribe($contact);
+                expect(subscribed($contact))->toBeTrue();
+            });
+            PHP,
+        'it subscribes › a contact',
+        'it subscribes a contact',
+        [],
+        Action::Delete,
+    ],
     'the same value twice against two values' => [
         <<<'PHP'
             <?php
@@ -719,6 +769,23 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         'it imports three batches in a loop',
         'it imports one batch',
         ['value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:call:toBe#0/value:3'],
+        Action::Review,
+    ],
+    'two contacts against the one contact of a dataset row the test reads twice' => [
+        <<<'PHP'
+            <?php
+            it('subscribes', function (Contact $contact): void {
+                subscribe($contact);
+                expect(subscribed($contact))->toBeTrue();
+            })->with(['a contact' => [new Contact()]]);
+            it('subscribes two contacts', function (): void {
+                subscribe(new Contact());
+                expect(subscribed(new Contact()))->toBeTrue();
+            });
+            PHP,
+        'it subscribes two contacts',
+        'it subscribes › a contact',
+        ['new:Contact'],
         Action::Review,
     ],
 ]);

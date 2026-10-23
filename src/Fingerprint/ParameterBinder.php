@@ -10,7 +10,9 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Param;
 use PhpParser\Node\StaticVar;
 use PhpParser\Node\Stmt\Catch_;
+use PhpParser\Node\Stmt\Expression;
 use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor;
 use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\NodeVisitorAbstract;
 
@@ -25,8 +27,9 @@ final class ParameterBinder extends NodeVisitorAbstract
 
     /**
      * @param array<string, \PhpParser\Node\Expr> $arguments
+     * @param array<\PhpParser\Node\Expr\Assign> $droppedAssignments
      */
-    public function __construct(private readonly array $arguments)
+    public function __construct(private readonly array $arguments, private readonly array $droppedAssignments)
     {
     }
 
@@ -47,8 +50,12 @@ final class ParameterBinder extends NodeVisitorAbstract
         return $this->boundNames;
     }
 
-    public function enterNode(Node $node): null
+    public function enterNode(Node $node): ?int
     {
+        if ($node instanceof Expression && in_array($node->expr->getAttribute('origNode'), $this->droppedAssignments, strict: true)) {
+            return NodeVisitor::REMOVE_NODE;
+        }
+
         $declaredVariable = $node instanceof Param || $node instanceof ClosureUse || $node instanceof StaticVar || $node instanceof Catch_
             ? $node->var
             : null;

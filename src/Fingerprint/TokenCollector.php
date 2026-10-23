@@ -66,6 +66,13 @@ final class TokenCollector
         return $tokens;
     }
 
+    public static function isData(Node $node): bool
+    {
+        $token = self::carriesContract($node) ? self::token($node) : null;
+
+        return $token !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
+    }
+
     /**
      * @param array<string, int> ...$fingerprints
      * @return array<string, int>
