@@ -129,6 +129,7 @@ final readonly class TestRedundancy
             array_values(array_diff(array_keys($lost), $unstable)),
             array_values(array_diff($baseline->testFiles, $existing)),
             $unstable,
+            $baseline->supportChanged($this->configuration->projectRoot),
         );
     }
 

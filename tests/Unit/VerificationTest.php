@@ -43,6 +43,18 @@ it('keeps the restore instruction and names the unstable lines when both kinds e
         ]);
 });
 
+it('names the changed support file instead of a test to restore when a support file changed', function (): void {
+    $verification = new Verification(4, ['src/A.php:1'], [], [], supportChanged: true);
+
+    expect($verification->isOk())->toBeFalse()
+        ->and($verification->jsonSerialize())->toMatchArray([
+            'instruction' => 'Coverage dropped, and a test support file changed since analyse, '
+                . 'so the lines in "lostLines" may be lost because of that change and not because a test was removed. '
+                . 'Check the changed support file, then run verify again. Run analyse again when the change is intended.',
+            'lostLines' => ['src/A.php:1'],
+        ]);
+});
+
 it('reports a clean verification when nothing differs', function (): void {
     $verification = new Verification(4, [], [], []);
 
