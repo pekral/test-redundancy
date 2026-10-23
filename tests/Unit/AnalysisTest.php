@@ -443,7 +443,7 @@ it('still deletes a test that one matching covering test runs completely, whatev
             authenticate(['secret' => 'configured']);
         });
         it('rejects a request with a wrong redirect', function (): void {
-            authenticate(['secret' => 'configured', 'redirect' => 'https://other.example.test']);
+            authenticate(['secret' => 'configured'], 'https://other.example.test');
         });
         it('rejects every request while no secret is configured', function (): void {
             authenticate(['secret' => '']);
@@ -614,6 +614,72 @@ it('still deletes a dataset row whose literal sits under the same key as in the 
         ->and($reports[0]->candidates[0]->differsBy)->toBe([])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Delete);
 });
+
+it('asks for a review of a dataset row that omits an array key its covering row sets', function (
+    FileReport $report,
+    string $test,
+    array $coveringDiffersBy,
+): void {
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe($test)
+        ->and(valueAt($json, 'differsBy'))->toBe([])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy)
+        ->and(valueAt($json, 'action'))->toBe('review');
+})->with([
+    'mail action without variants' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('builds the exportable shape of a mail action carrying variants', function (array $action, array $expected): void {
+                    expect(buildPipelineAction($action))->toEqual($expected);
+                })->with([
+                    'mail action without variants' => [
+                        ['type' => 'mail', 'properties' => ['senderMail' => 'test@example.com']],
+                        ['type' => 'mail', 'properties' => ['senderMail' => 'test@example.com']],
+                    ],
+                    'mail action with non-array variants' => [
+                        ['type' => 'mail', 'properties' => ['senderMail' => 'test@example.com', 'variants' => 'not_an_array']],
+                        ['type' => 'mail', 'properties' => ['senderMail' => 'test@example.com', 'variants' => 'not_an_array']],
+                    ],
+                ]);
+                PHP,
+            linesByTest: [
+                'it builds the exportable shape of a mail action carrying variants › mail action with non-array variants' => [
+                    'src/PipelineExportBuilder.php:10',
+                    'src/PipelineExportBuilder.php:11',
+                    'src/PipelineExportBuilder.php:12',
+                ],
+                'it builds the exportable shape of a mail action carrying variants › mail action without variants' => [
+                    'src/PipelineExportBuilder.php:10',
+                    'src/PipelineExportBuilder.php:11',
+                ],
+            ],
+        ),
+        'it builds the exportable shape of a mail action carrying variants › mail action without variants',
+        ['key:value:\'variants\''],
+    ],
+    'multicast pipeline without the parallel flag' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('refuses to drain a pipeline through the recurring queue', function (array $attributes): void {
+                    expect(canDrainThroughRecurringQueue(pipeline($attributes)))->toBeFalse();
+                })->with([
+                    'multicast' => [['multicast' => 1]],
+                    'parallel' => [['multicast' => 1, 'parallel' => 1]],
+                ]);
+                PHP,
+            linesByTest: [
+                'it refuses to drain a pipeline through the recurring queue › multicast' => ['src/Validator.php:20'],
+                'it refuses to drain a pipeline through the recurring queue › parallel' => ['src/Validator.php:20'],
+            ],
+        ),
+        'it refuses to drain a pipeline through the recurring queue › multicast',
+        ['key:value:\'parallel\''],
+    ],
+]);
 
 it('keeps a dataset row whose literals a sibling row has at swapped positions', function (string $source, array $differsBy): void {
     $project = temporaryDirectory();

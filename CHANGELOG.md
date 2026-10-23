@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   covering test runs the rest, the action is now `review`, and `unionOnlyLines` names the lines the matching test
   misses. Before, such a candidate got `differsBy: []` and the action `delete`, and deleting it left the lines of the
   second test without an assertion (#45).
+- A candidate whose covering test sets an array key the candidate does not set, or sets it more times, is reported
+  with the action `review` instead of `delete`, and `coveringDiffersBy` names the key (`key:value:'variants'`). A
+  missing array key is another input shape, not less of the same data. Before, a dataset row without the key got
+  `differsBy: []` and the action `delete`. A test such as `add(1, 2)` covered by the dataset row `[1, 2, 3]` is still
+  reported with the action `delete`, because positional values carry no `key:` token (#46).
 
 ## [0.1.1] - 2026-10-23
 
