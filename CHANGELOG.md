@@ -58,7 +58,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A boolean, string, number or constant used as the value of an array key now carries the path of its keys in the
   contract fingerprint (`in:value:'enabled'/value:false`). A dataset row that passes the same literal without that key,
   or under another key, is reported with a non-empty `differsBy` and the action `review-dataset-row` or `review`
-  instead of `differsBy: []` and the action `delete` (#25). An empty array literal under a key keeps the token `value:[]`.
+  instead of `differsBy: []` and the action `delete` (#25).
+- An empty array literal `[]` used as the value of an array key now carries the path of its keys in the contract
+  fingerprint (`in:value:'tags'/value:[]`), like the other literals since #25. A dataset row whose empty array the
+  covering row has only under an unrelated key is reported with a non-empty `differsBy` and the action
+  `review-dataset-row` or `review` instead of `differsBy: []` and the action `delete` (#36).
 
 ## [0.1] - 2026-10-22
 

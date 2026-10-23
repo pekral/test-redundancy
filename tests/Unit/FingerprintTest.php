@@ -139,7 +139,12 @@ it('tells a literal under one array key from the same literal under another key'
         'key:value:\'status\'' => 1,
     ],
     ],
-    'empty array under a key' => ['store([\'tags\' => []]);', ['function:store' => 1, 'key:value:\'tags\'' => 1, 'value:[]' => 1]],
+    'empty array under a key' => ['store([\'tags\' => []]);', [
+        'function:store' => 1,
+        'in:value:\'tags\'/value:[]' => 1,
+        'key:value:\'tags\'' => 1,
+    ],
+    ],
     'literal in a call under a key' => ['store([\'limit\' => min(5, 9)]);', [
         'function:min' => 1,
         'function:store' => 1,
