@@ -156,7 +156,7 @@ final readonly class CoverageBaseline
             $hashes[$supportFile] = self::hashOf($projectRoot, $supportFile);
         }
 
-        return hash('sha256', json_encode($hashes, JSON_THROW_ON_ERROR));
+        return hash('sha256', serialize($hashes));
     }
 
     private static function sourceOf(string $line): string
