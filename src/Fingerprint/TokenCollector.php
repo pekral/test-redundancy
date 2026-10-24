@@ -73,7 +73,7 @@ final class TokenCollector
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
         }
 
-        return $tokens;
+        return self::sum($tokens, KeyOrders::tokens($nodeFinder, $nodes, $paths, $readProperties));
     }
 
     public static function isData(Node $node): bool
@@ -94,6 +94,18 @@ final class TokenCollector
         return preg_match(self::DATA_TOKEN_PATTERN, $token) === 1
             ? preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && self::isAssertion($matches[2])
             : self::isAssertion(self::calledMethod($token));
+    }
+
+    /**
+     * @param array<int, string> $readProperties
+     * @return array{0: \PhpParser\Node, 1: string}|null
+     */
+    public static function keyOf(ArrayItem $arrayItem, array $readProperties): ?array
+    {
+        $key = $arrayItem->key === null ? null : NodeContext::enumCaseReadBy($arrayItem->key) ?? $arrayItem->key;
+        $keyToken = $key === null ? null : self::token($key);
+
+        return $key === null || $keyToken === null ? null : [$key, $keyToken . ($readProperties[spl_object_id($key)] ?? '')];
     }
 
     /**
@@ -143,12 +155,9 @@ final class TokenCollector
      */
     private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem, array $readProperties): array
     {
-        $key = $arrayItem->key === null ? null : NodeContext::enumCaseReadBy($arrayItem->key) ?? $arrayItem->key;
-        $keyToken = $key === null ? null : self::token($key);
+        $key = self::keyOf($arrayItem, $readProperties);
 
-        return $keyToken === null
-            ? []
-            : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $keyToken . ($readProperties[spl_object_id($key)] ?? ''));
+        return $key === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
     }
 
     /**
@@ -307,10 +316,9 @@ final class TokenCollector
      */
     private static function prefix(array $arrayKeys, array $paths, Node $node, string $token): string
     {
-        $path = $paths[spl_object_id($node)] ?? null;
-        $isPathedData = $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
+        $pathPrefix = preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 ? NodeContext::pathPrefix($paths, $node) : '';
 
-        return ($isPathedData ? 'in:' . implode('/', $path) . '/' : '') . (isset($arrayKeys[spl_object_id($node)]) ? self::KEY_PREFIX : '');
+        return $pathPrefix . (isset($arrayKeys[spl_object_id($node)]) ? self::KEY_PREFIX : '');
     }
 
     /**

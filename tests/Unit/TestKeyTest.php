@@ -13,7 +13,9 @@ it('joins and splits a test key', function (): void {
         ->and(TestKey::testCase($testKey))->toBe('it works › empty')
         ->and(TestKey::isDatasetRow($testKey))->toBeTrue()
         ->and(TestKey::isDatasetRow(TestKey::make('tests/FooTest.php', 'it works')))->toBeFalse()
-        ->and(TestKey::testCase('tests/FooTest.php'))->toBe('');
+        ->and(TestKey::testCase('tests/FooTest.php'))->toBe('')
+        ->and(TestKey::withoutDatasetRow('it works › empty'))->toBe('it works')
+        ->and(TestKey::withoutDatasetRow('it works'))->toBe('it works');
 });
 
 it('builds the evaluable name Pest gives a test', function (): void {

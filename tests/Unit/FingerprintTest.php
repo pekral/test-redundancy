@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
+use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use PhpParser\ParserFactory;
 
@@ -179,6 +180,8 @@ it('tells a literal used as an array key from the same literal used as a value',
                 'in:function:normalize#0/value:\'z\'/value:\'x\'/value:2',
                 'in:expect:function:normalize/call:toBe#0/value:\'z\'/value:\'y\'/value:1',
                 'in:expect:function:normalize/call:toBe#0/value:\'z\'/value:\'x\'/value:2',
+                'in:function:normalize#0/value:\'z\'/keys:value:\'y\'>value:\'x\'',
+                'in:expect:function:normalize/call:toBe#0/value:\'z\'/keys:value:\'x\'>value:\'y\'',
             ],
         )
         ->and(array_keys(array_diff_key($fingerprints['it normalizes › false'], $fingerprints['it normalizes › false key'])))
@@ -212,6 +215,7 @@ it('tells a literal under one array key from the same literal under another key'
         'function:store' => 1,
         'in:function:store#0/key:value:\'flag\'' => 1,
         'in:function:store#0/key:value:\'status\'' => 1,
+        'in:function:store#0/keys:value:\'status\'>value:\'flag\'' => 1,
         'in:function:store#0/value:\'flag\'/value:null' => 1,
         'in:function:store#0/value:\'status\'/const:Status::Active' => 1,
     ],
@@ -282,6 +286,67 @@ it('tells a literal under one array key from the same literal under another key'
     ],
     ],
 ]);
+
+it('gives each pair of array keys a token, so the order of the keys counts', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    $orderTokens = array_filter(
+        TokenCollector::collect($statements),
+        static fn (string $token): bool => preg_match('/(?<!-)>/', $token) === 1,
+        ARRAY_FILTER_USE_KEY,
+    );
+
+    expect($orderTokens)->toEqual($expected);
+})->with([
+    'a list' => ['store([1, 2]);', []],
+    'an enum case read through a property as a key' => ['store([CouponType::FIXED->value => 1, \'b\' => 2]);', [
+        'in:function:store#0/keys:const:CouponType::FIXED->value>value:\'b\'' => 1,
+    ],
+    ],
+    'keys of an array nested under a key' => ['store([\'user\' => [\'x\' => 1, \'y\' => 2], \'z\' => 3]);', [
+        'in:function:store#0/keys:value:\'user\'>value:\'z\'' => 1,
+        'in:function:store#0/value:\'user\'/keys:value:\'x\'>value:\'y\'' => 1,
+    ],
+    ],
+    'keys of an array no call receives' => ['$options = [\'a\' => 1, \'b\' => 2];', ['keys:value:\'a\'>value:\'b\'' => 1]],
+    'keys that no token names' => ['store([\'a\' => 1, $key => 2, 3, \'b\' => 4]);', ['in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1]],
+    'one key' => ['store([\'a\' => 1]);', []],
+    'the same array twice' => ['store([\'a\' => 1, \'b\' => 2], [\'a\' => 1, \'b\' => 2]);', [
+        'in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1,
+        'in:function:store#1/keys:value:\'a\'>value:\'b\'' => 1,
+    ],
+    ],
+    'the same keys in another order' => ['store([\'b\' => 2, \'a\' => 1]);', ['in:function:store#0/keys:value:\'b\'>value:\'a\'' => 1]],
+    'three keys' => ['store([\'a\' => 1, \'b\' => 2, \'c\' => 3]);', [
+        'in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1,
+        'in:function:store#0/keys:value:\'a\'>value:\'c\'' => 1,
+        'in:function:store#0/keys:value:\'b\'>value:\'c\'' => 1,
+    ],
+    ],
+    'two keys passed to a call' => ['store([\'a\' => 1, \'b\' => 2]);', ['in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1]],
+]);
+
+it('tells dataset rows that pass the same array with its keys in another order', function (): void {
+    $fingerprints = fingerprintsOf(<<<'PHP'
+        <?php
+        it('returns a row identical to the request or to its trimmed form', function (array $storedRows): void {
+            foreach ($storedRows as $storedItemId => $name) {
+                Product::create(['item_id' => $storedItemId, 'name' => $name]);
+            }
+        })->with([
+            'clean row inserted before a both-sides one' => [['AA' => 'exact', ' AA ' => 'variant']],
+            'clean row inserted after a both-sides one' => [[' AA ' => 'variant', 'AA' => 'exact']],
+        ]);
+        PHP);
+
+    $before = $fingerprints['it returns a row identical to the request or to its trimmed form › clean row inserted before a both-sides one'];
+    $after = $fingerprints['it returns a row identical to the request or to its trimmed form › clean row inserted after a both-sides one'];
+    $exactFirst = 'keys:value:\'AA\'>value:\' AA \'';
+    $variantFirst = 'keys:value:\' AA \'>value:\'AA\'';
+
+    expect([isset($before[$exactFirst]), isset($before[$variantFirst]), isset($after[$exactFirst]), isset($after[$variantFirst])])
+        ->toBe([true, false, false, true]);
+});
 
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
@@ -448,6 +513,7 @@ it('gives a map of literals a dataset row passes the argument position of the ca
         'in:function:changedKeys#1/key:value:\'listId\'' => 1,
         'in:function:changedKeys#1/value:\'store\'/value:\'shop\'' => 1,
         'in:function:changedKeys#1/key:value:\'store\'' => 1,
+        'in:function:changedKeys#1/keys:value:\'listId\'>value:\'store\'' => 1,
     ]);
 });
 
@@ -676,6 +742,32 @@ it('fingerprints Pest tests in a namespace, inside describe blocks and with a sh
         'it uses an unknown dataset',
     ])
         ->and($fingerprints['`adding` → it adds › two'])->toHaveKey('in:function:expect#0/value:2');
+});
+
+it('names the other tests that use the named dataset of a dataset row', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/RowsTest.php', <<<'PHP'
+        <?php
+        dataset('rows', ['a' => [1], 'b' => [2]]);
+        dataset('single', ['c' => [3]]);
+
+        describe('reading', function (): void {
+            it('reads', fn (int $row) => expect($row)->toBeInt())->with('rows');
+        });
+        it('writes', fn (int $row) => expect($row)->toBeInt())->with('rows')->group('write');
+        it('is alone', fn (int $row) => expect($row)->toBeInt())->with('single');
+        it('has its own rows', fn (int $row) => expect($row)->toBeInt())->with(['d' => [4]]);
+        it('has no rows', fn () => true);
+        PHP);
+    $cache = new FingerprintCache($project);
+
+    expect($cache->sharedDataset('tests/RowsTest.php :: `reading` → it reads › a'))->toEqual(new SharedDataset('rows', ['it writes']))
+        ->and($cache->sharedDataset('tests/RowsTest.php :: it writes › b'))->toEqual(new SharedDataset('rows', ['`reading` → it reads']))
+        ->and($cache->sharedDataset('tests/RowsTest.php :: it is alone › c'))->toBeNull()
+        ->and($cache->sharedDataset('tests/RowsTest.php :: it has its own rows › d'))->toBeNull()
+        ->and($cache->sharedDataset('tests/RowsTest.php :: it has no rows'))->toBeNull()
+        ->and($cache->sharedDataset('tests/MissingTest.php :: it reads › a'))->toBeNull();
 });
 
 function declaresSingleTestCase(string $code): bool

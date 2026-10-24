@@ -26,6 +26,11 @@ final class TestKey
         return explode(self::FILE_SEPARATOR, $testKey, 2)[1] ?? '';
     }
 
+    public static function withoutDatasetRow(string $testCase): string
+    {
+        return explode(self::DATASET_SEPARATOR, $testCase, 2)[0];
+    }
+
     public static function isDatasetRow(string $testKey): bool
     {
         return str_contains(self::testCase($testKey), self::DATASET_SEPARATOR);
