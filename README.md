@@ -194,7 +194,11 @@ and the steps ask whether the code under test reads one of these keys. A key nes
 already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
-`merge-into-dataset`. A candidate whose `differsBy` holds only data against several covering tests or against a test
+`merge-into-dataset`. When that test passes an argument at a position where `differsBy` lists no value, such as
+`in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
+pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
+action is `review`, and the steps ask whether the code under test behaves differently without one of these values. A
+candidate whose `differsBy` holds only data against several covering tests or against a test
 of another file is `review` too, and so is a dataset row whose covering test is not a row of the same dataset.
 
 ### How `differsBy` names a difference

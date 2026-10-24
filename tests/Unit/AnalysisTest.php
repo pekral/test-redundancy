@@ -1821,6 +1821,37 @@ it('asks for a review of a test that differs only in data from a covering test t
         ]);
 });
 
+it('asks for a review of a test that differs only in data from a covering test that passes an argument it lacks', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores three', function (): void {
+                expect(store(3))->toBeTrue();
+            });
+            it('stores one with two', function (): void {
+                expect(store(1, 2))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it stores three' => ['src/Store.php:5'],
+            'it stores one with two' => ['src/Store.php:5', 'src/Store.php:6'],
+        ],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it stores three')
+        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:store#0/value:3'])
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:function:store#1/value:2'])
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(Action::MISSING_ARGUMENT_STEP, '"it stores one with two"', 'in:function:store#1/value:2'),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
+});
+
 it('keeps a test that passes the same item several times in one list against a test that passes it once', function (
     string $source,
     array $differsBy,
