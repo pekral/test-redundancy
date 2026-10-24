@@ -55,8 +55,9 @@ final class TokenCollector
         $paths = self::paths($nodeFinder, $nodes, $assignedValues);
         $loopBodies = self::loopBodies($nodeFinder, $nodes);
         $tokens = [];
+        $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
-        foreach ($nodeFinder->find($nodes, static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0) as $node) {
+        foreach ($nodeFinder->find($nodes, $carriesToken) as $node) {
             $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::tokenWithSubject($node, $assignedValues);
 
             if ($token === null) {
