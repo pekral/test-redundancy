@@ -34,7 +34,8 @@ final class TokenCollector
 
     private const string KEY_PREFIX = 'key:';
 
-    private const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#\w+/)(?:value|const):~';
+    private const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#\w+/)'
+        . '(?:key:)?(?:value|const):~';
 
     private const string ARGUMENT_POSITION_PATTERN = '~^in:.*(?:call|function|new):(?:[^/#]*::)?[^/#:]+#\w+/(?=(?:value|const):)~';
 
