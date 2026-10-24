@@ -2387,3 +2387,60 @@ it('reports a row of a named dataset that another test uses as review, not delet
         ->and($report->candidates[0]->steps()[0])->toContain('"collidingRows"', '"it second"')
         ->and($report->candidates[1]->steps()[0])->toContain('"it first"');
 });
+
+it('reports a test that passes the values of a row as delete, covered by that row', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('matches on the plain birthday field name', function (): void {
+                expect(birthdaysOn('2024-06-15'))->toHaveCount(2);
+            });
+
+            it('matches the expected number of records for a static date', function (string $date, int $expectedCount): void {
+                expect(birthdaysOn($date))->toHaveCount($expectedCount);
+            })->with([
+                'June 15th' => ['2024-06-15', 2],
+                'December 25th' => ['2024-12-25', 1],
+            ]);
+            PHP_SOURCE,
+        linesByTest: [
+            'it matches on the plain birthday field name' => ['src/Birthdays.php:5'],
+            'it matches the expected number of records for a static date › June 15th' => ['src/Birthdays.php:5'],
+            'it matches the expected number of records for a static date › December 25th' => ['src/Birthdays.php:5'],
+        ],
+    );
+
+    $plain = $report->candidates[0];
+
+    expect($plain->testCase())->toBe('it matches on the plain birthday field name')
+        ->and($plain->coveredBy)->toBe(['it matches the expected number of records for a static date › June 15th'])
+        ->and($plain->differsBy)->toBe([])
+        ->and($plain->action())->toBe(Action::Delete);
+});
+
+it('reports a test that passes the values of a kept row as delete, covered by that row and not by another row', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('matches on the plain birthday field name', function (): void {
+                expect(birthdaysOn('2024-06-15'))->toHaveCount(2);
+            });
+
+            it('matches the expected number of records for a static date', function (string $date, int $expectedCount): void {
+                expect(birthdaysOn($date))->toHaveCount($expectedCount);
+            })->with([
+                'June 15th' => ['2024-06-15', 2],
+                'December 25th' => ['2024-12-25', 1],
+            ]);
+            PHP_SOURCE,
+        linesByTest: [
+            'it matches on the plain birthday field name' => ['src/Birthdays.php:5'],
+            'it matches the expected number of records for a static date › December 25th' => ['src/Birthdays.php:5', 'src/Birthdays.php:9'],
+            'it matches the expected number of records for a static date › June 15th' => ['src/Birthdays.php:5', 'src/Birthdays.php:7'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->coveredBy)->toBe(['it matches the expected number of records for a static date › June 15th'])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});

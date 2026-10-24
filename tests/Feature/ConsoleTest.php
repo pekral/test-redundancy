@@ -73,7 +73,7 @@ it('prints the JSON report for an agent by default', function (): void {
 
     expect($tester->getStatusCode())->toBe(0)
         ->and(valueAt($report, 'summary.candidates'))->toBe(3)
-        ->and(valueAt($report, 'files.0.candidates.0.action'))->toBe('merge-into-dataset');
+        ->and(valueAt($report, 'files.0.candidates.0.action'))->toBe('delete');
 });
 
 it('prints a text report for people', function (): void {

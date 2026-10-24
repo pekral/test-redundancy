@@ -131,7 +131,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
     }
   ],
   "summary": {
-    "byAction": { "delete": 0, "merge-into-dataset": 2, "review-dataset-row": 1, "review": 0 },
+    "byAction": { "delete": 1, "merge-into-dataset": 1, "review-dataset-row": 1, "review": 0 },
     "candidates": 3,
     "seconds": 0,
     "skippedFiles": 1,
@@ -149,7 +149,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | --- | --- |
 | `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file, and `summary.testCases` every test case, a skipped file included. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
-| `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. |
+| `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. A single test that runs every line of the candidate and has an empty `differsBy` is preferred, so a test that passes the values of a dataset row is covered by that row, and the action is `delete`. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
 | `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). The `review` steps name them. Empty for every other candidate. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
