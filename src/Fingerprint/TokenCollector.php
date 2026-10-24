@@ -56,7 +56,7 @@ final class TokenCollector
         $loopBodies = self::loopBodies($nodeFinder, $nodes);
         $tokens = [];
 
-        foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
+        foreach ($nodeFinder->find($nodes, static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0) as $node) {
             $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::tokenWithSubject($node, $assignedValues);
 
             if ($token === null) {
@@ -65,7 +65,7 @@ final class TokenCollector
 
             $prefixedToken = self::prefix($arrayKeys, $paths, $node, $token) . $token;
             $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
-            $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + 1;
+            $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
         }
 
         return $tokens;
@@ -263,6 +263,18 @@ final class TokenCollector
             || ($node instanceof Array_ && $node->items === []);
     }
 
+    private static function listLength(Node $node): int
+    {
+        $isListItem = static fn (ArrayItem $item): bool => $item->key === null && !$item->unpack;
+
+        return $node instanceof Array_ && array_all($node->items, $isListItem) ? count($node->items) : 0;
+    }
+
+    private static function arrayToken(Array_ $array): string
+    {
+        return self::listLength($array) > 0 ? 'value:list-item' : 'value:[]';
+    }
+
     private static function token(Node $node): ?string
     {
         return match (true) {
@@ -280,7 +292,7 @@ final class TokenCollector
                 : null,
             $node instanceof FuncCall => $node->name instanceof Name ? 'function:' . $node->name->toString() : null,
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
-            $node instanceof Array_ => 'value:[]',
+            $node instanceof Array_ => self::arrayToken($node),
             default => null,
         };
     }

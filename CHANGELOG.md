@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A list carries its length: every element of a non-empty array literal without keys counts once in the token
+  `value:list-item`, with the path of the list, e.g. `in:function:collect#0/value:list-item`. A test that passes the
+  same item several times in one list, such as `collect([$click, $click, $click])`, is then `review` or
+  `merge-into-dataset` against a test that passes it once. Before, `differsBy` was empty and the test was `delete`,
+  because a variable read again in the same list adds no token. A list that unpacks an array with `...` carries no
+  length. The token also appears in `coveringDiffersBy` when the covering test passes a longer list (#72).
 - A `merge-into-dataset` candidate whose covering test sets an array key the candidate lacks, such as a key the covering
   dataset row sets through a parameter, is `review`. `coveringDiffersBy` lists the `key:` tokens, and the steps ask
   whether the code under test reads one of these keys. Before, `coveringDiffersBy` stayed empty and the steps merged the
