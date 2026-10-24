@@ -254,8 +254,9 @@ test lacks.
   name instead of the position, e.g. `in:function:store#enabled/value:true`. An enum case read through `->value` or
   `->name` names the property it reads, e.g. `in:function:store#0/const:CouponType::FIXED->value` for
   `store(CouponType::FIXED->value)`, so the value, the name and the case itself are different tokens. An element of a
-  list passed straight to a call carries the same path, e.g. `in:function:store#0/value:'a'` for `store(['a'])`. A
-  value under a key of an array passed straight to a call carries the call and the position before the key, e.g.
+  list passed straight to a call carries the same path, e.g. `in:function:store#0/value:'a'` for `store(['a'])` and
+  `in:function:store#0/const:CouponType::FIXED->value` for `store([CouponType::FIXED->value])`. A value under a key of
+  an array passed straight to a call carries the call and the position before the key, e.g.
   `in:function:store#0/value:'enabled'/value:false` for `store(['enabled' => false])`, so the same array at swapped
   positions is a different token.
 - **Enclosing calls.** A value that an argument passes on through an array or a nested call carries every enclosing

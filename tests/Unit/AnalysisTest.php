@@ -1368,6 +1368,14 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             PHP,
         'in:function:store#0/const:CouponType::FIXED->name',
     ],
+    'enum value against a literal as an item of a list passed to a call' => [
+        <<<'PHP'
+            <?php
+            it('passes the enum value', fn () => store([CouponType::FIXED->value]));
+            it('passes another value', fn () => store(['fixed']));
+            PHP,
+        'in:function:store#0/const:CouponType::FIXED->value',
+    ],
     'enum value against a literal passed straight to a call' => [
         <<<'PHP'
             <?php
@@ -1383,6 +1391,14 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => $this->post('/import', ['default_type' => 'percentual'])->assertOk());
             PHP,
         'in:call:post#1/value:\'default_type\'/const:CouponType::FIXED->value',
+    ],
+    'enum value against the enum case as an item of a list passed to a call' => [
+        <<<'PHP'
+            <?php
+            it('passes the enum value', fn () => store([CouponType::FIXED->value]));
+            it('passes another value', fn () => store([CouponType::FIXED]));
+            PHP,
+        'in:function:store#0/const:CouponType::FIXED->value',
     ],
     'enum value against the enum case passed straight to a call' => [
         <<<'PHP'
