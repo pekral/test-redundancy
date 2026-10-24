@@ -179,18 +179,27 @@ final class TokenCollector
                 $value->getRawArgs(),
                 static fn (Node $argument): bool => $argument instanceof Arg,
             ),
-            default => $value instanceof PropertyFetch && $value->var instanceof ClassConstFetch ? [$value->var] : [],
+            default => [],
         };
 
-        return array_merge([spl_object_id($value)], ...array_map(
-            static fn (ArrayItem|Arg|ClassConstFetch $item): array => match (true) {
-                $item instanceof ClassConstFetch => [spl_object_id($item)],
+        return array_merge(self::valueIds($value), ...array_map(
+            static fn (ArrayItem|Arg $item): array => match (true) {
                 $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
-                $item->key === null => [spl_object_id($item->value)],
+                $item->key === null => self::valueIds($item->value),
                 default => [spl_object_id($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
             },
             array_values($passedItems),
         ));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function valueIds(Expr $value): array
+    {
+        return $value instanceof PropertyFetch && $value->var instanceof ClassConstFetch
+            ? [spl_object_id($value), spl_object_id($value->var)]
+            : [spl_object_id($value)];
     }
 
     /**
