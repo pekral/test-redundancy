@@ -111,6 +111,25 @@ final class TokenCollector
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @return array<int, true>
      */
+    public static function loopBodies(NodeFinder $nodeFinder, Node|array $nodes): array
+    {
+        $loopBodies = [];
+
+        foreach ([Do_::class, For_::class, Foreach_::class, While_::class] as $loopClass) {
+            foreach ($nodeFinder->findInstanceOf($nodes, $loopClass) as $loop) {
+                foreach ($nodeFinder->find($loop->stmts, static fn (): bool => true) as $node) {
+                    $loopBodies[spl_object_id($node)] = true;
+                }
+            }
+        }
+
+        return $loopBodies;
+    }
+
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @return array<int, true>
+     */
     private static function negatedScalars(NodeFinder $nodeFinder, Node|array $nodes): array
     {
         $negatedScalars = [];
@@ -228,25 +247,6 @@ final class TokenCollector
     private static function nodeIds(NodeFinder $nodeFinder, Node $node): array
     {
         return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
-    }
-
-    /**
-     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @return array<int, true>
-     */
-    private static function loopBodies(NodeFinder $nodeFinder, Node|array $nodes): array
-    {
-        $loopBodies = [];
-
-        foreach ([Do_::class, For_::class, Foreach_::class, While_::class] as $loopClass) {
-            foreach ($nodeFinder->findInstanceOf($nodes, $loopClass) as $loop) {
-                foreach ($nodeFinder->find($loop->stmts, static fn (): bool => true) as $node) {
-                    $loopBodies[spl_object_id($node)] = true;
-                }
-            }
-        }
-
-        return $loopBodies;
     }
 
     private static function carriesContract(Node $node): bool

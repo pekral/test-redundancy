@@ -435,6 +435,36 @@ it('counts a literal a test assigns once to a local variable where the test read
     'variable the test never reads' => ['$email = \'a\'; notify();', ['function:notify' => 1, 'value:\'a\'' => 1]],
 ]);
 
+it('gives a call result a test assigns once to a local variable the tokens of the call passed where the test first reads it', function (
+    string $assigned,
+    string $inline,
+): void {
+    $fingerprints = fingerprintsOf(
+        '<?php it(\'assigned\', function (): void { ' . $assigned . ' }); it(\'inline\', function (): void { ' . $inline . ' });',
+    );
+
+    expect($fingerprints['it assigned'])->toEqual($fingerprints['it inline']);
+})->with([
+    'call result read once' => ['$email = sprintf(\'email@%s\', $domain); notify($email);', 'notify(sprintf(\'email@%s\', $domain));'],
+    'call result read twice' => [
+        '$user = create([\'role\' => \'admin\']); login($user); expect($user->fresh())->toBeTrue();',
+        'login(create([\'role\' => \'admin\'])); expect($user->fresh())->toBeTrue();',
+    ],
+]);
+
+it('keeps the tokens of a call result without a path when the test first reads its variable in a loop body', function (): void {
+    $fingerprints = fingerprintsOf(
+        '<?php it(\'sends\', function (): void { $client = client([\'a\' => 1]); foreach ($ids as $id) { $client->send($id); } });',
+    );
+
+    expect($fingerprints['it sends'])->toEqual([
+        'function:client' => 1,
+        'in:function:client#0/value:\'a\'/value:1' => 1,
+        'key:value:\'a\'' => 1,
+        'loop:call:send' => 1,
+    ]);
+});
+
 it('fingerprints Pest tests, their dataset rows and chained modifiers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php

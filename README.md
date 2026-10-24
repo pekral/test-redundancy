@@ -187,7 +187,11 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 `merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
 only in data from one test of the same file. When that test has a call, function or `new` expression that the
 candidate lacks, or has it more times than the candidate does, the two tests cannot be rows of one test: the tokens are
-listed in `coveringDiffersBy` and the action is `review`. A candidate whose `differsBy` holds only data against several
+listed in `coveringDiffersBy` and the action is `review`. When that test sets an array key that the candidate lacks,
+such as `key:value:'default_min_spend'`, a row with the values in `differsBy` would still set the key, so the case
+without the key would be lost: the `key:` tokens are listed in `coveringDiffersBy`, the action is `review`, and the
+steps ask whether the code under test reads one of these keys. A `key:` token carries no path, so a key nested in a
+value that `differsBy` already lists counts too. A candidate whose `differsBy` holds only data against several
 covering tests or against a test of another file is `review` too, and so is a dataset row whose covering test is not a
 row of the same dataset.
 
@@ -268,6 +272,12 @@ test lacks.
   `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,
   `$columns = ['id', 'tags']; load($columns);` has the same tokens as `load(['id', 'tags'])`, and
   `$options = ['enabled' => false]; store($options);` has the same tokens as `store(['enabled' => false])`. A variable the test writes more than once keeps its tokens without a path.
+  A call, function call or `new` expression that the test assigns once to a local variable is counted once, where the
+  test first reads the variable, when that read passes the variable on as a call argument or an array value outside a
+  loop body: `$email = sprintf('email@%s', $domain); notify($email);` has the same tokens as
+  `notify(sprintf('email@%s', $domain))`, and a later read of the variable adds no token. A variable whose first read
+  does not pass it on, such as `$user->email`, or whose first read is in a loop body keeps the tokens of the call
+  without a path.
 
 ### Test files with a single test case
 

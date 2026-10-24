@@ -50,7 +50,10 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
 })->with([
     'call in a sibling row' => [candidate('it works › a', ['it works › b'], ['value:1'], ['new:Money', 'value:2']), Action::ReviewDatasetRow],
     'call in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget']), Action::Review],
-    'data in both tests' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
+    'data in both tests and a key only in the covering test' => [
+        candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']),
+        Action::Review,
+    ],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'literal under a key in both tests' => [
@@ -577,7 +580,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
         'it stores a contact without custom fields',
         'it stores a contact with custom fields',
         ['in:function:store#0/value:\'custom_fields\'/value:[]'],
-        Action::MergeIntoDataset,
+        Action::Review,
     ],
 ]);
 
@@ -1653,6 +1656,103 @@ it('still deletes a test without an assertion whose covering test only asserts m
             ['expect:function:approveDomain/call:toBe', 'function:expect', 'in:expect:function:approveDomain/call:toBe#0/value:\'approved\''],
         )
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('asks for a review of a test that omits an array key its covering dataset row sets through a parameter', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('finds pipelines with domain in email', function (): void {
+                $domainName = fake()->unique()->domainName();
+                $senderEmail = sprintf('email@%s', $domainName);
+                $manager->createAction($account->name, collect([
+                    'type' => 'mail',
+                    'properties' => ['senderMail' => $senderEmail],
+                ]));
+
+                expect($this->facade->findPipelinesWithDomainInEmail($account->name, $domainName))->toHaveCount(1);
+            });
+            it('finds pipelines with domain in email by step visibility', function (bool $hidden, int $expectedCount): void {
+                $domainName = fake()->unique()->domainName();
+                $manager->createAction($account->name, collect([
+                    'type' => 'mail',
+                    'hidden' => $hidden,
+                    'properties' => ['senderMail' => sprintf('email@%s', $domainName)],
+                ]));
+
+                expect($this->facade->findPipelinesWithDomainInEmail($account->name, $domainName))->toHaveCount($expectedCount);
+            })->with([
+                'hidden step' => [true, 0],
+                'visible step' => [false, 1],
+            ]);
+            PHP,
+        linesByTest: [
+            'it finds pipelines with domain in email' => ['src/Pipelines.php:5'],
+            'it finds pipelines with domain in email by step visibility › visible step' => ['src/Pipelines.php:5', 'src/Pipelines.php:6'],
+        ],
+    );
+    $coveringTest = '"it finds pipelines with domain in email by step visibility › visible step"';
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it finds pipelines with domain in email')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([
+            'key:value:\'hidden\'',
+            'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
+        ])
+        ->and($report->candidates[0]->steps())->toBe([
+            sprintf(Action::MISSING_KEY_STEP, $coveringTest, 'key:value:\'hidden\''),
+            sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTest, 'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false'),
+            Action::VERIFY_STEP,
+        ]);
+});
+
+it('asks for a review of a test that differs only in data from a covering test that sets an array key it lacks', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('rejects a fixed type without a currency', function (): void {
+                $this->post($url, [
+                    'file_url' => 'import-code-only.csv',
+                    'default_type' => 'fixed',
+                    'default_value' => 100,
+                ])->assertStatus(422)->assertJsonPath('error', $missingCurrency);
+            });
+            it('rejects a percentual type with a minimum spend without a currency', function (): void {
+                $this->post($url, [
+                    'file_url' => 'import-code-only.csv',
+                    'default_type' => 'percentual',
+                    'default_value' => 50,
+                    'default_min_spend' => 200,
+                ])->assertStatus(422)->assertJsonPath('error', $missingCurrency);
+            });
+            PHP,
+        linesByTest: [
+            'it rejects a fixed type without a currency' => ['src/Import.php:5'],
+            'it rejects a percentual type with a minimum spend without a currency' => ['src/Import.php:5', 'src/Import.php:6'],
+        ],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it rejects a fixed type without a currency')
+        ->and(valueAt($json, 'differsBy'))->toBe([
+            'in:call:post#1/value:\'default_type\'/value:\'fixed\'',
+            'in:call:post#1/value:\'default_value\'/value:100',
+        ])
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['key:value:\'default_min_spend\''])
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(
+                Action::MISSING_KEY_STEP,
+                '"it rejects a percentual type with a minimum spend without a currency"',
+                'key:value:\'default_min_spend\'',
+            ),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
 });
 
 it('counts a skipped file in the summary and leaves it out of the files', function (): void {

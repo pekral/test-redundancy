@@ -62,7 +62,10 @@ final readonly class Candidate implements JsonSerializable
     {
         return match (true) {
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
-            $this->differsOnlyInDataFromOneTestOfTheSameFile() => $this->nonDataTokens($this->coveringDiffersBy ?? []),
+            $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
+                $this->coveringDiffersBy ?? [],
+                static fn (string $token): bool => self::isKey($token) || !self::isData($token),
+            )),
             default => [],
         };
     }
@@ -105,7 +108,13 @@ final readonly class Candidate implements JsonSerializable
         }
 
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
-        $steps = $this->action()->steps($this->quoted($coveringTests), $this->coveringTokensForReview());
+        $steps = [
+            ...$this->missingKeySteps(),
+            ...$this->action()->steps(
+                $this->quoted($coveringTests),
+                array_values(array_diff($this->coveringTokensForReview(), $this->coveringKeys())),
+            ),
+        ];
 
         return $this->differsBy === null
             ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
@@ -126,9 +135,25 @@ final readonly class Candidate implements JsonSerializable
      */
     private function nonDataTokens(array $tokens): array
     {
-        return array_values(
-            array_filter($tokens, static fn (string $token): bool => preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) !== 1),
-        );
+        return array_values(array_filter($tokens, static fn (string $token): bool => !self::isData($token)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function coveringKeys(): array
+    {
+        return array_values(array_filter($this->coveringTokensForReview(), self::isKey(...)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function missingKeySteps(): array
+    {
+        return $this->coveringKeys() === []
+            ? []
+            : [sprintf(Action::MISSING_KEY_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringKeys()))];
     }
 
     /**
@@ -137,15 +162,11 @@ final readonly class Candidate implements JsonSerializable
     private function missingInputSteps(): array
     {
         $coveringTests = $this->quoted($this->coveredBy);
-        $keys = array_filter(
-            $this->coveringTokensForReview(),
-            static fn (string $token): bool => str_starts_with($token, TokenCollector::KEY_PREFIX),
-        );
         $arguments = array_filter($this->coveringTokensForReview(), TokenCollector::isArgumentOfCodeUnderTest(...));
-        $arrangement = array_diff($this->coveringTokensForReview(), $keys, $arguments);
+        $arrangement = array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $arguments);
 
         return [
-            ...($keys === [] ? [] : [sprintf(Action::MISSING_KEY_STEP, $coveringTests, implode(', ', $keys))]),
+            ...$this->missingKeySteps(),
             ...($arguments === [] ? [] : [sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTests, implode(', ', $arguments))]),
             ...($arrangement === [] ? [] : [sprintf(Action::NO_ASSERTION_STEP, $coveringTests, implode(', ', $arrangement))]),
         ];
@@ -161,7 +182,7 @@ final readonly class Candidate implements JsonSerializable
                 $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => $this->assertsNothing
                     ? !TokenCollector::isAssertionToken($token)
-                    : str_starts_with($token, TokenCollector::KEY_PREFIX) || TokenCollector::isArgumentOfCodeUnderTest($token),
+                    : self::isKey($token) || TokenCollector::isArgumentOfCodeUnderTest($token),
             ),
         );
     }
@@ -196,6 +217,16 @@ final readonly class Candidate implements JsonSerializable
         }
 
         return null;
+    }
+
+    private static function isData(string $token): bool
+    {
+        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1;
+    }
+
+    private static function isKey(string $token): bool
+    {
+        return str_starts_with($token, TokenCollector::KEY_PREFIX);
     }
 
 }

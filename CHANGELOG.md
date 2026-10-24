@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A `merge-into-dataset` candidate whose covering test sets an array key the candidate lacks, such as a key the covering
+  dataset row sets through a parameter, is `review`. `coveringDiffersBy` lists the `key:` tokens, and the steps ask
+  whether the code under test reads one of these keys. Before, `coveringDiffersBy` stayed empty and the steps merged the
+  candidate into a row that still set the key, so the case without the key was lost (#71).
+- A call, function call or `new` expression that a test assigns once to a local variable is counted where the test
+  first passes the variable on as a call argument or an array value, so it has the same tokens as the same call passed
+  inline. Before, `$email = sprintf('email@%s', $domain); notify($email);` listed the literal in `differsBy` against
+  `notify(sprintf('email@%s', $domain))`. A first read that does not pass the variable on, or that is in a loop body,
+  keeps the tokens without a path (#71).
+
 ## [0.1.3] - 2026-10-24
 
 ### Changed
