@@ -257,7 +257,7 @@ it('asks for a review of a test whose covering test asserts the negated result',
 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it reads the stored value'])
-        ->and($reports[0]->candidates[0]->differsBy)->toBe(['expect:call:read/call:toBeEmpty'])
+        ->and($reports[0]->candidates[0]->differsBy)->toBe(['expect:function:app/call:read/call:toBeEmpty'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -282,9 +282,44 @@ it('asks for a review of a test whose covering test makes the same assertion on 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it creates a template')
         ->and($report->candidates[0]->differsBy)->toBe([
-            'expect:call:create/call:toBeGreaterThan',
-            'in:expect:call:create/call:toBeGreaterThan#0/value:0',
+            'expect:function:app/call:create/call:toBeGreaterThan',
+            'in:expect:function:app/call:create/call:toBeGreaterThan#0/value:0',
         ])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('asks for a review of a test whose covering test makes the same assertion on the result of another receiver', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('leaves the instant it was given untouched', function (): void {
+                $moment = CarbonImmutable::parse('2026-08-02 23:15:40', 'UTC');
+
+                new Interval(5)->applyTo($moment);
+
+                expect($moment->format('Y-m-d H:i:s'))->toBe('2026-08-02 23:15:40');
+            });
+            it('moves the instant', function (string $at, int $hours, string $expected): void {
+                $moment = CarbonImmutable::parse($at, 'UTC');
+
+                expect(new Interval($hours)->applyTo($moment)->format('Y-m-d H:i:s'))->toBe($expected);
+            })->with([
+                'one day back' => ['2026-10-25 00:30:00', -24, '2026-10-24 00:30:00'],
+            ]);
+            PHP,
+        linesByTest: [
+            'it leaves the instant it was given untouched' => ['src/Interval.php:9'],
+            'it moves the instant › one day back' => ['src/Interval.php:9'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it leaves the instant it was given untouched')
+        ->and($report->candidates[0]->differsBy)->toContain(
+            'expect:variable:moment/call:format/call:toBe',
+            'in:expect:variable:moment/call:format/call:toBe#0/value:\'2026-08-02 23:15:40\'',
+        )
+        ->and($report->candidates[0]->coveringDiffersBy)->toContain('expect:call:applyTo/call:format/call:toBe')
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -324,7 +359,7 @@ it('asks for a review of a test whose covering test makes a call it does not', f
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe([
             'in:call:put#1/value:\'<html><body><h1>Test</h1></body></html>\'',
-            'in:expect:call:get/call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
+            'in:expect:property:manager/call:get/call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
         ])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review)
         ->and($reports[0]->candidates[0]->coveringTokensForReview())->toBe(['call:forget']);

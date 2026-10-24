@@ -20,6 +20,7 @@ use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
+use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
@@ -281,9 +282,21 @@ final class TokenCollector
 
     private static function subjectToken(Expr $subject): ?string
     {
-        $token = $subject instanceof PropertyFetch && $subject->name instanceof Identifier
-            ? 'property:' . $subject->name->toString()
-            : self::token($subject);
+        $token = self::subjectPartToken($subject);
+        $receiver = match (true) {
+            !$subject instanceof MethodCall => null,
+            $subject->var instanceof Variable && is_string($subject->var->name) => 'variable:' . $subject->var->name,
+            default => self::subjectPartToken($subject->var),
+        };
+
+        return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
+    }
+
+    private static function subjectPartToken(Expr $part): ?string
+    {
+        $token = $part instanceof PropertyFetch && $part->name instanceof Identifier
+            ? 'property:' . $part->name->toString()
+            : self::token($part);
 
         return $token === null || preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 ? null : $token;
     }

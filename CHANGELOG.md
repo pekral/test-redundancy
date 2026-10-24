@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The subject of an assertion on a method call carries the receiver of that call. `expect($moment->format('Y-m-d'))`
+  has the subject `variable:moment/call:format`, and `expect($interval->applyTo($moment)->format('Y-m-d'))` has
+  `call:applyTo/call:format`, so a test that asserts its input is no longer `merge-into-dataset` into a test that
+  asserts the result of a call on that input. Its `differsBy` lists the assertion on the other receiver, e.g.
+  `expect:variable:moment/call:format/call:toBe`, and the candidate is `review`. Before, both subjects were
+  `call:format`. Only the nearest receiver is kept, and a literal or a constant receiver adds nothing, e.g.
+  `Status::Active->label()` keeps `call:label`. Every assertion on a method call gets new tokens:
+  `expect(app(Templates::class)->create())` has `expect:function:app/call:create/…` instead of `expect:call:create/…`
+  (#86).
+
 ## [0.1.4] - 2026-10-24
 
 ### Fixed

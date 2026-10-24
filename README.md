@@ -114,7 +114,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "action": "merge-into-dataset",
           "coveredBy": ["it adds two numbers › negative numbers"],
           "coveringDiffersBy": [],
-          "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:expect:call:add/call:toBe#0/value:5"],
+          "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:expect:new:Calculator/call:add/call:toBe#0/value:5"],
           "steps": [
             "Turn \"it adds two numbers › negative numbers\" into one test with a dataset and add a row with the values in differsBy.",
             "Delete this test.",
@@ -221,15 +221,24 @@ test lacks.
   carries the token of its call form.
 - **Assertion subjects.** An assertion carries the value it checks, its subject, as an `expect:` prefix. The same
   assertion on two different subjects therefore gives two different tokens, and the candidate is not `delete`.
-  `expect($templates->create())->toBeGreaterThan(0)` has the tokens `expect:call:create/call:toBeGreaterThan` and
-  `in:expect:call:create/call:toBeGreaterThan#0/value:0`, and `expect($template->order)->toBeGreaterThan(0)` has
-  `expect:property:order/call:toBeGreaterThan` and `in:expect:property:order/call:toBeGreaterThan#0/value:0`.
+  `expect($templates->create())->toBeGreaterThan(0)` has the tokens
+  `expect:variable:templates/call:create/call:toBeGreaterThan` and
+  `in:expect:variable:templates/call:create/call:toBeGreaterThan#0/value:0`, and
+  `expect($template->order)->toBeGreaterThan(0)` has `expect:property:order/call:toBeGreaterThan` and
+  `in:expect:property:order/call:toBeGreaterThan#0/value:0`.
   - The subject of a Pest expectation is the value passed to the nearest `->and()` before the call, or else to
     `expect()`. Every call of the expectation chain carries it, `->and()` and `->each` included.
   - The subject of a PHPUnit `assert*` call is its last argument that is not a literal or a constant:
     `self::assertSame(3, add(1, 2))` has the token `expect:function:add/call:self::assertSame`.
   - A property carries the token `property:<name>`. A call, a function call and a `new` expression carry their own
     token.
+  - A method call also carries its receiver before its own token: a variable by its name as `variable:<name>`, also
+    when the test assigns it once, a property as `property:<name>`, and a call, a function call or a `new` expression
+    as its own token.
+    `expect($moment->format('Y-m-d'))` has the subject `variable:moment/call:format`, and
+    `expect($interval->applyTo($moment)->format('Y-m-d'))` has `call:applyTo/call:format`. Only the nearest receiver
+    is kept. A literal or a constant as the receiver adds nothing, so `expect(Status::Active->label())` has the subject
+    `call:label`.
   - A variable that the test assigns once in its own statements stands for the value assigned to it:
     `$sum = add(1, 2); expect($sum)->toBe(3);` has the same assertion tokens as `expect(add(1, 2))->toBe(3)`.
   - A literal, a constant, any other variable, a closure and any other expression give no subject. The assertion then
