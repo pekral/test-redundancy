@@ -34,7 +34,9 @@ final class TokenCollector
 
     public const string DATA_TOKEN_PATTERN = '/^(in:.*\/)?(key:)?(value|const):/';
 
-    public const string KEY_PREFIX = 'key:';
+    public const string KEY_TOKEN_PATTERN = '/^(in:.*\/)?key:/';
+
+    private const string KEY_PREFIX = 'key:';
 
     private const string ARGUMENT_PATTERN = '/^in:(?:.*?\/)?(?:not:)?(?:call|function|new):(?:[^\/#]*::)?([^\/#:]+)#\w+\/(?:value|const):/';
 
@@ -233,9 +235,11 @@ final class TokenCollector
         };
 
         $passedValueIds = array_map(
-            static fn (ArrayItem|Arg $item): array => $item instanceof ArrayItem && $item->key === null
-                ? [spl_object_id($item->value)]
-                : self::argumentValueIds($item->value, $isAssertion, isArgument: $item instanceof Arg),
+            static fn (ArrayItem|Arg $item): array => match (true) {
+                $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
+                $item->key === null => [spl_object_id($item->value)],
+                default => [spl_object_id($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
+            },
             array_values($passedItems),
         );
 
@@ -331,11 +335,7 @@ final class TokenCollector
         $path = $paths[spl_object_id($node)] ?? null;
         $isPathedData = $path !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
 
-        return match (true) {
-            isset($arrayKeys[spl_object_id($node)]) => self::KEY_PREFIX,
-            $isPathedData => 'in:' . implode('/', $path) . '/',
-            default => '',
-        };
+        return ($isPathedData ? 'in:' . implode('/', $path) . '/' : '') . (isset($arrayKeys[spl_object_id($node)]) ? self::KEY_PREFIX : '');
     }
 
     /**

@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- An array key carries the path of its array, the same path a literal in the array has, e.g.
+  `in:function:store#0/value:'custom_fields'/key:value:'color'` instead of `key:value:'color'`. A key nested in a value
+  that `differsBy` already lists then does not count as a key the candidate lacks, because a dataset row replaces the
+  whole value: `store(['custom_fields' => []])` against `store(['custom_fields' => ['color' => 'red']])` is
+  `merge-into-dataset`. Before, a `key:` token carried no path, so the key sent the candidate to `review`. The same key
+  under another call or another argument is now a different token, and a key nested in a call argument is named only
+  in the step about array keys (#74).
 - A list carries its length: every element of a non-empty array literal without keys counts once in the token
   `value:list-item`, with the path of the list, e.g. `in:function:collect#0/value:list-item`. A test that passes the
   same item several times in one list, such as `collect([$click, $click, $click])`, is then `review` or

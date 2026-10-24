@@ -188,12 +188,14 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 only in data from one test of the same file. When that test has a call, function or `new` expression that the
 candidate lacks, or has it more times than the candidate does, the two tests cannot be rows of one test: the tokens are
 listed in `coveringDiffersBy` and the action is `review`. When that test sets an array key that the candidate lacks,
-such as `key:value:'default_min_spend'`, a row with the values in `differsBy` would still set the key, so the case
-without the key would be lost: the `key:` tokens are listed in `coveringDiffersBy`, the action is `review`, and the
-steps ask whether the code under test reads one of these keys. A `key:` token carries no path, so a key nested in a
-value that `differsBy` already lists counts too. A candidate whose `differsBy` holds only data against several
-covering tests or against a test of another file is `review` too, and so is a dataset row whose covering test is not a
-row of the same dataset.
+such as `in:call:post#1/key:value:'default_min_spend'`, a row with the values in `differsBy` would still set the key,
+so the case without the key would be lost: the `key:` tokens are listed in `coveringDiffersBy`, the action is `review`,
+and the steps ask whether the code under test reads one of these keys. A key nested in a value that `differsBy`
+already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
+`store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
+`in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
+`merge-into-dataset`. A candidate whose `differsBy` holds only data against several covering tests or against a test
+of another file is `review` too, and so is a dataset row whose covering test is not a row of the same dataset.
 
 ### How `differsBy` names a difference
 
@@ -226,10 +228,13 @@ test lacks.
     `$sum = add(1, 2); expect($sum)->toBe(3);` has the same assertion tokens as `expect(add(1, 2))->toBe(3)`.
   - A literal, a constant, any other variable, a closure and any other expression give no subject. The assertion then
     keeps its token without the prefix, e.g. `call:toBe`.
-- **Array keys and values.** An array key carries a `key:` prefix, e.g. `key:value:'x'`. A literal under an array key
-  carries the key as a path prefix, e.g. `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the
-  test never passes on, so the same literal under another key, or in a list without a key, is a different token. A map
-  passed to a call also carries the call and the argument position (see *Call arguments*).
+- **Array keys and values.** An array key carries a `key:` prefix and the path of its array, the same path a literal in
+  the array has: `key:value:'x'` for `$options = ['x' => 1]` that the test never passes on,
+  `in:function:store#0/key:value:'x'` for `store(['x' => 1])`, and `in:function:store#0/value:'user'/key:value:'x'` for
+  `store(['user' => ['x' => 1]])`. A literal under an array key carries the key as a path prefix, e.g.
+  `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the test never passes on, so the same
+  literal under another key, or in a list without a key, is a different token. A map passed to a call also carries the
+  call and the argument position (see *Call arguments*).
 - **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
   too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
 - **Lists.** A non-empty array literal whose elements have no key, and none of which unpacks an array with `...`,
