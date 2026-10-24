@@ -55,7 +55,19 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
         Action::Review,
     ],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
+    'key in a value of a call that only the covering test sets' => [
+        candidate('it works', ['it also works'], ['in:function:store#0/value:\'a\'/value:1'], ['in:function:store#0/value:\'b\'/key:value:\'c\'']),
+        Action::Review,
+    ],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
+    'key next to a key differsBy lists' => [
+        candidate('it works', ['it also works'], ['in:function:store#0/key:value:\'a\''], ['in:function:store#0/key:value:\'b\'']),
+        Action::Review,
+    ],
+    'key of a call and a value without a path in differsBy' => [
+        candidate('it works', ['it also works'], ['value:1'], ['in:function:store#0/key:value:\'b\'']),
+        Action::Review,
+    ],
     'literal under a key in both tests' => [
         candidate('it works', ['it also works'], ['in:value:\'a/b\'/value:false'], ['in:value:\'c\'/value:\'x\'/const:Foo::BAR']),
         Action::MergeIntoDataset,
@@ -109,6 +121,15 @@ it('asks whether the code under test reads the array key only the covering test 
             . 'without such a key, the input has another shape. '
             . 'Check whether the code under test reads one of these keys, for example in an isset() check, a required rule or a short-circuit condition; '
             . 'keep this test when it does, and delete it only when the code never reads them.',
+        Action::VERIFY_STEP,
+    ]);
+});
+
+it('asks only about the array key, not a missing argument value, when the key is nested in an argument', function (): void {
+    $key = 'in:function:drain#0/value:\'options\'/key:value:\'parallel\'';
+
+    expect(candidate('it drains › multicast', ['it drains › parallel'], [], [$key])->steps())->toBe([
+        sprintf(Action::MISSING_KEY_STEP, '"it drains › parallel"', $key),
         Action::VERIFY_STEP,
     ]);
 });
@@ -580,7 +601,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
         'it stores a contact without custom fields',
         'it stores a contact with custom fields',
         ['in:function:store#0/value:\'custom_fields\'/value:[]'],
-        Action::Review,
+        Action::MergeIntoDataset,
     ],
 ]);
 
@@ -748,7 +769,11 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             ],
         ),
         'it builds the exportable shape of a mail action carrying variants › mail action without variants',
-        ['key:value:\'variants\'', 'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\''],
+        [
+            'in:function:buildPipelineAction#0/value:\'properties\'/key:value:\'variants\'',
+            'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\'',
+            'in:expect:function:buildPipelineAction/call:toEqual#0/value:\'properties\'/key:value:\'variants\'',
+        ],
     ],
     'multicast pipeline without the parallel flag' => [
         fn (): FileReport => analyzeTokenTest(
@@ -767,7 +792,10 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             ],
         ),
         'it refuses to drain a pipeline through the recurring queue › multicast',
-        ['key:value:\'parallel\'', 'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/value:\'parallel\'/value:1'],
+        [
+            'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/key:value:\'parallel\'',
+            'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/value:\'parallel\'/value:1',
+        ],
     ],
 ]);
 
@@ -923,7 +951,10 @@ it('keeps the rows of a dataset that swap the same literals between two argument
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it lists the changed keys › a key was added')
         ->and($report->candidates[0]->coveredBy)->toBe(['it lists the changed keys › a key was removed'])
-        ->and($report->candidates[0]->differsBy)->toBe(['in:function:changedKeys#1/value:\'store\'/value:\'shop\''])
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:function:changedKeys#1/key:value:\'store\'',
+            'in:function:changedKeys#1/value:\'store\'/value:\'shop\'',
+        ])
         ->and($report->candidates[0]->action())->not->toBe(Action::Delete);
 });
 
@@ -975,7 +1006,10 @@ it('does not delete a dataset row whose value a sibling row passes through one m
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it decodes stored custom fields › a json string is decoded')
-        ->and($report->candidates[0]->differsBy)->toBe(['in:function:json_encode#0/value:\'test\'/value:true'])
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:function:json_encode#0/key:value:\'test\'',
+            'in:function:json_encode#0/value:\'test\'/value:true',
+        ])
         ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
 });
 
@@ -1046,8 +1080,31 @@ it('does not delete a test whose covering test passes its literal inside a neste
         '[\'a\' => 1]',
         ['in:function:foo#0/value:\'a\'/value:list-item', 'in:value:\'a\'/value:1'],
     ],
-    'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/value:\'a\'/value:1']],
 ]);
+
+it('asks for a review of a test whose covering test sets its array key only inside a list', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('passes the literal', function (): void {
+                expect(foo(['a' => 1]))->toBeTrue();
+            });
+            it('passes the literal in a nested list', function (): void {
+                expect(foo([['a' => 1]]))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it passes the literal' => ['src/Foo.php:5'],
+            'it passes the literal in a nested list' => ['src/Foo.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it passes the literal')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/key:value:\'a\'', 'in:function:foo#0/value:\'a\'/value:1'])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['key:value:\'a\''])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
 
 it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (
     string $row,
@@ -1077,7 +1134,7 @@ it('does not delete a dataset row whose sibling row passes its value inside a ne
 })->with([
     'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
     'list under a key' => ['[\'a\' => 1]', '[\'a\' => [1]]', ['in:function:foo#0/value:\'a\'/value:1']],
-    'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/value:\'a\'/value:1']],
+    'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/key:value:\'a\'', 'in:function:foo#0/value:\'a\'/value:1']],
 ]);
 
 it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
@@ -1100,7 +1157,7 @@ it('does not list the literal a flat row and a sibling row with a nested list bo
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it registers › flat')
         ->and($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->coveringDiffersBy)->toContain('key:value:\'tags\'')
+        ->and($report->candidates[0]->coveringDiffersBy)->toContain('in:function:register#0/key:value:\'tags\'')
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -1700,17 +1757,18 @@ it('asks for a review of a test that omits an array key its covering dataset row
         ],
     );
     $coveringTest = '"it finds pipelines with domain in email by step visibility › visible step"';
+    $hiddenKey = 'in:call:createAction#1/function:collect#0/key:value:\'hidden\'';
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it finds pipelines with domain in email')
         ->and($report->candidates[0]->differsBy)->toBe([])
         ->and($report->candidates[0]->action())->toBe(Action::Review)
         ->and($report->candidates[0]->coveringTokensForReview())->toBe([
-            'key:value:\'hidden\'',
+            $hiddenKey,
             'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
         ])
         ->and($report->candidates[0]->steps())->toBe([
-            sprintf(Action::MISSING_KEY_STEP, $coveringTest, 'key:value:\'hidden\''),
+            sprintf(Action::MISSING_KEY_STEP, $coveringTest, $hiddenKey),
             sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTest, 'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false'),
             Action::VERIFY_STEP,
         ]);
@@ -1750,12 +1808,12 @@ it('asks for a review of a test that differs only in data from a covering test t
             'in:call:post#1/value:\'default_value\'/value:100',
         ])
         ->and(valueAt($json, 'action'))->toBe('review')
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['key:value:\'default_min_spend\''])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:call:post#1/key:value:\'default_min_spend\''])
         ->and(valueAt($json, 'steps'))->toBe([
             sprintf(
                 Action::MISSING_KEY_STEP,
                 '"it rejects a percentual type with a minimum spend without a currency"',
-                'key:value:\'default_min_spend\'',
+                'in:call:post#1/key:value:\'default_min_spend\'',
             ),
             'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
             'Delete this test only when it does not; otherwise keep it.',

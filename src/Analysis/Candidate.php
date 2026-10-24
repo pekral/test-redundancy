@@ -64,7 +64,7 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
                 $this->coveringDiffersBy ?? [],
-                static fn (string $token): bool => self::isKey($token) || !self::isData($token),
+                fn (string $token): bool => !self::isData($token) || ($this->isKey($token) && !$this->isInValueDiffersByLists($token)),
             )),
             default => [],
         };
@@ -143,7 +143,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringKeys(): array
     {
-        return array_values(array_filter($this->coveringTokensForReview(), self::isKey(...)));
+        return array_values(array_filter($this->coveringTokensForReview(), $this->isKey(...)));
     }
 
     /**
@@ -162,7 +162,10 @@ final readonly class Candidate implements JsonSerializable
     private function missingInputSteps(): array
     {
         $coveringTests = $this->quoted($this->coveredBy);
-        $arguments = array_filter($this->coveringTokensForReview(), TokenCollector::isArgumentOfCodeUnderTest(...));
+        $arguments = array_diff(
+            array_filter($this->coveringTokensForReview(), TokenCollector::isArgumentOfCodeUnderTest(...)),
+            $this->coveringKeys(),
+        );
         $arrangement = array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $arguments);
 
         return [
@@ -182,8 +185,19 @@ final readonly class Candidate implements JsonSerializable
                 $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => $this->assertsNothing
                     ? !TokenCollector::isAssertionToken($token)
-                    : self::isKey($token) || TokenCollector::isArgumentOfCodeUnderTest($token),
+                    : $this->isKey($token) || TokenCollector::isArgumentOfCodeUnderTest($token),
             ),
+        );
+    }
+
+    private function isInValueDiffersByLists(string $key): bool
+    {
+        return array_any(
+            $this->differsBy ?? [],
+            static fn (string $token): bool => preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token, $matches) === 1
+                && $matches[1] !== ''
+                && $matches[2] === ''
+                && str_starts_with($key, $matches[1]),
         );
     }
 
@@ -219,14 +233,14 @@ final readonly class Candidate implements JsonSerializable
         return null;
     }
 
+    private function isKey(string $token): bool
+    {
+        return preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token) === 1;
+    }
+
     private static function isData(string $token): bool
     {
         return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1;
-    }
-
-    private static function isKey(string $token): bool
-    {
-        return str_starts_with($token, TokenCollector::KEY_PREFIX);
     }
 
 }

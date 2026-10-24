@@ -161,9 +161,12 @@ it('tells a literal used as an array key from the same literal used as a value',
     )
         ->and(array_keys(array_diff_key($nestedArray, $scalarString)))->toEqualCanonicalizing(
             [
-                'key:value:\'z\'',
-                'key:value:\'y\'',
-                'key:value:\'x\'',
+                'in:function:normalize#0/key:value:\'z\'',
+                'in:function:normalize#0/value:\'z\'/key:value:\'y\'',
+                'in:function:normalize#0/value:\'z\'/key:value:\'x\'',
+                'in:expect:function:normalize/call:toBe#0/key:value:\'z\'',
+                'in:expect:function:normalize/call:toBe#0/value:\'z\'/key:value:\'y\'',
+                'in:expect:function:normalize/call:toBe#0/value:\'z\'/key:value:\'x\'',
                 'in:function:normalize#0/value:\'z\'/value:\'y\'/value:1',
                 'in:function:normalize#0/value:\'z\'/value:\'x\'/value:2',
                 'in:expect:function:normalize/call:toBe#0/value:\'z\'/value:\'y\'/value:1',
@@ -181,51 +184,57 @@ it('tells a literal under one array key from the same literal under another key'
 })->with([
     'boolean under a key' => ['store([\'enabled\' => false]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'enabled\'' => 1,
         'in:function:store#0/value:\'enabled\'/value:false' => 1,
-        'key:value:\'enabled\'' => 1,
     ],
     ],
     'boolean under another key' => ['store([\'visible\' => false]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'visible\'' => 1,
         'in:function:store#0/value:\'visible\'/value:false' => 1,
-        'key:value:\'visible\'' => 1,
     ],
     ],
     'class constant as a key' => ['store([Status::Active => true]);', [
         'function:store' => 1,
         'in:function:store#0/const:Status::Active/value:true' => 1,
-        'key:const:Status::Active' => 1,
+        'in:function:store#0/key:const:Status::Active' => 1,
     ],
     ],
     'constant under a key' => ['store([\'status\' => Status::Active, \'flag\' => null]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'flag\'' => 1,
+        'in:function:store#0/key:value:\'status\'' => 1,
         'in:function:store#0/value:\'flag\'/value:null' => 1,
         'in:function:store#0/value:\'status\'/const:Status::Active' => 1,
-        'key:value:\'flag\'' => 1,
-        'key:value:\'status\'' => 1,
     ],
     ],
     'empty array under a key' => ['store([\'tags\' => []]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'tags\'' => 1,
         'in:function:store#0/value:\'tags\'/value:[]' => 1,
-        'key:value:\'tags\'' => 1,
+    ],
+    ],
+    'key under a key of an array no call receives' => ['$options = [\'user\' => [\'active\' => true]];', [
+        'in:value:\'user\'/key:value:\'active\'' => 1,
+        'in:value:\'user\'/value:\'active\'/value:true' => 1,
+        'key:value:\'user\'' => 1,
     ],
     ],
     'literal in a call under a key' => ['store([\'limit\' => min(5, 9)]);', [
         'function:min' => 1,
         'function:store' => 1,
+        'in:function:store#0/key:value:\'limit\'' => 1,
         'in:function:store#0/value:\'limit\'/function:min#0/value:5' => 1,
         'in:function:store#0/value:\'limit\'/function:min#1/value:9' => 1,
-        'key:value:\'limit\'' => 1,
     ],
     ],
     'literal in a list inside a list' => ['store([[1]]);', ['function:store' => 1, 'in:function:store#0/value:list-item' => 2, 'value:1' => 1]],
     'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'tags\'' => 1,
         'in:function:store#0/value:\'tags\'/value:list-item' => 2,
         'in:value:\'tags\'/value:\'a\'' => 1,
         'in:value:\'tags\'/value:\'b\'' => 1,
-        'key:value:\'tags\'' => 1,
     ],
     ],
     'literal in a list without a key' => ['store([false, false]);', [
@@ -236,21 +245,21 @@ it('tells a literal under one array key from the same literal under another key'
     ],
     'literal under nested keys' => ['store([\'user\' => [\'active\' => true]]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'user\'' => 1,
+        'in:function:store#0/value:\'user\'/key:value:\'active\'' => 1,
         'in:function:store#0/value:\'user\'/value:\'active\'/value:true' => 1,
-        'key:value:\'active\'' => 1,
-        'key:value:\'user\'' => 1,
     ],
     ],
     'negative number under a key' => ['store([\'balance\' => -5]);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'balance\'' => 1,
         'in:function:store#0/value:\'balance\'/value:-5' => 1,
-        'key:value:\'balance\'' => 1,
     ],
     ],
     'string under a key' => ['store([\'name\' => \'x\']);', [
         'function:store' => 1,
+        'in:function:store#0/key:value:\'name\'' => 1,
         'in:function:store#0/value:\'name\'/value:\'x\'' => 1,
-        'key:value:\'name\'' => 1,
     ],
     ],
 ]);
@@ -273,8 +282,8 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'argument under a key' => ['store([\'limit\' => min(5)]);', [
         'function:min' => 1,
         'function:store' => 1,
+        'in:function:store#0/key:value:\'limit\'' => 1,
         'in:function:store#0/value:\'limit\'/function:min#0/value:5' => 1,
-        'key:value:\'limit\'' => 1,
     ],
     ],
     'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
@@ -296,8 +305,8 @@ it('carries every enclosing call in the call path of a value', function (string 
 })->with([
     'map in a call passed to the same call' => ['json_encode(json_encode([\'test\' => true]));', [
         'function:json_encode' => 2,
+        'in:function:json_encode#0/function:json_encode#0/key:value:\'test\'' => 1,
         'in:function:json_encode#0/function:json_encode#0/value:\'test\'/value:true' => 1,
-        'key:value:\'test\'' => 1,
     ],
     ],
     'value in a call an assertion receives' => ['expect(add(1, 2))->toBe(3);', [
@@ -332,7 +341,7 @@ it('gives a list the number of its items, so a repeated item counts', function (
     ],
     ],
     'list that unpacks another array' => ['notify([...$clicks, $click]);', ['function:notify' => 1]],
-    'map' => ['notify([\'a\' => $click]);', ['function:notify' => 1, 'key:value:\'a\'' => 1]],
+    'map' => ['notify([\'a\' => $click]);', ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1]],
 ]);
 
 it('counts how many times a test uses each token', function (): void {
@@ -377,7 +386,12 @@ it('marks a call or new expression in a loop body, whose number of runs the fing
     ],
     'literals in a loop body' => [
         'foreach ($ids as $id) { store([\'id\' => 5], null); }',
-        ['loop:function:store' => 1, 'key:value:\'id\'' => 1, 'in:function:store#0/value:\'id\'/value:5' => 1, 'in:function:store#1/value:null' => 1],
+        [
+            'in:function:store#0/key:value:\'id\'' => 1,
+            'in:function:store#0/value:\'id\'/value:5' => 1,
+            'in:function:store#1/value:null' => 1,
+            'loop:function:store' => 1,
+        ],
     ],
     'nested loops' => ['foreach ($lists as $list) { foreach ($list as $item) { import(); } }', ['loop:function:import' => 1]],
     'while' => ['while (true) { Batch::import(); }', ['value:true' => 1, 'loop:call:Batch::import' => 1]],
@@ -410,10 +424,11 @@ it('gives a map of literals a dataset row passes the argument position of the ca
     expect($fingerprints['it lists the changed keys › a key was added'])->toEqual([
         'function:changedKeys' => 1,
         'in:function:changedKeys#0/value:\'listId\'/value:1' => 1,
-        'key:value:\'listId\'' => 2,
+        'in:function:changedKeys#0/key:value:\'listId\'' => 1,
         'in:function:changedKeys#1/value:\'listId\'/value:1' => 1,
+        'in:function:changedKeys#1/key:value:\'listId\'' => 1,
         'in:function:changedKeys#1/value:\'store\'/value:\'shop\'' => 1,
-        'key:value:\'store\'' => 1,
+        'in:function:changedKeys#1/key:value:\'store\'' => 1,
     ]);
 });
 
@@ -442,11 +457,11 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable assigned a map and read once' => [
         '$options = [\'a\' => 1]; notify($options);',
-        ['function:notify' => 1, 'key:value:\'a\'' => 1, 'in:function:notify#0/value:\'a\'/value:1' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1, 'in:function:notify#0/value:\'a\'/value:1' => 1],
     ],
     'variable assigned an array with a key and read twice' => [
         '$data = [\'id\' => 5]; notify($data); notify($data);',
-        ['function:notify' => 2, 'key:value:\'id\'' => 2, 'in:function:notify#0/value:\'id\'/value:5' => 2],
+        ['function:notify' => 2, 'in:function:notify#0/key:value:\'id\'' => 2, 'in:function:notify#0/value:\'id\'/value:5' => 2],
     ],
     'variable assigned an object' => ['$contact = new Contact(); notify($contact);', ['function:notify' => 1, 'new:Contact' => 1]],
     'variable the test appends to' => [
@@ -481,7 +496,7 @@ it('keeps the tokens of a call result without a path when the test first reads i
     expect($fingerprints['it sends'])->toEqual([
         'function:client' => 1,
         'in:function:client#0/value:\'a\'/value:1' => 1,
-        'key:value:\'a\'' => 1,
+        'in:function:client#0/key:value:\'a\'' => 1,
         'loop:call:send' => 1,
     ]);
 });
