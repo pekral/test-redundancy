@@ -26,20 +26,27 @@ final readonly class RedundancyAnalyzer
         $fixedTests = $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
         $removed = $this->eliminate($analyzedTests, $fixedTests);
         $pool = [...array_diff_key($analyzedTests, $removed), ...$fixedTests];
+        $removalRank = array_flip(array_keys($removed));
         $reports = [];
 
         foreach ($testsByFile as $testFile => $tests) {
             $candidates = [];
 
             foreach (array_keys(array_intersect_key($removed, $tests)) as $testKey) {
-                $coveredBy = $this->smallestCover($tests[$testKey], $pool);
+                $coverPool = [...$pool, ...array_filter(
+                    array_intersect_key($analyzedTests, $removed),
+                    static fn (array $lines, string $removedKey): bool => $removalRank[$removedKey] > $removalRank[$testKey],
+                    ARRAY_FILTER_USE_BOTH,
+                )];
+                $coveredBy = $this->singleCoverWithoutDifference($testKey, $tests[$testKey], $coverPool)
+                    ?? $this->smallestCover($tests[$testKey], $pool);
                 $differsBy = $this->fingerprints->difference($testKey, $coveredBy);
                 $candidates[] = new Candidate(
                     $testKey,
                     array_map(static fn (string $covering): string => self::display($covering, $testFile), $coveredBy),
                     $differsBy,
                     $this->fingerprints->coveringDifference($testKey, $coveredBy),
-                    $differsBy === [] ? $this->linesOnlyTheUnionReaches($testKey, $tests[$testKey], $coveredBy, $pool) : [],
+                    $differsBy === [] ? $this->linesOnlyTheUnionReaches($testKey, $tests[$testKey], $coveredBy, $coverPool) : [],
                     $this->fingerprints->assertsNothing($testKey),
                     $this->fingerprints->sharedDataset($testKey),
                 );
@@ -83,6 +90,22 @@ final readonly class RedundancyAnalyzer
         }
 
         return $removed;
+    }
+
+    /**
+     * @param array<string, true> $lines
+     * @param array<string, array<string, true>> $candidates
+     * @return list<string>|null
+     */
+    private function singleCoverWithoutDifference(string $testKey, array $lines, array $candidates): ?array
+    {
+        foreach ($candidates as $candidateKey => $candidateLines) {
+            if (array_diff_key($lines, $candidateLines) === [] && $this->fingerprints->difference($testKey, [$candidateKey]) === []) {
+                return [$candidateKey];
+            }
+        }
+
+        return null;
     }
 
     /**

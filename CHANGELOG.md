@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that passes exactly the values of a row of a dataset is `delete`, covered by that row, not `merge-into-dataset`
+  against another row of the dataset. Before, the covering test was the first test that runs the same lines, so the row
+  `December 25th` covered a test that passes the values of the row `June 15th`, and the steps asked to add a row that
+  already exists. Now a single test that runs every line of the candidate and has an empty `differsBy` is preferred as
+  `coveredBy`. It is a kept test, or a test that the analysis removes after the candidate, so the covering test is never
+  a test that is removed before the candidate. The fixture reports `it adds one and two` and `testGreetsJane` as `delete`
+  (#88).
 - The order of the keys of an array literal is part of its fingerprint. An array with two or more keys has one token
   for each pair of its keys, the earlier key first, e.g. `in:function:store#0/keys:value:'a'>value:'b'` for
   `store(['a' => 1, 'b' => 2])`. Two dataset rows that pass the same array with the keys in another order differ in

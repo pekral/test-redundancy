@@ -31,7 +31,7 @@ it('analyses a Pest test folder', function (): void {
     $reports = $testRedundancy->analyse($testRedundancy->testFiles(['tests'], baseRef: null), ['tests']);
 
     expect(candidatesOf($reports))->toBe([
-        'tests/CalculatorTest.php :: it adds one and two' => 'merge-into-dataset',
+        'tests/CalculatorTest.php :: it adds one and two' => 'delete',
         'tests/CalculatorTest.php :: it adds zero' => 'merge-into-dataset',
         'tests/CalculatorTest.php :: it adds two numbers › small numbers' => 'review-dataset-row',
     ]);
@@ -43,7 +43,7 @@ it('analyses a single PHPUnit test file in parallel', function (): void {
     $reports = $testRedundancy->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
 
     expect(candidatesOf($reports))->toBe([
-        'tests/GreeterTest.php :: testGreetsJane' => 'merge-into-dataset',
+        'tests/GreeterTest.php :: testGreetsJane' => 'delete',
         'tests/GreeterTest.php :: testGreetsByName › jane' => 'review-dataset-row',
     ]);
 });
@@ -84,7 +84,7 @@ it('compares test files with each other through the coverage map', function (): 
     expect($chunks->getArrayCopy())->toBe([['tests']])
         ->and($map->testCount())->toBe(7)
         ->and(candidatesOf($fromMap))->toBe([
-            'tests/CalculatorTest.php :: it adds one and two' => 'merge-into-dataset',
+            'tests/CalculatorTest.php :: it adds one and two' => 'delete',
             'tests/CalculatorTest.php :: it adds zero' => 'merge-into-dataset',
             'tests/CalculatorTest.php :: it adds two numbers › small numbers' => 'review-dataset-row',
             'tests/CalculatorTest.php :: it divides two numbers' => 'delete',
