@@ -115,7 +115,7 @@ final readonly class Candidate implements JsonSerializable
             ...$this->missingArgumentSteps(),
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
-                array_values(array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $this->coveringArguments())),
+                $this->otherCoveringTokens(),
             ),
         ];
 
@@ -184,7 +184,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function missingInputSteps(): array
     {
-        $arrangement = array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $this->coveringArguments());
+        $arrangement = $this->otherCoveringTokens();
 
         return [
             ...$this->missingKeySteps(),
@@ -193,6 +193,14 @@ final readonly class Candidate implements JsonSerializable
                 sprintf(Action::NO_ASSERTION_STEP, $this->quoted($this->coveredBy), implode(', ', $arrangement)),
             ]),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function otherCoveringTokens(): array
+    {
+        return array_values(array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $this->coveringArguments()));
     }
 
     /**
