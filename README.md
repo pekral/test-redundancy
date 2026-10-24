@@ -237,7 +237,9 @@ test lacks.
 - **Array keys and values.** An array key carries a `key:` prefix and the path of its array, the same path a literal in
   the array has: `key:value:'x'` for `$options = ['x' => 1]` that the test never passes on,
   `in:function:store#0/key:value:'x'` for `store(['x' => 1])`, and `in:function:store#0/value:'user'/key:value:'x'` for
-  `store(['user' => ['x' => 1]])`. A literal under an array key carries the key as a path prefix, e.g.
+  `store(['user' => ['x' => 1]])`. An enum case read through `->value` or `->name` as a key names the property it
+  reads, like an argument value: `in:function:store#0/key:const:CouponType::FIXED->value` for
+  `store([CouponType::FIXED->value => true])`. A literal under an array key carries the key as a path prefix, e.g.
   `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the test never passes on, so the same
   literal under another key, or in a list without a key, is a different token. A map passed to a call also carries the
   call and the argument position (see *Call arguments*).
