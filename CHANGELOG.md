@@ -13,7 +13,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `in:function:store#0/key:const:CouponType::FIXED->value` and
   `in:function:store#0/const:CouponType::FIXED->value/value:true`. Before, the key had neither the path nor the prefix,
   `const:CouponType::FIXED->value`, and the value under it carried the key as `call:value`, e.g.
-  `in:function:store#0/call:value/value:true` (#82).
+  `in:function:store#0/call:value/value:true`. An enum key of an array no call receives also gets the `key:` prefix,
+  `key:const:CouponType::FIXED->value`, and the value under it becomes `in:const:CouponType::FIXED->value/value:true`;
+  before, they were `const:CouponType::FIXED->value` and `in:call:value/value:true` (#82).
 - A key that the covering test passes only to an assertion, such as a key of the array `toEqual` expects, is not
   listed in `coveringDiffersBy` and no longer makes the candidate `review`. A top-level key and a nested key under an
   assertion are treated the same way: `in:expect:function:build/call:toEqual#0/key:value:'type'` and

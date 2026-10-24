@@ -220,6 +220,11 @@ it('tells a literal under one array key from the same literal under another key'
         'in:function:store#0/key:const:CouponType::FIXED->value' => 1,
     ],
     ],
+    'enum value as a key of an array no call receives' => ['$options = [CouponType::FIXED->value => true];', [
+        'in:const:CouponType::FIXED->value/value:true' => 1,
+        'key:const:CouponType::FIXED->value' => 1,
+    ],
+    ],
     'key under a key of an array no call receives' => ['$options = [\'user\' => [\'active\' => true]];', [
         'in:value:\'user\'/key:value:\'active\'' => 1,
         'in:value:\'user\'/value:\'active\'/value:true' => 1,
