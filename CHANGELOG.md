@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `merge-into-dataset` candidate whose covering test passes an argument at a position where `differsBy` lists no
+  value, such as `store(1, 2)` against `store(3)`, is `review`. `coveringDiffersBy` lists the argument tokens, e.g.
+  `in:function:store#1/value:2`, and the steps ask whether the code under test behaves differently without one of
+  these values. Before, the extra argument could not be told apart from a differing value, so `coveringDiffersBy`
+  stayed empty and the steps merged the candidate into a row that still passed the argument (#75).
 - An array key carries the path of its array, the same path a literal in the array has, e.g.
   `in:function:store#0/value:'custom_fields'/key:value:'color'` instead of `key:value:'color'`. A key nested in a value
   that `differsBy` already lists then does not count as a key the candidate lacks, because a dataset row replaces the
