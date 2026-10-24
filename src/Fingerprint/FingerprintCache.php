@@ -9,11 +9,8 @@ use Pekral\TestRedundancy\Support\TestKey;
 final class FingerprintCache
 {
 
-    /** @var array<string, array<string, array<string, int>>> */
+    /** @var array<string, \Pekral\TestRedundancy\Fingerprint\FileFingerprints> */
     private array $byFile = [];
-
-    /** @var array<string, array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>> */
-    private array $sharedByFile = [];
 
     public function __construct(private readonly string $projectRoot)
     {
@@ -34,7 +31,7 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $difference = $this->exceeding($tokens['own'], $covering);
+            $difference = KeyOrders::withoutImplied($this->exceeding($tokens['own'], $covering));
 
             if ($smallest === null || count($difference) < count($smallest)) {
                 $smallest = $difference;
@@ -60,16 +57,7 @@ final class FingerprintCache
 
     public function sharedDataset(string $testKey): ?SharedDataset
     {
-        $file = TestKey::file($testKey);
-        $path = $this->projectRoot . DIRECTORY_SEPARATOR . $file;
-
-        if (!is_file($path)) {
-            return null;
-        }
-
-        $this->sharedByFile[$file] ??= ContractFingerprints::sharedDatasets($path);
-
-        return $this->sharedByFile[$file][TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;
+        return $this->fileOf($testKey)?->sharedDatasets[TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;
     }
 
     public function assertsNothing(string $testKey): bool
@@ -121,6 +109,11 @@ final class FingerprintCache
      */
     private function of(string $testKey): ?array
     {
+        return $this->fileOf($testKey)?->fingerprints[TestKey::testCase($testKey)] ?? null;
+    }
+
+    private function fileOf(string $testKey): ?FileFingerprints
+    {
         $file = TestKey::file($testKey);
         $path = $this->projectRoot . DIRECTORY_SEPARATOR . $file;
 
@@ -128,9 +121,7 @@ final class FingerprintCache
             return null;
         }
 
-        $this->byFile[$file] ??= ContractFingerprints::of($path);
-
-        return $this->byFile[$file][TestKey::testCase($testKey)] ?? null;
+        return $this->byFile[$file] ??= ContractFingerprints::analyse($path);
     }
 
 }
