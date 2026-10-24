@@ -1344,37 +1344,61 @@ it('asks to merge a test whose literal arguments its covering test passes at swa
         ->and($reports[0]->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
-it('asks to merge a test that passes an enum value to the argument its covering test passes a literal to', function (
+it('asks to merge a test that passes an enum value to the argument its covering test passes another value to', function (
     string $source,
     string $enumValue,
 ): void {
     $report = analyzeTokenTest(
         source: $source,
-        linesByTest: ['it imports a fixed coupon' => ['src/Import.php:5'], 'it imports a percentual coupon' => ['src/Import.php:5', 'src/Import.php:6']],
+        linesByTest: ['it passes the enum value' => ['src/Import.php:5'], 'it passes another value' => ['src/Import.php:5', 'src/Import.php:6']],
     );
     $json = decodedJson((string) json_encode($report->candidates[0]));
 
     expect($report->candidates)->toHaveCount(1)
-        ->and(valueAt($json, 'test'))->toBe('it imports a fixed coupon')
+        ->and(valueAt($json, 'test'))->toBe('it passes the enum value')
         ->and(valueAt($json, 'differsBy'))->toBe([$enumValue])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe([]);
 })->with([
-    'enum value passed straight to a call' => [
+    'enum name against the enum value passed straight to a call' => [
         <<<'PHP'
             <?php
-            it('imports a fixed coupon', fn () => $this->post('/import', CouponType::FIXED->value)->assertOk());
-            it('imports a percentual coupon', fn () => $this->post('/import', 'percentual')->assertOk());
+            it('passes the enum value', fn () => store(CouponType::FIXED->name));
+            it('passes another value', fn () => store(CouponType::FIXED->value));
             PHP,
-        'in:call:post#1/const:CouponType::FIXED',
+        'in:function:store#0/const:CouponType::FIXED->name',
     ],
-    'enum value under a key of an array passed to a call' => [
+    'enum value against a literal passed straight to a call' => [
         <<<'PHP'
             <?php
-            it('imports a fixed coupon', fn () => $this->post('/import', ['default_type' => CouponType::FIXED->value])->assertOk());
-            it('imports a percentual coupon', fn () => $this->post('/import', ['default_type' => 'percentual'])->assertOk());
+            it('passes the enum value', fn () => $this->post('/import', CouponType::FIXED->value)->assertOk());
+            it('passes another value', fn () => $this->post('/import', 'percentual')->assertOk());
             PHP,
-        'in:call:post#1/value:\'default_type\'/const:CouponType::FIXED',
+        'in:call:post#1/const:CouponType::FIXED->value',
+    ],
+    'enum value against a literal under a key of an array passed to a call' => [
+        <<<'PHP'
+            <?php
+            it('passes the enum value', fn () => $this->post('/import', ['default_type' => CouponType::FIXED->value])->assertOk());
+            it('passes another value', fn () => $this->post('/import', ['default_type' => 'percentual'])->assertOk());
+            PHP,
+        'in:call:post#1/value:\'default_type\'/const:CouponType::FIXED->value',
+    ],
+    'enum value against the enum case passed straight to a call' => [
+        <<<'PHP'
+            <?php
+            it('passes the enum value', fn () => store(CouponType::FIXED->value));
+            it('passes another value', fn () => store(CouponType::FIXED));
+            PHP,
+        'in:function:store#0/const:CouponType::FIXED->value',
+    ],
+    'enum value against the enum case under a key of an array passed to a call' => [
+        <<<'PHP'
+            <?php
+            it('passes the enum value', fn () => $this->post('/import', ['type' => CouponType::FIXED->value])->assertOk());
+            it('passes another value', fn () => $this->post('/import', ['type' => CouponType::FIXED])->assertOk());
+            PHP,
+        'in:call:post#1/value:\'type\'/const:CouponType::FIXED->value',
     ],
 ]);
 

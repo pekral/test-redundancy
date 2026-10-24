@@ -23,10 +23,6 @@ use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
-use PhpParser\Node\Stmt\Do_;
-use PhpParser\Node\Stmt\For_;
-use PhpParser\Node\Stmt\Foreach_;
-use PhpParser\Node\Stmt\While_;
 use PhpParser\NodeFinder;
 
 final class TokenCollector
@@ -54,10 +50,11 @@ final class TokenCollector
         }
 
         $nodeFinder = new NodeFinder();
-        $negatedScalars = self::negatedScalars($nodeFinder, $nodes);
-        $arrayKeys = self::arrayKeys($nodeFinder, $nodes);
+        $negatedScalars = NodeContext::negatedScalars($nodeFinder, $nodes);
+        $readProperties = NodeContext::readProperties($nodeFinder, $nodes);
+        $arrayKeys = NodeContext::arrayKeys($nodeFinder, $nodes);
         $paths = self::paths($nodeFinder, $nodes, $assignedValues);
-        $loopBodies = self::loopBodies($nodeFinder, $nodes);
+        $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
         $tokens = [];
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
@@ -68,6 +65,7 @@ final class TokenCollector
                 continue;
             }
 
+            $token .= $readProperties[spl_object_id($node)] ?? '';
             $prefixedToken = self::prefix($arrayKeys, $paths, $node, $token) . $token;
             $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
@@ -111,59 +109,6 @@ final class TokenCollector
         }
 
         return $sum;
-    }
-
-    /**
-     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @return array<int, true>
-     */
-    public static function loopBodies(NodeFinder $nodeFinder, Node|array $nodes): array
-    {
-        $loopBodies = [];
-
-        foreach ([Do_::class, For_::class, Foreach_::class, While_::class] as $loopClass) {
-            foreach ($nodeFinder->findInstanceOf($nodes, $loopClass) as $loop) {
-                foreach ($nodeFinder->find($loop->stmts, static fn (): bool => true) as $node) {
-                    $loopBodies[spl_object_id($node)] = true;
-                }
-            }
-        }
-
-        return $loopBodies;
-    }
-
-    /**
-     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @return array<int, true>
-     */
-    private static function negatedScalars(NodeFinder $nodeFinder, Node|array $nodes): array
-    {
-        $negatedScalars = [];
-
-        foreach ($nodeFinder->findInstanceOf($nodes, UnaryMinus::class) as $unaryMinus) {
-            if ($unaryMinus->expr instanceof Scalar) {
-                $negatedScalars[spl_object_id($unaryMinus->expr)] = true;
-            }
-        }
-
-        return $negatedScalars;
-    }
-
-    /**
-     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @return array<int, true>
-     */
-    private static function arrayKeys(NodeFinder $nodeFinder, Node|array $nodes): array
-    {
-        $arrayKeys = [];
-
-        foreach ($nodeFinder->findInstanceOf($nodes, ArrayItem::class) as $arrayItem) {
-            if ($arrayItem->key !== null) {
-                $arrayKeys[spl_object_id($arrayItem->key)] = true;
-            }
-        }
-
-        return $arrayKeys;
     }
 
     /**

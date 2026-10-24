@@ -151,7 +151,7 @@ final class DatasetRows
     private static function passedOnFirstReads(array $body, array $assignments): array
     {
         $nodeFinder = new NodeFinder();
-        $loopBodies = TokenCollector::loopBodies($nodeFinder, $body);
+        $loopBodies = NodeContext::loopBodies($nodeFinder, $body);
         $passedOnValues = array_map(
             static fn (Arg|ArrayItem $item): int => spl_object_id($item->value),
             [...$nodeFinder->findInstanceOf($body, Arg::class), ...$nodeFinder->findInstanceOf($body, ArrayItem::class)],
