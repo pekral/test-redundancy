@@ -54,7 +54,7 @@ final class TokenCollector
         $negatedScalars = NodeContext::negatedScalars($nodeFinder, $nodes);
         $readProperties = NodeContext::readProperties($nodeFinder, $nodes);
         $arrayKeys = NodeContext::arrayKeys($nodeFinder, $nodes);
-        $paths = self::paths($nodeFinder, $nodes, $assignedValues);
+        $paths = self::paths($nodeFinder, $nodes, $assignedValues, $readProperties);
         $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
         $tokens = [];
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
@@ -115,16 +115,17 @@ final class TokenCollector
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param array<int, string> $readProperties
      * @return array<int, list<string>>
      */
-    private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues): array
+    private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues, array $readProperties): array
     {
         $paths = [];
         $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
 
         foreach ($pathNodes as $pathNode) {
             $segments = $pathNode instanceof ArrayItem
-                ? self::keySegments($nodeFinder, $pathNode)
+                ? self::keySegments($nodeFinder, $pathNode, $readProperties)
                 : self::argumentSegments($pathNode, $assignedValues);
 
             foreach ($segments as $nodeId => $segment) {
@@ -136,13 +137,17 @@ final class TokenCollector
     }
 
     /**
+     * @param array<int, string> $readProperties
      * @return array<int, string>
      */
-    private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem): array
+    private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem, array $readProperties): array
     {
-        $keyToken = $arrayItem->key === null ? null : self::token($arrayItem->key);
+        $key = $arrayItem->key === null ? null : NodeContext::enumCaseReadBy($arrayItem->key) ?? $arrayItem->key;
+        $keyToken = $key === null ? null : self::token($key);
 
-        return $keyToken === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $keyToken);
+        return $keyToken === null
+            ? []
+            : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $keyToken . ($readProperties[spl_object_id($key)] ?? ''));
     }
 
     /**
@@ -187,7 +192,7 @@ final class TokenCollector
             static fn (ArrayItem|Arg $item): array => match (true) {
                 $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
                 $item->key === null => self::valueIds($item->value),
-                default => [spl_object_id($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
+                default => [...self::valueIds($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
             },
             array_values($passedItems),
         ));
@@ -198,9 +203,9 @@ final class TokenCollector
      */
     private static function valueIds(Expr $value): array
     {
-        return $value instanceof PropertyFetch && $value->var instanceof ClassConstFetch
-            ? [spl_object_id($value), spl_object_id($value->var)]
-            : [spl_object_id($value)];
+        $enumCase = NodeContext::enumCaseReadBy($value);
+
+        return $enumCase === null ? [spl_object_id($value)] : [spl_object_id($value), spl_object_id($enumCase)];
     }
 
     /**

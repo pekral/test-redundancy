@@ -46,8 +46,10 @@ final class NodeContext
         $readProperties = [];
 
         foreach ($nodeFinder->findInstanceOf($nodes, PropertyFetch::class) as $propertyFetch) {
-            if ($propertyFetch->var instanceof ClassConstFetch && $propertyFetch->name instanceof Identifier) {
-                $readProperties[spl_object_id($propertyFetch->var)] = '->' . $propertyFetch->name->toString();
+            $enumCase = self::enumCaseReadBy($propertyFetch);
+
+            if ($enumCase !== null && $propertyFetch->name instanceof Identifier) {
+                $readProperties[spl_object_id($enumCase)] = '->' . $propertyFetch->name->toString();
             }
         }
 
@@ -64,11 +66,16 @@ final class NodeContext
 
         foreach ($nodeFinder->findInstanceOf($nodes, ArrayItem::class) as $arrayItem) {
             if ($arrayItem->key !== null) {
-                $arrayKeys[spl_object_id($arrayItem->key)] = true;
+                $arrayKeys[spl_object_id(self::enumCaseReadBy($arrayItem->key) ?? $arrayItem->key)] = true;
             }
         }
 
         return $arrayKeys;
+    }
+
+    public static function enumCaseReadBy(Node $node): ?ClassConstFetch
+    {
+        return $node instanceof PropertyFetch && $node->var instanceof ClassConstFetch ? $node->var : null;
     }
 
     /**
