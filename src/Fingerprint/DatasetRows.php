@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use Pekral\TestRedundancy\Support\TestKey;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\ClosureUse;
 use PhpParser\Node\Expr;
@@ -14,6 +15,7 @@ use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\AssignOp;
 use PhpParser\Node\Expr\AssignRef;
+use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\PostDec;
 use PhpParser\Node\Expr\PostInc;
@@ -78,7 +80,7 @@ final class DatasetRows
             }
         }
 
-        $binder = new ParameterBinder(array_map(static fn (ArrayItem $item): Expr => $item->value, $arguments), droppedAssignments: []);
+        $binder = new ParameterBinder(array_map(static fn (ArrayItem $item): Expr => $item->value, $arguments), dropped: []);
         $boundBody = $binder->bind($body);
         $boundItems = array_intersect_key($arguments, $binder->boundNames());
         $unboundItems = array_filter($items, static fn (ArrayItem $item): bool => !in_array($item, $boundItems, strict: true));
@@ -109,8 +111,9 @@ final class DatasetRows
     {
         $assignments = self::onceAssignments($body, $parameters);
         $assignedValues = array_map(static fn (Assign $assignment): Expr => $assignment->expr, $assignments);
-        $values = array_filter($assignedValues, self::isBindable(...));
-        $binder = new ParameterBinder($values, array_values(array_intersect_key($assignments, $values)));
+        $boundReads = self::passedOnFirstReads($body, $assignments);
+        $values = [...array_filter($assignedValues, self::isBindable(...)), ...array_intersect_key($assignedValues, $boundReads)];
+        $binder = new ParameterBinder($values, array_values(array_intersect_key($assignments, $values)), $boundReads);
 
         return TokenCollector::sum(
             TokenCollector::collect($binder->bind($body), $assignedValues),
@@ -138,6 +141,39 @@ final class DatasetRows
         }
 
         return $assignments;
+    }
+
+    /**
+     * @param array<\PhpParser\Node> $body
+     * @param array<string, \PhpParser\Node\Expr\Assign> $assignments
+     * @return array<string, \PhpParser\Node\Expr\Variable>
+     */
+    private static function passedOnFirstReads(array $body, array $assignments): array
+    {
+        $nodeFinder = new NodeFinder();
+        $loopBodies = TokenCollector::loopBodies($nodeFinder, $body);
+        $passedOnValues = array_map(
+            static fn (Arg|ArrayItem $item): int => spl_object_id($item->value),
+            [...$nodeFinder->findInstanceOf($body, Arg::class), ...$nodeFinder->findInstanceOf($body, ArrayItem::class)],
+        );
+        $callResultAssignments = array_filter($assignments, static fn (Assign $assignment): bool => $assignment->expr instanceof CallLike);
+        $firstReads = [];
+
+        foreach ($callResultAssignments as $name => $assignment) {
+            $firstRead = $nodeFinder->findFirst(
+                $body,
+                static fn (Node $node): bool => $node !== $assignment->var && self::variableName($node) === $name,
+            );
+
+            if ($firstRead instanceof Variable
+                && in_array(spl_object_id($firstRead), $passedOnValues, strict: true)
+                && !isset($loopBodies[spl_object_id($firstRead)])
+            ) {
+                $firstReads[$name] = $firstRead;
+            }
+        }
+
+        return $firstReads;
     }
 
     /**

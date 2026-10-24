@@ -27,9 +27,10 @@ final class ParameterBinder extends NodeVisitorAbstract
 
     /**
      * @param array<string, \PhpParser\Node\Expr> $arguments
-     * @param array<\PhpParser\Node\Expr\Assign> $droppedAssignments
+     * @param array<\PhpParser\Node\Expr\Assign> $dropped
+     * @param array<string, \PhpParser\Node\Expr\Variable> $boundReads
      */
-    public function __construct(private readonly array $arguments, private readonly array $droppedAssignments)
+    public function __construct(private readonly array $arguments, private readonly array $dropped, private readonly array $boundReads = [])
     {
     }
 
@@ -52,7 +53,7 @@ final class ParameterBinder extends NodeVisitorAbstract
 
     public function enterNode(Node $node): ?int
     {
-        if ($node instanceof Expression && in_array($node->expr->getAttribute('origNode'), $this->droppedAssignments, strict: true)) {
+        if ($node instanceof Expression && in_array($node->expr->getAttribute('origNode'), $this->dropped, strict: true)) {
             return NodeVisitor::REMOVE_NODE;
         }
 
@@ -72,13 +73,18 @@ final class ParameterBinder extends NodeVisitorAbstract
         $name = $node instanceof Variable && is_string($node->name) ? $node->name : null;
         $argument = $name === null ? null : $this->arguments[$name] ?? null;
 
-        if ($name === null || $argument === null || isset($this->declarations[spl_object_id($node)])) {
+        if ($name === null || $argument === null || isset($this->declarations[spl_object_id($node)]) || !$this->bindsRead($name, $node)) {
             return null;
         }
 
         $this->boundNames[$name] = true;
 
-        return $this->copy([$argument])[0];
+        return $this->bind([$argument])[0];
+    }
+
+    private function bindsRead(string $name, Node $read): bool
+    {
+        return !isset($this->boundReads[$name]) || $read->getAttribute('origNode') === $this->boundReads[$name];
     }
 
     /**
