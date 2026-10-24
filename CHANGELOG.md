@@ -9,12 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - An enum case read through `->value` inside a call argument carries the path of the argument, like any other argument
-  value: `$this->post('/import', ['default_type' => CouponType::FIXED->value])` has the token
-  `in:call:post#1/value:'default_type'/const:CouponType::FIXED` instead of
+  value, and its token names the property it reads:
+  `$this->post('/import', ['default_type' => CouponType::FIXED->value])` has the token
+  `in:call:post#1/value:'default_type'/const:CouponType::FIXED->value` instead of
   `in:value:'default_type'/const:CouponType::FIXED`, and `store(CouponType::FIXED->value)` has
-  `in:function:store#0/const:CouponType::FIXED`. A test that passes the enum value is then `merge-into-dataset` against
-  a test that passes a literal to the same argument. Before, the token had no argument position, so the candidate was
-  `review` (#76).
+  `in:function:store#0/const:CouponType::FIXED->value`. A test that passes the enum value is then `merge-into-dataset`
+  against a test that passes a literal, the enum case itself, or its `->name` to the same argument. Before, the token
+  had no argument position, so the candidate was `review` against a literal, and `->value`, `->name` and the case
+  itself had the same token, so a test that passes `->name` was `delete` against a test that passes `->value` (#76).
 - A `merge-into-dataset` candidate whose covering test passes an argument at a position where `differsBy` lists no
   value, such as `store(1, 2)` against `store(3)`, is `review`. `coveringDiffersBy` lists the argument tokens, e.g.
   `in:function:store#1/value:2`, and the steps ask whether the code under test behaves differently without one of
