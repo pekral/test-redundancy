@@ -10,20 +10,15 @@ use PhpParser\ParserFactory;
 final class ContractFingerprints
 {
 
-    /**
-     * @return array<string, array<string, int>>
-     */
-    public static function of(string $testFile): array
+    public static function analyse(string $testFile): FileFingerprints
     {
-        return self::fingerprintsOf(self::statements($testFile));
-    }
+        $statements = self::statements($testFile);
+        $pestTests = PestFingerprints::tests($statements);
 
-    /**
-     * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
-     */
-    public static function sharedDatasets(string $testFile): array
-    {
-        return PestFingerprints::sharedDatasets(self::statements($testFile));
+        return new FileFingerprints(
+            [...PestFingerprints::fingerprints($pestTests), ...PhpUnitFingerprints::of($statements)],
+            PestFingerprints::sharedDatasets($pestTests),
+        );
     }
 
     public static function declaresSingleTestCase(string $testFile): bool

@@ -42,18 +42,27 @@ final readonly class PestFingerprints
      */
     public static function of(array $statements): array
     {
-        return array_map(static fn (array $test): array => $test['tokens'], self::tests($statements));
+        return self::fingerprints(self::tests($statements));
     }
 
     /**
-     * @param array<\PhpParser\Node\Stmt> $statements
+     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @return array<string, array<string, int>>
+     */
+    public static function fingerprints(array $tests): array
+    {
+        return array_map(static fn (array $test): array => $test['tokens'], $tests);
+    }
+
+    /**
+     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
      * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
      */
-    public static function sharedDatasets(array $statements): array
+    public static function sharedDatasets(array $tests): array
     {
         $shared = [];
 
-        foreach (self::testsByDataset($statements) as $dataset) {
+        foreach (self::testsByDataset($tests) as $dataset) {
             foreach (array_keys($dataset['tests']) as $test) {
                 $otherTests = array_values(array_diff(array_keys($dataset['tests']), [$test]));
 
@@ -190,7 +199,7 @@ final readonly class PestFingerprints
      * @param array<\PhpParser\Node\Stmt> $statements
      * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
      */
-    private static function tests(array $statements): array
+    public static function tests(array $statements): array
     {
         $statements = self::withoutNamespaces($statements);
 
@@ -198,14 +207,14 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @param array<\PhpParser\Node\Stmt> $statements
+     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
      * @return array<string, array{name: string, tests: array<string, true>}>
      */
-    private static function testsByDataset(array $statements): array
+    private static function testsByDataset(array $tests): array
     {
         $datasets = [];
 
-        foreach (self::tests($statements) as $testKey => $test) {
+        foreach ($tests as $testKey => $test) {
             if ($test['dataset'] !== null) {
                 $datasets[$test['dataset']] ??= ['name' => $test['dataset'], 'tests' => []];
                 $datasets[$test['dataset']]['tests'][TestKey::withoutDatasetRow($testKey)] = true;

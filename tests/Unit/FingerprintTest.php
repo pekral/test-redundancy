@@ -15,7 +15,7 @@ function fingerprintsOf(string $code): array
 {
     $file = (string) tempnam(sys_get_temp_dir(), 'fingerprint');
     file_put_contents($file, $code);
-    $fingerprints = ContractFingerprints::of($file);
+    $fingerprints = ContractFingerprints::analyse($file)->fingerprints;
     unlink($file);
 
     return $fingerprints;

@@ -14,11 +14,37 @@ final class KeyOrders
 
     private const string PREFIX = 'keys:';
 
+    private const string KEY_PATTERN = '/^((?:in:.*\/)?)key:(.+)$/';
+
     private const string PATTERN = '/^(in:.*\/)?' . self::PREFIX . '/';
 
     public static function isToken(string $token): bool
     {
         return preg_match(self::PATTERN, $token) === 1;
+    }
+
+    /**
+     * @param list<string> $difference
+     * @return list<string>
+     */
+    public static function withoutImplied(array $difference): array
+    {
+        $keys = [];
+
+        foreach ($difference as $token) {
+            if (preg_match(self::KEY_PATTERN, $token, $matches) === 1) {
+                $keys[] = $matches;
+            }
+        }
+
+        return array_values(array_filter(
+            $difference,
+            static fn (string $token): bool => !self::isToken($token) || !array_any(
+                $keys,
+                static fn (array $key): bool => str_starts_with($token, $key[1] . self::PREFIX . $key[2] . '>')
+                    || (str_starts_with($token, $key[1] . self::PREFIX) && str_ends_with($token, '>' . $key[2])),
+            ),
+        ));
     }
 
     /**

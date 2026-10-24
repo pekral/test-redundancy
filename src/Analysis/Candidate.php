@@ -103,27 +103,25 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
+        $sharedSteps = $this->sharedDataset === null ? [] : [$this->sharedDatasetStep($this->sharedDataset)];
+
         if ($this->unionOnlyLines !== []) {
-            return [sprintf(Action::UNION_ONLY_LINES_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
+            return [...$sharedSteps, sprintf(Action::UNION_ONLY_LINES_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
         if ($this->addsNoValueOrCall() && $this->coveringTokensForReview() !== []) {
-            return [...$this->missingInputSteps(), Action::VERIFY_STEP];
+            return [...$sharedSteps, ...$this->missingInputSteps(), Action::VERIFY_STEP];
         }
 
         if ($this->sharedDataset !== null && $this->addsNoValueOrCall()) {
-            return [
-                $this->sharedDatasetStep($this->sharedDataset),
-                sprintf(Action::CONFIRM_STEP, $this->quoted($this->coveredBy)),
-                Action::VERIFY_STEP,
-            ];
+            return [...$sharedSteps, sprintf(Action::CONFIRM_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
         $steps = [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
-            ...($this->sharedDataset === null ? [] : [$this->sharedDatasetStep($this->sharedDataset)]),
+            ...$sharedSteps,
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
                 $this->otherCoveringTokens(),

@@ -31,12 +31,22 @@ function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array
 /**
  * @param list<string> $coveredBy
  * @param list<string>|null $differsBy
+ * @param list<string> $coveringDiffersBy
+ * @param list<string> $unionOnlyLines
  */
-function sharedRow(array $coveredBy, ?array $differsBy): Candidate
+function sharedRow(array $coveredBy, ?array $differsBy, array $coveringDiffersBy = [], array $unionOnlyLines = []): Candidate
 {
     $dataset = new SharedDataset('collidingRows', ['it second', 'it third']);
 
-    return new Candidate('tests/FooTest.php :: it first › one', $coveredBy, $differsBy, [], [], assertsNothing: false, sharedDataset: $dataset);
+    return new Candidate(
+        'tests/FooTest.php :: it first › one',
+        $coveredBy,
+        $differsBy,
+        $coveringDiffersBy,
+        $unionOnlyLines,
+        assertsNothing: false,
+        sharedDataset: $dataset,
+    );
 }
 
 /**
@@ -1000,7 +1010,6 @@ it('keeps the rows of a dataset that swap the same literals between two argument
         ->and($report->candidates[0]->differsBy)->toBe([
             'in:function:changedKeys#1/key:value:\'store\'',
             'in:function:changedKeys#1/value:\'store\'/value:\'shop\'',
-            'in:function:changedKeys#1/keys:value:\'listId\'>value:\'store\'',
         ])
         ->and($report->candidates[0]->action())->not->toBe(Action::Delete);
 });
@@ -2226,6 +2235,63 @@ it('leaves the order of the keys of a covering test out of coveringDiffersBy', f
         ]);
 });
 
+it('lists no order token for a key that the covering test lacks, because the key is listed already', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores three keys', fn () => expect(store(['a' => 1, 'b' => 2, 'c' => 3]))->toBeTrue());
+            it('stores two keys', fn () => expect(store(['a' => 1, 'b' => 2]))->toBeTrue());
+            PHP,
+        linesByTest: [
+            'it stores three keys' => ['src/Store.php:10'],
+            'it stores two keys' => ['src/Store.php:10', 'src/Store.php:20'],
+        ],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it stores three keys')
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:function:store#0/key:value:\'c\'',
+            'in:function:store#0/value:\'c\'/value:3',
+        ])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('lists no order token for a key that a sibling row lacks, because the key is listed already', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores', fn (array $row) => expect(store($row))->toBeTrue())->with([
+                'three' => [['a' => 1, 'b' => 2, 'c' => 3]],
+                'two' => [['a' => 1, 'b' => 2]],
+            ]);
+            PHP,
+        linesByTest: [
+            'it stores › three' => ['src/Store.php:10'],
+            'it stores › two' => ['src/Store.php:10', 'src/Store.php:20'],
+        ],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it stores › three')
+        ->and($report->candidates[0]->differsBy)->not->toContain('in:function:store#0/keys:value:\'a\'>value:\'c\'')
+        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+});
+
+it('lists the order token of a key whose pair the covering test has in another order', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores a key more in another order', fn () => store(['b' => 2, 'a' => 1, 'c' => 3]));
+            it('stores', fn () => store(['a' => 1, 'b' => 2]));
+            PHP,
+        linesByTest: [
+            'it stores a key more in another order' => ['src/Store.php:10'],
+            'it stores' => ['src/Store.php:10', 'src/Store.php:20'],
+        ],
+    );
+
+    expect($report->candidates[0]->differsBy)->toContain('in:function:store#0/keys:value:\'b\'>value:\'a\'');
+});
+
 const SHARED_ROW_STEP = 'This row belongs to the named dataset "collidingRows", which these tests also use: "it second", "it third". '
     . 'Deleting the row deletes it from each of them. '
     . 'Delete the row only when each of them stays covered without it; otherwise keep it, or give this test its own dataset.';
@@ -2249,6 +2315,15 @@ it('names the tests that use the dataset in the steps of every other action for 
     expect($candidate->action())->toBe($action)
         ->and($candidate->steps())->toBe($steps);
 })->with([
+    'a covering test that sets a key the row lacks' => [
+        sharedRow(['it first › two'], [], coveringDiffersBy: ['in:function:store#0/key:value:\'b\'']),
+        Action::Review,
+        [
+            SHARED_ROW_STEP,
+            sprintf(Action::MISSING_KEY_STEP, '"it first › two"', 'in:function:store#0/key:value:\'b\''),
+            Action::VERIFY_STEP,
+        ],
+    ],
     'a row that could not be parsed' => [
         sharedRow(['it first › two'], differsBy: null),
         Action::Review,
@@ -2267,6 +2342,15 @@ it('names the tests that use the dataset in the steps of every other action for 
             SHARED_ROW_STEP,
             'Compare this row with "it first › two".',
             'Delete the row when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input.',
+            Action::VERIFY_STEP,
+        ],
+    ],
+    'lines that only the union of the covering tests runs' => [
+        sharedRow(['it first › two', 'it third'], [], unionOnlyLines: ['src/A.php:3']),
+        Action::Review,
+        [
+            SHARED_ROW_STEP,
+            sprintf(Action::UNION_ONLY_LINES_STEP, '"it first › two", "it third"'),
             Action::VERIFY_STEP,
         ],
     ],

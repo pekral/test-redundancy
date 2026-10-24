@@ -264,7 +264,8 @@ test lacks.
   order of their keys differ in `differsBy`, and the candidate is `review`, not `delete`. The order is input when the
   test reads the array in order, for example in a `foreach` that inserts records. A key that no token names, such as a
   variable, and an item without a key add nothing. A test whose keys are a part of the keys of its covering test, in the
-  same order, has no order token the covering test lacks. The order tokens of the covering test are never listed in
+  same order, has no order token the covering test lacks. An order token of a key that the covering test lacks is not
+  listed either, because that key is listed already. The order tokens of the covering test are never listed in
   `coveringDiffersBy`, because the keys that cause them are listed already.
 - **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
   too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
