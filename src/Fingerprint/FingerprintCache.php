@@ -12,6 +12,9 @@ final class FingerprintCache
     /** @var array<string, array<string, array<string, int>>> */
     private array $byFile = [];
 
+    /** @var array<string, array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>> */
+    private array $sharedByFile = [];
+
     public function __construct(private readonly string $projectRoot)
     {
     }
@@ -49,7 +52,24 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']);
+        return $tokens === null ? null : array_values(array_filter(
+            $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']),
+            static fn (string $token): bool => !KeyOrders::isToken($token),
+        ));
+    }
+
+    public function sharedDataset(string $testKey): ?SharedDataset
+    {
+        $file = TestKey::file($testKey);
+        $path = $this->projectRoot . DIRECTORY_SEPARATOR . $file;
+
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $this->sharedByFile[$file] ??= ContractFingerprints::sharedDatasets($path);
+
+        return $this->sharedByFile[$file][TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;
     }
 
     public function assertsNothing(string $testKey): bool

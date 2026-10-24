@@ -14,6 +14,12 @@ enum Action: string
 
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
+    public const string CONFIRM_STEP = 'Confirm that %s together assert the same input and result.';
+
+    public const string SHARED_DATASET_STEP = 'This row belongs to the named dataset "%s", which these tests also use: %s. '
+        . 'Deleting the row deletes it from each of them. '
+        . 'Delete the row only when each of them stays covered without it; otherwise keep it, or give this test its own dataset.';
+
     public const string UNION_ONLY_LINES_STEP = 'No single covering test runs every line of this test: '
         . 'the lines in unionOnlyLines run only in the union of %s. '
         . 'Check whether a covering test that runs those lines asserts what this test asserts about them; '
@@ -50,7 +56,7 @@ enum Action: string
         return [
             ...match ($this) {
                 self::Delete => [
-                    sprintf('Confirm that %s together assert the same input and result.', $coveringTests),
+                    sprintf(self::CONFIRM_STEP, $coveringTests),
                     'Delete this test.',
                 ],
                 self::MergeIntoDataset => [

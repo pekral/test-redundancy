@@ -154,7 +154,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). The `review` steps name them. Empty for every other candidate. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
@@ -184,6 +184,11 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   action is `review`, and the steps ask whether the empty or missing input is a case of its own. An assertion and a
   value or key passed only to an assertion do not count, so a covering test that only asserts more about the same input
   still leaves the candidate `delete`.
+- **No other test uses the dataset.** A row of a named Pest dataset, `dataset('name', …)`, that another test of the
+  same file also uses with `->with('name')` cannot be deleted for one test: deleting the row removes it from every
+  test that uses the dataset. Such a row is `review`, not `delete`, and the first step names the dataset and the other
+  tests. The same step comes first for every other action of such a row. A named dataset defined in another file is
+  not parsed, so its rows are not checked.
 
 `merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
 only in data from one test of the same file. When that test has a call, function or `new` expression that the
@@ -252,6 +257,15 @@ test lacks.
   `in:value:'enabled'/value:false` for `$options = ['enabled' => false]` that the test never passes on, so the same
   literal under another key, or in a list without a key, is a different token. A map passed to a call also carries the
   call and the argument position (see *Call arguments*).
+- **Order of array keys.** An array with two or more keys also carries one token for each pair of its keys, with the
+  earlier key first: `keys:value:'a'>value:'b'` for `$options = ['a' => 1, 'b' => 2]`, and
+  `in:function:store#0/keys:value:'a'>value:'b'` for `store(['a' => 1, 'b' => 2])`. An array with three keys has three
+  such tokens. The same keys in another order give other tokens, so two dataset rows whose arrays differ only in the
+  order of their keys differ in `differsBy`, and the candidate is `review`, not `delete`. The order is input when the
+  test reads the array in order, for example in a `foreach` that inserts records. A key that no token names, such as a
+  variable, and an item without a key add nothing. A test whose keys are a part of the keys of its covering test, in the
+  same order, has no order token the covering test lacks. The order tokens of the covering test are never listed in
+  `coveringDiffersBy`, because the keys that cause them are listed already.
 - **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
   too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
 - **Lists.** A non-empty array literal whose elements have no key, and none of which unpacks an array with `...`,

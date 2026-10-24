@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The order of the keys of an array literal is part of its fingerprint. An array with two or more keys has one token
+  for each pair of its keys, the earlier key first, e.g. `in:function:store#0/keys:value:'a'>value:'b'` for
+  `store(['a' => 1, 'b' => 2])`. Two dataset rows that pass the same array with the keys in another order differ in
+  `differsBy`, so such a row is no longer reported with the action `delete`. The order tokens of the covering test are
+  not listed in `coveringDiffersBy`. Every array with two or more keys gets new tokens (#87).
+- A row of a named dataset (`dataset('name', …)`) that another test of the same file also uses with `->with('name')` is
+  `review`, not `delete`, because deleting the row removes it from every test that uses the dataset. The first step
+  names the dataset and the other tests, and it is the first step of every other action of such a row too (#87).
 - The subject of an assertion on a method call carries the receiver of that call. `expect($moment->format('Y-m-d'))`
   has the subject `variable:moment/call:format`, and `expect($interval->applyTo($moment)->format('Y-m-d'))` has
   `call:applyTo/call:format`, so a test that asserts its input is no longer `merge-into-dataset` into a test that

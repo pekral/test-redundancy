@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use JsonSerializable;
+use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Support\TestKey;
 
@@ -24,6 +25,7 @@ final readonly class Candidate implements JsonSerializable
         public ?array $coveringDiffersBy,
         public array $unionOnlyLines,
         public bool $assertsNothing,
+        public ?SharedDataset $sharedDataset = null,
     ) {
     }
 
@@ -46,7 +48,7 @@ final readonly class Candidate implements JsonSerializable
     {
         return match (true) {
             $this->differsBy === null => Action::Review,
-            $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => Action::Delete,
+            $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->deleteOrReviewSharedRow(),
             $this->differsBy === [] => Action::Review,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
@@ -109,10 +111,19 @@ final readonly class Candidate implements JsonSerializable
             return [...$this->missingInputSteps(), Action::VERIFY_STEP];
         }
 
+        if ($this->sharedDataset !== null && $this->addsNoValueOrCall()) {
+            return [
+                $this->sharedDatasetStep($this->sharedDataset),
+                sprintf(Action::CONFIRM_STEP, $this->quoted($this->coveredBy)),
+                Action::VERIFY_STEP,
+            ];
+        }
+
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
         $steps = [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
+            ...($this->sharedDataset === null ? [] : [$this->sharedDatasetStep($this->sharedDataset)]),
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
                 $this->otherCoveringTokens(),
@@ -122,6 +133,16 @@ final readonly class Candidate implements JsonSerializable
         return $this->differsBy === null
             ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
             : $steps;
+    }
+
+    private function deleteOrReviewSharedRow(): Action
+    {
+        return $this->sharedDataset === null ? Action::Delete : Action::Review;
+    }
+
+    private function sharedDatasetStep(SharedDataset $sharedDataset): string
+    {
+        return sprintf(Action::SHARED_DATASET_STEP, $sharedDataset->name, $this->quoted($sharedDataset->otherTests));
     }
 
     /**
@@ -257,7 +278,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function siblingRow(): ?string
     {
-        $test = explode(TestKey::DATASET_SEPARATOR, $this->testCase(), 2)[0];
+        $test = TestKey::withoutDatasetRow($this->testCase());
 
         foreach ($this->coveredBy as $coveringTest) {
             if (str_starts_with($coveringTest, $test . TestKey::DATASET_SEPARATOR)) {

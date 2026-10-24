@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use Pekral\TestRedundancy\Support\TestKey;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Array_;
@@ -41,9 +42,28 @@ final readonly class PestFingerprints
      */
     public static function of(array $statements): array
     {
-        $statements = self::withoutNamespaces($statements);
+        return array_map(static fn (array $test): array => $test['tokens'], self::tests($statements));
+    }
 
-        return new self(self::namedDatasets($statements))->walk($statements, '');
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
+     */
+    public static function sharedDatasets(array $statements): array
+    {
+        $shared = [];
+
+        foreach (self::testsByDataset($statements) as $dataset) {
+            foreach (array_keys($dataset['tests']) as $test) {
+                $otherTests = array_values(array_diff(array_keys($dataset['tests']), [$test]));
+
+                if ($otherTests !== []) {
+                    $shared[$test] = new SharedDataset($dataset['name'], $otherTests);
+                }
+            }
+        }
+
+        return $shared;
     }
 
     /**
@@ -63,7 +83,7 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array<string, int>>
+     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
      */
     private function walk(array $statements, string $prefix): array
     {
@@ -79,7 +99,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array<string, int>>
+     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
      */
     private function expression(Node $expression, string $prefix): array
     {
@@ -94,11 +114,11 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array<string, int>>
+     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
      */
     private function test(Node $expression, string $prefix): array
     {
-        [$call, $datasetRows, $modifierTokens] = $this->unwrapChain($expression);
+        [$call, $datasetRows, $modifierTokens, $dataset] = $this->unwrapChain($expression);
         $description = $call === null ? null : self::functionCall($call, self::TEST_FUNCTIONS);
 
         if ($call === null || $description === null) {
@@ -109,7 +129,7 @@ final readonly class PestFingerprints
         $test = self::argument($call, 1);
 
         return array_map(
-            static fn (array $tokens): array => TokenCollector::sum($tokens, $modifierTokens),
+            static fn (array $tokens): array => ['tokens' => TokenCollector::sum($tokens, $modifierTokens), 'dataset' => $dataset],
             DatasetRows::fingerprints(
                 $prefix . ($isIt ? 'it ' : '') . $description,
                 $test === null ? [] : [$test],
@@ -120,18 +140,21 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array{0: \PhpParser\Node\Expr\FuncCall|null, 1: array<\PhpParser\Node\ArrayItem|null>, 2: array<string, int>}
+     * @return array{0: \PhpParser\Node\Expr\FuncCall|null, 1: array<\PhpParser\Node\ArrayItem|null>, 2: array<string, int>, 3: string|null}
      */
     private function unwrapChain(Node $expression): array
     {
         $datasetRows = [];
         $modifierTokens = [];
+        $dataset = null;
 
         while ($expression instanceof MethodCall) {
             $method = $expression->name instanceof Identifier ? $expression->name->toString() : null;
 
             if ($method === 'with') {
-                $datasetRows = $this->datasetRows(self::argument($expression, 0));
+                $datasetArgument = self::argument($expression, 0);
+                $datasetRows = $this->datasetRows($datasetArgument);
+                $dataset = $this->datasetName($datasetArgument);
             } elseif ($method !== null) {
                 $modifierTokens = TokenCollector::sum(
                     $modifierTokens,
@@ -143,7 +166,7 @@ final readonly class PestFingerprints
             $expression = $expression->var;
         }
 
-        return [$expression instanceof FuncCall ? $expression : null, $datasetRows, $modifierTokens];
+        return [$expression instanceof FuncCall ? $expression : null, $datasetRows, $modifierTokens, $dataset];
     }
 
     /**
@@ -156,6 +179,40 @@ final readonly class PestFingerprints
             $dataset instanceof String_ => $this->namedDatasets[$dataset->value] ?? [],
             default => [],
         };
+    }
+
+    private function datasetName(?Node $dataset): ?string
+    {
+        return $dataset instanceof String_ ? $dataset->value : null;
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
+     */
+    private static function tests(array $statements): array
+    {
+        $statements = self::withoutNamespaces($statements);
+
+        return new self(self::namedDatasets($statements))->walk($statements, '');
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     * @return array<string, array{name: string, tests: array<string, true>}>
+     */
+    private static function testsByDataset(array $statements): array
+    {
+        $datasets = [];
+
+        foreach (self::tests($statements) as $testKey => $test) {
+            if ($test['dataset'] !== null) {
+                $datasets[$test['dataset']] ??= ['name' => $test['dataset'], 'tests' => []];
+                $datasets[$test['dataset']]['tests'][TestKey::withoutDatasetRow($testKey)] = true;
+            }
+        }
+
+        return $datasets;
     }
 
     /**

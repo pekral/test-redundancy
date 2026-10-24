@@ -25,8 +25,7 @@ final readonly class RedundancyAnalyzer
         $analyzedLines = array_merge([], ...array_values($analyzedTests));
         $fixedTests = $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
         $removed = $this->eliminate($analyzedTests, $fixedTests);
-        $kept = array_diff_key($analyzedTests, $removed);
-        $pool = [...$kept, ...$fixedTests];
+        $pool = [...array_diff_key($analyzedTests, $removed), ...$fixedTests];
         $reports = [];
 
         foreach ($testsByFile as $testFile => $tests) {
@@ -42,6 +41,7 @@ final readonly class RedundancyAnalyzer
                     $this->fingerprints->coveringDifference($testKey, $coveredBy),
                     $differsBy === [] ? $this->linesOnlyTheUnionReaches($testKey, $tests[$testKey], $coveredBy, $pool) : [],
                     $this->fingerprints->assertsNothing($testKey),
+                    $this->fingerprints->sharedDataset($testKey),
                 );
             }
 

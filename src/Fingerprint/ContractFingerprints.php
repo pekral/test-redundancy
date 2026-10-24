@@ -18,6 +18,14 @@ final class ContractFingerprints
         return self::fingerprintsOf(self::statements($testFile));
     }
 
+    /**
+     * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
+     */
+    public static function sharedDatasets(string $testFile): array
+    {
+        return PestFingerprints::sharedDatasets(self::statements($testFile));
+    }
+
     public static function declaresSingleTestCase(string $testFile): bool
     {
         if (!is_file($testFile)) {

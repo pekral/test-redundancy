@@ -73,6 +73,16 @@ final class NodeContext
         return $arrayKeys;
     }
 
+    /**
+     * @param array<int, list<string>> $paths
+     */
+    public static function pathPrefix(array $paths, Node $node): string
+    {
+        $path = $paths[spl_object_id($node)] ?? null;
+
+        return $path === null ? '' : 'in:' . implode('/', $path) . '/';
+    }
+
     public static function enumCaseReadBy(Node $node): ?ClassConstFetch
     {
         return $node instanceof PropertyFetch && $node->var instanceof ClassConstFetch ? $node->var : null;
