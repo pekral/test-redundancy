@@ -46,33 +46,13 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
-     * @return array<string, array<string, int>>
+     * @param array<\PhpParser\Node\Stmt> $statements
      */
-    public static function fingerprints(array $tests): array
+    public static function analyse(array $statements): FileFingerprints
     {
-        return array_map(static fn (array $test): array => $test['tokens'], $tests);
-    }
+        $tests = self::tests($statements);
 
-    /**
-     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
-     * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
-     */
-    public static function sharedDatasets(array $tests): array
-    {
-        $shared = [];
-
-        foreach (self::testsByDataset($tests) as $dataset) {
-            foreach (array_keys($dataset['tests']) as $test) {
-                $otherTests = array_values(array_diff(array_keys($dataset['tests']), [$test]));
-
-                if ($otherTests !== []) {
-                    $shared[$test] = new SharedDataset($dataset['name'], $otherTests);
-                }
-            }
-        }
-
-        return $shared;
+        return new FileFingerprints(self::fingerprints($tests), self::sharedDatasets($tests));
     }
 
     /**
@@ -196,10 +176,40 @@ final readonly class PestFingerprints
     }
 
     /**
+     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @return array<string, array<string, int>>
+     */
+    private static function fingerprints(array $tests): array
+    {
+        return array_map(static fn (array $test): array => $test['tokens'], $tests);
+    }
+
+    /**
+     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
+     */
+    private static function sharedDatasets(array $tests): array
+    {
+        $shared = [];
+
+        foreach (self::testsByDataset($tests) as $dataset) {
+            foreach (array_keys($dataset['tests']) as $test) {
+                $otherTests = array_values(array_diff(array_keys($dataset['tests']), [$test]));
+
+                if ($otherTests !== []) {
+                    $shared[$test] = new SharedDataset($dataset['name'], $otherTests);
+                }
+            }
+        }
+
+        return $shared;
+    }
+
+    /**
      * @param array<\PhpParser\Node\Stmt> $statements
      * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
      */
-    public static function tests(array $statements): array
+    private static function tests(array $statements): array
     {
         $statements = self::withoutNamespaces($statements);
 

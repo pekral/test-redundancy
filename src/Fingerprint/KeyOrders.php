@@ -14,8 +14,6 @@ final class KeyOrders
 
     private const string PREFIX = 'keys:';
 
-    private const string KEY_PATTERN = '/^((?:in:.*\/)?)key:(.+)$/';
-
     private const string PATTERN = '/^(in:.*\/)?' . self::PREFIX . '/';
 
     public static function isToken(string $token): bool
@@ -32,8 +30,8 @@ final class KeyOrders
         $keys = [];
 
         foreach ($difference as $token) {
-            if (preg_match(self::KEY_PATTERN, $token, $matches) === 1) {
-                $keys[] = $matches;
+            if (preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token, $matches) === 1) {
+                $keys[] = [$matches[1] ?? '', substr($token, strlen($matches[0]))];
             }
         }
 
@@ -41,8 +39,8 @@ final class KeyOrders
             $difference,
             static fn (string $token): bool => !self::isToken($token) || !array_any(
                 $keys,
-                static fn (array $key): bool => str_starts_with($token, $key[1] . self::PREFIX . $key[2] . '>')
-                    || (str_starts_with($token, $key[1] . self::PREFIX) && str_ends_with($token, '>' . $key[2])),
+                static fn (array $key): bool => str_starts_with($token, $key[0] . self::PREFIX . $key[1] . '>')
+                    || (str_starts_with($token, $key[0] . self::PREFIX) && str_ends_with($token, '>' . $key[1])),
             ),
         ));
     }
