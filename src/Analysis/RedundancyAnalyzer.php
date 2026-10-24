@@ -22,24 +22,17 @@ final readonly class RedundancyAnalyzer
     public function analyze(array $testsByFile, ?CoverageMap $map): array
     {
         $analyzedTests = array_filter(array_merge([], ...array_values($testsByFile)), static fn (array $lines): bool => $lines !== []);
-        $analyzedLines = array_merge([], ...array_values($analyzedTests));
-        $fixedTests = $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
+        $fixedTests = $this->fixedTests($analyzedTests, $testsByFile, $map);
         $removed = $this->eliminate($analyzedTests, $fixedTests);
         $pool = [...array_diff_key($analyzedTests, $removed), ...$fixedTests];
-        $removalRank = array_flip(array_keys($removed));
         $reports = [];
 
         foreach ($testsByFile as $testFile => $tests) {
             $candidates = [];
 
             foreach (array_keys(array_intersect_key($removed, $tests)) as $testKey) {
-                $coverPool = [...$pool, ...array_filter(
-                    array_intersect_key($analyzedTests, $removed),
-                    static fn (array $lines, string $removedKey): bool => $removalRank[$removedKey] > $removalRank[$testKey],
-                    ARRAY_FILTER_USE_BOTH,
-                )];
-                $coveredBy = $this->singleCoverWithoutDifference($testKey, $tests[$testKey], $coverPool)
-                    ?? $this->smallestCover($tests[$testKey], $pool);
+                $coverPool = $this->coverPool($testKey, $analyzedTests, $removed, $pool);
+                $coveredBy = $this->coveredBy($testKey, $tests[$testKey], $coverPool, $pool);
                 $differsBy = $this->fingerprints->difference($testKey, $coveredBy);
                 $candidates[] = new Candidate(
                     $testKey,
@@ -62,6 +55,42 @@ final readonly class RedundancyAnalyzer
         }
 
         return $reports;
+    }
+
+    /**
+     * @param array<string, array<string, true>> $analyzedTests
+     * @param array<string, array<string, array<string, true>>> $testsByFile
+     * @return array<string, array<string, true>>
+     */
+    private function fixedTests(array $analyzedTests, array $testsByFile, ?CoverageMap $map): array
+    {
+        $analyzedLines = array_merge([], ...array_values($analyzedTests));
+
+        return $map?->testsCovering($analyzedLines, array_fill_keys(array_keys($testsByFile), value: true)) ?? [];
+    }
+
+    /**
+     * @param array<string, array<string, true>> $analyzedTests
+     * @param array<string, true> $removed
+     * @param array<string, array<string, true>> $pool
+     * @return array<string, array<string, true>>
+     */
+    private function coverPool(string $testKey, array $analyzedTests, array $removed, array $pool): array
+    {
+        $removedLater = array_slice($removed, array_flip(array_keys($removed))[$testKey] + 1, preserve_keys: true);
+
+        return [...$pool, ...array_intersect_key($analyzedTests, $removedLater)];
+    }
+
+    /**
+     * @param array<string, true> $lines
+     * @param array<string, array<string, true>> $coverPool
+     * @param array<string, array<string, true>> $pool
+     * @return list<string>
+     */
+    private function coveredBy(string $testKey, array $lines, array $coverPool, array $pool): array
+    {
+        return $this->singleCoverWithoutDifference($testKey, $lines, $coverPool) ?? $this->smallestCover($lines, $pool);
     }
 
     /**

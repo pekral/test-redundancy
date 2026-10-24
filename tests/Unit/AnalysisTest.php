@@ -2415,7 +2415,9 @@ it('reports a test that passes the values of a row as delete, covered by that ro
     expect($plain->testCase())->toBe('it matches on the plain birthday field name')
         ->and($plain->coveredBy)->toBe(['it matches the expected number of records for a static date › June 15th'])
         ->and($plain->differsBy)->toBe([])
-        ->and($plain->action())->toBe(Action::Delete);
+        ->and($plain->action())->toBe(Action::Delete)
+        ->and($report->candidates[1]->coveredBy)->toBe(['it matches the expected number of records for a static date › December 25th'])
+        ->and($report->candidates[1]->action())->toBe(Action::ReviewDatasetRow);
 });
 
 it('reports a test that passes the values of a kept row as delete, covered by that row and not by another row', function (): void {
