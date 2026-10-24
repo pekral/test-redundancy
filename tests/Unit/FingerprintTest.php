@@ -219,15 +219,21 @@ it('tells a literal under one array key from the same literal under another key'
         'key:value:\'limit\'' => 1,
     ],
     ],
-    'literal in a list inside a list' => ['store([[1]]);', ['function:store' => 1, 'value:1' => 1]],
+    'literal in a list inside a list' => ['store([[1]]);', ['function:store' => 1, 'in:function:store#0/value:list-item' => 2, 'value:1' => 1]],
     'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
         'function:store' => 1,
+        'in:function:store#0/value:\'tags\'/value:list-item' => 2,
         'in:value:\'tags\'/value:\'a\'' => 1,
         'in:value:\'tags\'/value:\'b\'' => 1,
         'key:value:\'tags\'' => 1,
     ],
     ],
-    'literal in a list without a key' => ['store([false, false]);', ['function:store' => 1, 'in:function:store#0/value:false' => 2]],
+    'literal in a list without a key' => ['store([false, false]);', [
+        'function:store' => 1,
+        'in:function:store#0/value:false' => 2,
+        'in:function:store#0/value:list-item' => 2,
+    ],
+    ],
     'literal under nested keys' => ['store([\'user\' => [\'active\' => true]]);', [
         'function:store' => 1,
         'in:function:store#0/value:\'user\'/value:\'active\'/value:true' => 1,
@@ -274,6 +280,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
     'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
     'literal inside an argument' => ['store([true], 1 + 2);', [
         'function:store' => 1,
+        'in:function:store#0/value:list-item' => 1,
         'in:function:store#0/value:true' => 1,
         'value:1' => 1,
         'value:2' => 1,
@@ -307,11 +314,25 @@ it('carries every enclosing call in the call path of a value', function (string 
 it('counts the token value:[] once per empty array literal, however deeply it is nested', function (string $argument, int $count): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php $tags = ' . $argument . ';');
 
-    expect(TokenCollector::collect($statements))->toBe(['value:[]' => $count]);
+    expect(TokenCollector::collect($statements)['value:[]'])->toBe($count);
 })->with([
     'nested empty array' => ['[[[]]]', 1],
     'one empty array' => ['[]', 1],
     'two empty arrays' => ['[[], []]', 2],
+]);
+
+it('gives a list the number of its items, so a repeated item counts', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'list of one variable read three times' => ['notify([$click, $click, $click]);', [
+        'function:notify' => 1,
+        'in:function:notify#0/value:list-item' => 3,
+    ],
+    ],
+    'list that unpacks another array' => ['notify([...$clicks, $click]);', ['function:notify' => 1]],
+    'map' => ['notify([\'a\' => $click]);', ['function:notify' => 1, 'key:value:\'a\'' => 1]],
 ]);
 
 it('counts how many times a test uses each token', function (): void {
@@ -412,7 +433,7 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable assigned a list with an object and read twice' => [
         '$contacts = [new Contact()]; notify($contacts); notify($contacts);',
-        ['function:notify' => 2, 'new:Contact' => 1],
+        ['function:notify' => 2, 'new:Contact' => 1, 'value:list-item' => 1],
     ],
     'variable assigned a literal once' => ['$email = \'a\'; notify($email);', ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1]],
     'variable assigned a literal twice' => [

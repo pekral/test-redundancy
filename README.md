@@ -232,6 +232,13 @@ test lacks.
   passed to a call also carries the call and the argument position (see *Call arguments*).
 - **Empty arrays.** An empty array literal `[]` carries the token `value:[]`. Under an array key it carries the key path
   too, e.g. `in:value:'tags'/value:[]` for `['tags' => []]`.
+- **Lists.** A non-empty array literal whose elements have no key, and none of which unpacks an array with `...`,
+  carries the token `value:list-item` once per element. The token has the path an element in the place of the list
+  would have, e.g. `in:function:notify#0/value:list-item` counted three times for `notify([$click, $click, $click])`.
+  The length of a list therefore counts even when its elements carry no token, such as a variable whose later reads
+  add no token (see *Local variables*): a test that passes the same item three times in one list lists the token in
+  `differsBy` against a test that passes it once, and is not `delete`. A shorter list adds nothing to `differsBy`,
+  because a token the candidate has fewer times is never listed.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its
@@ -251,7 +258,8 @@ test lacks.
   direct item of an argument: `store([1])` has the token `in:function:store#0/value:1`, but `store([[1]])` has
   `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. So `store([[1]])` does not get the token
   of `store([1])` or `store(1)`, and `store(['tags' => ['a']])` does not get the token of `store(['tags' => 'a'])`. A
-  list passed straight to a call is not visible: `store([1])` has the same token as `store(1)`.
+  list passed straight to a call keeps the token of its element: `store([1])` has the token of `store(1)` and the
+  token of the list (see *Lists*).
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
   method. A literal, constant, empty array, list or map in a row is counted where the test reads that
   parameter: the row `[1, 2, 3]` of `expect(add($first, $second))->toBe($sum)` has the same tokens as

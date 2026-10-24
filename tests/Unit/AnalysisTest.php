@@ -812,11 +812,12 @@ it('asks for a review of a test that passes the code under test a list without a
         ->and(valueAt($candidates, 'it forces the email column even when it is omitted from the subscriber columns'))->toBe([
             'action' => 'review',
             'coveredBy' => ['it loads the subscriber relation with the requested columns'],
-            'coveringDiffersBy' => ['in:call:getByListIdAndLastId#4/value:\'email\''],
+            'coveringDiffersBy' => ['in:call:getByListIdAndLastId#4/value:list-item', 'in:call:getByListIdAndLastId#4/value:\'email\''],
             'differsBy' => [],
             'steps' => [
                 'The covering test "it loads the subscriber relation with the requested columns" passes the values in coveringDiffersBy '
-                    . '(in:call:getByListIdAndLastId#4/value:\'email\') to a call that is not an assertion, and this test does not: '
+                    . '(in:call:getByListIdAndLastId#4/value:list-item, in:call:getByListIdAndLastId#4/value:\'email\') '
+                    . 'to a call that is not an assertion, and this test does not: '
                     . 'without such a value, the code under test gets another input. '
                     . 'Check whether the code under test behaves differently without one of these values, '
                     . 'for example when it adds a missing value itself or falls back to a default; '
@@ -839,7 +840,10 @@ it('asks for a review of a test that passes a list through a local variable or a
         ->and($report->candidates[0]->testCase())->toBe($test)
         ->and($report->candidates[0]->coveredBy)->toBe([$covering])
         ->and($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['in:call:getByListIdAndLastId#4/value:\'email\''])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([
+            'in:call:getByListIdAndLastId#4/value:list-item',
+            'in:call:getByListIdAndLastId#4/value:\'email\'',
+        ])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
     'list in a dataset row' => [
@@ -1037,7 +1041,11 @@ it('does not delete a test whose covering test passes its literal inside a neste
     'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
     'list in a list under a key' => ['[\'a\' => 1]', '[\'a\' => [[1]]]', ['in:function:foo#0/value:\'a\'/value:1']],
     'list under a key' => ['[\'a\' => 1]', '[\'a\' => [1]]', ['in:function:foo#0/value:\'a\'/value:1']],
-    'list under a key against a map' => ['[\'a\' => [1]]', '[\'a\' => 1]', ['in:value:\'a\'/value:1']],
+    'list under a key against a map' => [
+        '[\'a\' => [1]]',
+        '[\'a\' => 1]',
+        ['in:function:foo#0/value:\'a\'/value:list-item', 'in:value:\'a\'/value:1'],
+    ],
     'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/value:\'a\'/value:1']],
 ]);
 
@@ -1551,7 +1559,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it imports three batches in a loop',
         'it imports one batch',
-        ['value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:expect:function:imported/call:toBe#0/value:3'],
+        ['value:list-item', 'value:1', 'value:2', 'value:3', 'loop:call:Batch::import', 'in:expect:function:imported/call:toBe#0/value:3'],
         Action::Review,
     ],
     'two contacts against the one contact of a dataset row the test reads twice' => [
@@ -1754,6 +1762,52 @@ it('asks for a review of a test that differs only in data from a covering test t
             Action::VERIFY_STEP,
         ]);
 });
+
+it('keeps a test that passes the same item several times in one list against a test that passes it once', function (
+    string $source,
+    array $differsBy,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it repeats the item' => ['src/Batch.php:5'], 'it passes the item once' => ['src/Batch.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it repeats the item')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'repeated literal' => [
+        <<<'PHP'
+            <?php
+            it('repeats the item', fn () => expect(uniqueItems(['a', 'a', 'a']))->toBe(['a']));
+            it('passes the item once', fn () => expect(uniqueItems(['a']))->toBe(['a']));
+            PHP,
+        ['in:function:uniqueItems#0/value:list-item', 'in:function:uniqueItems#0/value:\'a\''],
+        Action::MergeIntoDataset,
+    ],
+    'repeated variable' => [
+        <<<'PHP'
+            <?php
+            it('repeats the item', function (): void {
+                $click = new PushClickTokenData('acme', $this->email, 'myapp://product/1', campaignId: 1);
+
+                expect($this->cacheManager->claimUnregistered(collect([$click, $click, $click])))->toHaveCount(1);
+            });
+            it('passes the item once', function (): void {
+                $clicks = collect([new PushClickTokenData('acme', $this->email, 'myapp://product/1', campaignId: 1)]);
+
+                $claimed = $this->cacheManager->claimUnregistered($clicks);
+                $this->cacheManager->releaseClaims($claimed);
+
+                expect($this->cacheManager->claimUnregistered($clicks))->toHaveCount(1);
+            });
+            PHP,
+        ['in:call:claimUnregistered#0/function:collect#0/value:list-item'],
+        Action::Review,
+    ],
+]);
 
 it('counts a skipped file in the summary and leaves it out of the files', function (): void {
     $json = decodedJson((string) json_encode(new AgentReport([
