@@ -40,6 +40,8 @@ final class TokenCollector
 
     private const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#\w+/)(?:value|const):~';
 
+    private const string ARGUMENT_POSITION_PATTERN = '~^in:.*(?:call|function|new):(?:[^/#]*::)?[^/#:]+#\w+/(?=(?:value|const):)~';
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
@@ -83,7 +85,8 @@ final class TokenCollector
 
     public static function argumentPositionOfCodeUnderTest(string $token): ?string
     {
-        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && !self::isAssertion($matches[2]) ? $matches[1] : null;
+        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && !self::isAssertion($matches[2])
+            && preg_match(self::ARGUMENT_POSITION_PATTERN, $token, $position) === 1 ? $position[0] : null;
     }
 
     public static function isAssertionToken(string $token): bool
