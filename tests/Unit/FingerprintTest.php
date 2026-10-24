@@ -107,12 +107,20 @@ it('collects the subject of an assertion in the assertion tokens', function (str
         'value:1' => 1,
     ],
     ],
+    'call on an enum case' => ['expect(Status::Active->label())->toBe(\'Active\');', [
+        'call:label' => 1,
+        'const:Status::Active' => 1,
+        'expect:call:label/call:toBe' => 1,
+        'function:expect' => 1,
+        'in:expect:call:label/call:toBe#0/value:\'Active\'' => 1,
+    ],
+    ],
     'call passed to expect' => ['expect(app(Templates::class)->create())->toBeGreaterThan(0);', [
         'call:create' => 1,
-        'expect:call:create/call:toBeGreaterThan' => 1,
+        'expect:function:app/call:create/call:toBeGreaterThan' => 1,
         'function:app' => 1,
         'function:expect' => 1,
-        'in:expect:call:create/call:toBeGreaterThan#0/value:0' => 1,
+        'in:expect:function:app/call:create/call:toBeGreaterThan#0/value:0' => 1,
         'in:function:app#0/const:Templates::class' => 1,
     ],
     ],
@@ -583,7 +591,7 @@ it('reports what a test asserts beyond the tests that cover it', function (): vo
     $cache = new FingerprintCache($root);
 
     expect($cache->difference('tests/CalculatorTest.php :: it adds two numbers › negative numbers', ['tests/CalculatorTest.php :: it adds one and two']))
-        ->toBe(['in:call:add#0/value:-1', 'in:call:add#1/value:-2', 'in:expect:call:add/call:toBe#0/value:-3'])
+        ->toBe(['in:call:add#0/value:-1', 'in:call:add#1/value:-2', 'in:expect:new:Calculator/call:add/call:toBe#0/value:-3'])
         ->and(
             $cache->difference('tests/CalculatorTest.php :: it adds two numbers › small numbers', ['tests/CalculatorTest.php :: it adds one and two']),
         )->toBe(
