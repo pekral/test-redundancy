@@ -1852,6 +1852,57 @@ it('asks for a review of a test that differs only in data from a covering test t
         ]);
 });
 
+it('asks for a review of a test that differs only in data from a covering test that passes an argument it lacks to a nested call', function (
+    string $source,
+    string $missingArgument,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it stores the short input' => ['src/Store.php:5'], 'it stores the long input' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it stores the short input')
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([$missingArgument])
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(Action::MISSING_ARGUMENT_STEP, '"it stores the long input"', $missingArgument),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
+})->with([
+    'call inside an array passed to a call' => [
+        <<<'PHP'
+            <?php
+            it('stores the short input', fn () => expect(store(make(['a' => inner(3)])))->toBeTrue());
+            it('stores the long input', fn () => expect(store(make(['a' => inner(1, 2)])))->toBeTrue());
+            PHP,
+        'in:function:store#0/function:make#0/value:\'a\'/function:inner#1/value:2',
+    ],
+    'call inside an array passed to a call with a literal argument' => [
+        <<<'PHP'
+            <?php
+            it('stores the short input', function (): void {
+                $this->post('/u', collect(['when' => Carbon::create(2020, 1)]))->assertOk();
+            });
+            it('stores the long input', function (): void {
+                $this->post('/u', collect(['when' => Carbon::create(2021, 1, 15)]))->assertOk();
+            });
+            PHP,
+        'in:call:post#1/function:collect#0/value:\'when\'/call:Carbon::create#2/value:15',
+    ],
+    'call inside a nested array' => [
+        <<<'PHP'
+            <?php
+            it('stores the short input', fn () => expect(store(['a' => make(['b' => inner(3)])]))->toBeTrue());
+            it('stores the long input', fn () => expect(store(['a' => make(['b' => inner(1, 2)])]))->toBeTrue());
+            PHP,
+        'in:function:store#0/value:\'a\'/function:make#0/value:\'b\'/function:inner#1/value:2',
+    ],
+]);
+
 it('keeps a test that passes the same item several times in one list against a test that passes it once', function (
     string $source,
     array $differsBy,
