@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A key that the covering test passes only to an assertion, such as a key of the array `toEqual` expects, is not
+  listed in `coveringDiffersBy` and no longer makes the candidate `review`. A top-level key and a nested key under an
+  assertion are treated the same way: `in:expect:function:build/call:toEqual#0/key:value:'type'` and
+  `in:expect:function:build/call:toEqual#0/value:'properties'/key:value:'senderMail'` both count as passed to the
+  assertion. Before, every such key was listed for a test with an assertion and for a `merge-into-dataset` candidate,
+  and a top-level key was listed for a test without an assertion. In the variants case of #71, `coveringDiffersBy`
+  then named `in:expect:…/call:toEqual#0/value:'properties'/key:value:'variants'` next to the input key (#79).
 - An enum case read through `->value` inside a call argument carries the path of the argument, like any other argument
   value, and its token names the property it reads:
   `$this->post('/import', ['default_type' => CouponType::FIXED->value])` has the token

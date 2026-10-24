@@ -772,7 +772,6 @@ it('asks for a review of a dataset row that omits an array key its covering row 
         [
             'in:function:buildPipelineAction#0/value:\'properties\'/key:value:\'variants\'',
             'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\'',
-            'in:expect:function:buildPipelineAction/call:toEqual#0/value:\'properties\'/key:value:\'variants\'',
         ],
     ],
     'multicast pipeline without the parallel flag' => [
@@ -1190,6 +1189,59 @@ it('still deletes a test whose covering test passes a value it lacks only to an 
         'it adds one and two',
         ['expect:function:add/call:toBe', 'in:expect:function:add/call:toBe#0/value:3'],
     ],
+    'pest expectation of an array with a top-level and a nested key' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('builds a mail action', function (): void {
+                    expect(build('mail'))->toBeArray();
+                });
+                it('builds the shape of a mail action', function (): void {
+                    expect(build('mail'))->toBeArray()->toEqual(['type' => 'mail', 'properties' => ['senderMail' => 'a@example.com']]);
+                });
+                PHP,
+            linesByTest: [
+                'it builds a mail action' => ['src/Builder.php:5'],
+                'it builds the shape of a mail action' => ['src/Builder.php:5', 'src/Builder.php:6'],
+            ],
+        ),
+        'it builds a mail action',
+        [
+            'expect:function:build/call:toEqual',
+            'in:expect:function:build/call:toEqual#0/key:value:\'type\'',
+            'in:expect:function:build/call:toEqual#0/value:\'type\'/value:\'mail\'',
+            'in:expect:function:build/call:toEqual#0/key:value:\'properties\'',
+            'in:expect:function:build/call:toEqual#0/value:\'properties\'/key:value:\'senderMail\'',
+            'in:expect:function:build/call:toEqual#0/value:\'properties\'/value:\'senderMail\'/value:\'a@example.com\'',
+        ],
+    ],
+    'pest expectation of an array with a top-level and a nested key for a test without an assertion' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: <<<'PHP'
+                <?php
+                it('builds a mail action without an error', function (): void {
+                    build('mail');
+                });
+                it('builds the shape of a mail action', function (): void {
+                    expect(build('mail'))->toEqual(['type' => 'mail', 'properties' => ['senderMail' => 'a@example.com']]);
+                });
+                PHP,
+            linesByTest: [
+                'it builds a mail action without an error' => ['src/Builder.php:5'],
+                'it builds the shape of a mail action' => ['src/Builder.php:5', 'src/Builder.php:6'],
+            ],
+        ),
+        'it builds a mail action without an error',
+        [
+            'expect:function:build/call:toEqual',
+            'function:expect',
+            'in:expect:function:build/call:toEqual#0/key:value:\'type\'',
+            'in:expect:function:build/call:toEqual#0/value:\'type\'/value:\'mail\'',
+            'in:expect:function:build/call:toEqual#0/key:value:\'properties\'',
+            'in:expect:function:build/call:toEqual#0/value:\'properties\'/key:value:\'senderMail\'',
+            'in:expect:function:build/call:toEqual#0/value:\'properties\'/value:\'senderMail\'/value:\'a@example.com\'',
+        ],
+    ],
     'phpunit assertion' => [
         fn (): FileReport => analyzeTokenTest(
             source: <<<'PHP'
@@ -1342,6 +1394,34 @@ it('asks to merge a test whose literal arguments its covering test passes at swa
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:store#0/value:true', 'in:function:store#1/value:false'])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('asks to merge a test whose covering test sets an array key it lacks only in an assertion', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('builds an sms action', function (): void {
+                expect(build('sms'))->toEqual(['type' => 'sms']);
+            });
+            it('builds a mail action', function (): void {
+                expect(build('mail'))->toEqual(['type' => 'mail', 'properties' => ['senderMail' => 'a@example.com']]);
+            });
+            PHP,
+        linesByTest: [
+            'it builds an sms action' => ['src/Builder.php:5'],
+            'it builds a mail action' => ['src/Builder.php:5', 'src/Builder.php:6'],
+        ],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it builds an sms action')
+        ->and(valueAt($json, 'differsBy'))->toBe([
+            'in:function:build#0/value:\'sms\'',
+            'in:expect:function:build/call:toEqual#0/value:\'type\'/value:\'sms\'',
+        ])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 });
 
 it('asks to merge a test that passes an enum value to the argument its covering test passes another value to', function (

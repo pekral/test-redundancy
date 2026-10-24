@@ -170,7 +170,8 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   `coveredBy` tests reaches some lines, they are listed in `unionOnlyLines` and the action is `review`.
 - **No missing array key.** The covering test sets no array key, or sets no key more times, that the candidate lacks.
   A missing key is another input shape, so the `key:` tokens are listed in `coveringDiffersBy` and the action is
-  `review`.
+  `review`. A key passed only to an assertion, such as a key of the array `toEqual` expects, does not count, whether
+  it is a top-level key of that array or a key nested in it.
 - **No missing argument value.** The covering test passes no value, or passes no value more times, to a call that is
   not an assertion, such as an argument of the code under test (`in:call:getByListIdAndLastId#4/value:'email'`). A
   missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `review`. A
@@ -181,7 +182,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   value that the candidate lacks, such as `function:createDomain` for a record it creates before the call under test,
   the candidate can be the only test of an empty or missing input. The tokens are listed in `coveringDiffersBy`, the
   action is `review`, and the steps ask whether the empty or missing input is a case of its own. An assertion and a
-  value passed only to an assertion do not count, so a covering test that only asserts more about the same input
+  value or key passed only to an assertion do not count, so a covering test that only asserts more about the same input
   still leaves the candidate `delete`.
 
 `merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
@@ -194,7 +195,8 @@ and the steps ask whether the code under test reads one of these keys. A key nes
 already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
-`merge-into-dataset`. When that test passes an argument at a position where `differsBy` lists no value, such as
+`merge-into-dataset`. A key that test passes only to an assertion does not count either, because it is not input to
+the code under test. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
 action is `review`, and the steps ask whether the code under test behaves differently without one of these values. A
