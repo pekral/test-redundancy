@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-24
+
 ### Fixed
 
 - An enum case read through `->value` or `->name` as an array key inside a call argument keeps the call path and the
@@ -250,7 +252,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.3...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.4...HEAD
+[0.1.4]: https://github.com/pekral/test-redundancy/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/pekral/test-redundancy/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/pekral/test-redundancy/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/pekral/test-redundancy/compare/0.1...0.1.1
