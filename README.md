@@ -340,11 +340,12 @@ test lacks.
   `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
   `items:['id' => 1]>['id' => 2]` for two rows of a dataset. That source code is normalized: the quotes of a string,
   the base of an integer, the case of a constant and a comment do not change it, so `["id" => 0x10]` and
-  `['id' => 16]` are the same element. A variable and a closure add nothing. When `differsBy` lists a value, a
-  constant or a key, the order tokens of the lists are not listed, because the element that changes the order is
-  listed already. So a test whose list has another or an extra element of any kind stays `merge-into-dataset`, and a
-  test whose list differs only in the order of its elements is `review`. The order tokens of the covering test are
-  never listed in `coveringDiffersBy`.
+  `['id' => 16]` are the same element. A variable and a closure add nothing. `differsBy` lists an order token only
+  when the covering test has the same two elements in the other order. The order token of an element that the
+  covering test lacks is not listed, because that element is listed already. So a test whose list has another or an
+  extra element of any kind stays `merge-into-dataset`, and a test that swaps elements the covering test also has is
+  `review`, also when another value differs. The order tokens of the covering test are never listed in
+  `coveringDiffersBy`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its

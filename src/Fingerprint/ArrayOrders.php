@@ -34,14 +34,11 @@ final class ArrayOrders
 
     /**
      * @param list<string> $difference
+     * @param array<string, int> $covering
      * @return list<string>
      */
-    public static function withoutImplied(array $difference): array
+    public static function withoutImplied(array $difference, array $covering): array
     {
-        $listsData = array_any(
-            $difference,
-            static fn (string $token): bool => !self::isToken($token) && preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1,
-        );
         $keys = [];
 
         foreach ($difference as $token) {
@@ -52,14 +49,18 @@ final class ArrayOrders
 
         return array_values(array_filter(
             $difference,
-            static fn (string $token): bool => match (self::prefixOf($token)) {
-                null => true,
-                self::ITEMS_PREFIX => !$listsData,
-                default => !array_any(
-                    $keys,
-                    static fn (array $key): bool => str_starts_with($token, $key[0] . $key[1] . '>')
-                        || (str_starts_with($token, $key[0]) && str_ends_with($token, '>' . $key[1])),
-                ),
+            static function (string $token) use ($keys, $covering): bool {
+                $prefix = self::prefixOf($token);
+
+                return match (true) {
+                    $prefix === null => true,
+                    str_ends_with($prefix, self::ITEMS_PREFIX) => self::isReversedIn($prefix, substr($token, strlen($prefix)), $covering),
+                    default => !array_any(
+                        $keys,
+                        static fn (array $key): bool => str_starts_with($token, $key[0] . $key[1] . '>')
+                            || (str_starts_with($token, $key[0]) && str_ends_with($token, '>' . $key[1])),
+                    ),
+                };
             },
         ));
     }
@@ -132,9 +133,20 @@ final class ArrayOrders
         })->traverse([$element]));
     }
 
+    /**
+     * @param array<string, int> $covering
+     */
+    private static function isReversedIn(string $prefix, string $pair, array $covering): bool
+    {
+        return array_any(
+            array_keys(str_split($pair), '>', strict: true),
+            static fn (int $position): bool => isset($covering[$prefix . substr($pair, $position + 1) . '>' . substr($pair, 0, $position)]),
+        );
+    }
+
     private static function prefixOf(string $token): ?string
     {
-        return preg_match(self::PATTERN, $token, $matches) === 1 ? $matches[1] : null;
+        return preg_match(self::PATTERN, $token, $matches) === 1 ? $matches[0] : null;
     }
 
     private static function isComposite(Expr $element): bool

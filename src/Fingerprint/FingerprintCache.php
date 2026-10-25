@@ -31,7 +31,7 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $difference = ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering));
+            $difference = ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering);
 
             if ($smallest === null || count($difference) < count($smallest)) {
                 $smallest = $difference;
