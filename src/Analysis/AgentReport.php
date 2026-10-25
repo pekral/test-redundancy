@@ -15,6 +15,8 @@ final readonly class AgentReport implements JsonSerializable
         'All candidates of one file can be removed together without losing a covered line.',
         Action::VERIFY_STEP . ' It lists every source line no test covers any more; restore the test that covered it.',
         'testsWithoutSourceLines run no line under the configured source paths; check what they test.',
+        'failedTests failed in the coverage run. The analysis leaves them out: none is a candidate or a covering test. '
+        . 'Fix them and run analyse again; the exit code is 1 while a test fails.',
         'A non-null summary.staleMap means the coverage map is out of date: run vendor/bin/test-redundancy map first.',
     ];
 
@@ -57,6 +59,7 @@ final readonly class AgentReport implements JsonSerializable
         return [
             'byAction' => $byAction,
             'candidates' => count($candidates),
+            'failedTests' => array_sum(array_map(static fn (FileReport $report): int => count($report->failedTests), $this->reports)),
             'seconds' => $this->seconds,
             'skippedFiles' => count(array_filter($this->reports, static fn (FileReport $report): bool => $report->skipped)),
             'staleMap' => $this->staleMap,

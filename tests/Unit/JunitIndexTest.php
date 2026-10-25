@@ -2,6 +2,7 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Configuration;
 use Pekral\TestRedundancy\Coverage\CoverageReader;
 use Pekral\TestRedundancy\Coverage\JunitIndex;
 
@@ -84,5 +85,82 @@ it('sums the test case time per test file', function (): void {
 
     expect($index->secondsByFile())->toBe(['tests/FooTest.php' => 1.75, 'tests/BarTest.php' => 2.0]);
 
+    removeDirectory($root);
+});
+
+it('reads the failure message of a failed or errored test case without its title', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    $index = junitIndex(<<<'XML'
+        <testsuites>
+            <testcase name="it fails" file="tests/FooTest.php::it fails" class="P">
+                <failure type="PHPUnit\Framework\ExpectationFailedException">it failsFailed asserting that 2 is identical to 3.
+        at tests/FooTest.php:4</failure>
+            </testcase>
+            <testcase name="testErrors with data set #1" file="tests/FooTest.php" class="Tests\FooTest">
+                <error type="Error">Tests\FooTest::testErrors with data set #1
+        List not found!</error>
+            </testcase>
+            <testcase name="testUntitled" file="tests/FooTest.php" class="Tests\FooTest">
+                <failure type="Error">Something else</failure>
+            </testcase>
+            <testcase name="it passes" file="tests/FooTest.php::it passes" class="P"/>
+        </testsuites>
+        XML, $root);
+
+    expect($index->failureByTestId())->toBe([
+        'P::it fails' => "Failed asserting that 2 is identical to 3.\nat tests/FooTest.php:4",
+        'Tests\FooTest::testErrors with data set #1' => 'List not found!',
+        'Tests\FooTest::testUntitled' => 'Something else',
+    ])->and($index->testsWithoutCoverage([]))->toBe(['tests/FooTest.php :: it passes']);
+
+    removeDirectory($root);
+});
+
+it('reports a failed test case by the key of the coverage report', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    $index = junitIndex(<<<'XML'
+        <testsuites>
+            <testcase name="it rows with data set &quot;dataset &quot;bad row&quot;&quot;" file="tests/FooTest.php::it rows" class="P">
+                <failure type="Error">failed</failure>
+            </testcase>
+            <testcase name="it rows with data set &quot;(1, 1, 5)&quot;" file="tests/FooTest.php::it rows" class="P">
+                <failure type="Error">failed too</failure>
+            </testcase>
+            <testcase name="it rows with data set &quot;dataset &quot;good row&quot;&quot;" file="tests/FooTest.php::it rows" class="P"/>
+        </testsuites>
+        XML, $root);
+
+    expect(new CoverageReader(Configuration::load($root))->failedTests($index))->toBe([
+        'tests/FooTest.php :: it rows › bad row' => 'failed',
+        'tests/FooTest.php :: it rows › (1, 1, 5)' => 'failed too',
+    ])->and(CoverageReader::testKeyOf('P::__pest_evaluable_it_rows#dataset "bad row"', $index))
+        ->toBe('tests/FooTest.php :: it rows › bad row');
+
+    removeDirectory($root);
+});
+
+it('leaves a failed test case out of the lines and does not count it as a test without coverage', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    $index = junitIndex(<<<'XML'
+        <testsuites>
+            <testcase name="it fails" file="tests/FooTest.php::it fails" class="P"><failure type="Error">failed</failure></testcase>
+            <testcase name="it is fine" file="tests/FooTest.php::it is fine" class="P"/>
+        </testsuites>
+        XML, $root);
+    $coverage = (string) tempnam(sys_get_temp_dir(), 'coverage');
+    file_put_contents($coverage, '<?php return new SebastianBergmann\CodeCoverage\CodeCoverage('
+        . '(new SebastianBergmann\CodeCoverage\Driver\Selector())->forLineCoverage(new SebastianBergmann\CodeCoverage\Filter()), '
+        . 'new SebastianBergmann\CodeCoverage\Filter());');
+
+    expect(new CoverageReader(Configuration::load($root))->linesByTest($coverage, $index))
+        ->toBe(['tests/FooTest.php :: it is fine' => []]);
+
+    unlink($coverage);
     removeDirectory($root);
 });

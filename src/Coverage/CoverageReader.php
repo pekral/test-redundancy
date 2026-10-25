@@ -37,11 +37,29 @@ final readonly class CoverageReader
             $linesByTest[$testKey] = ($linesByTest[$testKey] ?? []) + $lines;
         }
 
+        $linesByTest = array_diff_key($linesByTest, $this->failedTests($junit));
+
         foreach ($junit->testsWithoutCoverage(array_keys($linesByTest)) as $testKey) {
             $linesByTest[$testKey] = [];
         }
 
         return $linesByTest;
+    }
+
+    /**
+     * The failure message of every failed or errored test case, by test key.
+     *
+     * @return array<string, string>
+     */
+    public function failedTests(JunitIndex $junit): array
+    {
+        $failedTests = [];
+
+        foreach ($junit->failureByTestId() as $testId => $message) {
+            $failedTests[self::testKeyOf($testId, $junit)] = $message;
+        }
+
+        return $failedTests;
     }
 
     public static function testKeyOf(string $testId, JunitIndex $junit): string
@@ -154,7 +172,7 @@ final readonly class CoverageReader
             return [$method, null];
         }
 
-        return [$matches[1], trim((string) preg_replace('/^dataset\s*/', '', $matches[2]), '"')];
+        return [$matches[1], trim((string) preg_replace('/^"?dataset\s*/', '', $matches[2]), '"')];
     }
 
 }

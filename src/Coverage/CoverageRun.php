@@ -20,23 +20,45 @@ final readonly class CoverageRun
     }
 
     /**
+     * A test case that fails aborts the run.
+     *
      * @param list<string> $paths
      * @return array<string, array<string, true>>
      */
     public function linesByTest(array $paths): array
     {
+        return $this->runGroups($this->groups($paths), tolerateFailedTests: false)['linesByTest'];
+    }
+
+    /**
+     * A test case that fails is left out of the lines and listed with its failure message in "failedTests".
+     *
+     * @param list<string> $paths
+     * @return array{linesByTest: array<string, array<string, true>>, failedTests: array<string, string>}
+     */
+    public function run(array $paths): array
+    {
+        return $this->runGroups($this->groups($paths), tolerateFailedTests: true);
+    }
+
+    /**
+     * @param list<string> $paths
+     * @return list<array{0: list<string>, 1: bool, 2: array<string, string>}>
+     */
+    private function groups(array $paths): array
+    {
         if (count($paths) === 1) {
-            return $this->runGroups([[$paths, true, $this->configuration->environment]]);
+            return [[$paths, true, $this->configuration->environment]];
         }
 
         $groups = TestDurations::load($this->configuration->absoluteDurationsPath())
             ->split($paths, min(count($paths), $this->configuration->processes));
 
-        return $this->runGroups(array_map(
+        return array_map(
             fn (array $group, int $token): array => [$group, false, $this->workerEnvironment($token + 1)],
             $groups,
             array_keys($groups),
-        ));
+        );
     }
 
     /**
@@ -49,9 +71,9 @@ final readonly class CoverageRun
 
     /**
      * @param list<array{0: list<string>, 1: bool, 2: array<string, string>}> $groups
-     * @return array<string, array<string, true>>
+     * @return array{linesByTest: array<string, array<string, true>>, failedTests: array<string, string>}
      */
-    private function runGroups(array $groups): array
+    private function runGroups(array $groups, bool $tolerateFailedTests): array
     {
         $runs = [];
 
@@ -60,22 +82,28 @@ final readonly class CoverageRun
                 $runs[] = $this->start($paths, $parallel, $environment);
             }
 
+            $reader = new CoverageReader($this->configuration);
             $linesByTest = [];
+            $failedTests = [];
             $secondsByFile = [];
 
             foreach ($runs as [$process, $coverageFile, $junitFile]) {
-                if ($process->wait() !== 0) {
+                $exitCode = $process->wait();
+                $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
+                $groupFailedTests = $reader->failedTests($junit);
+
+                if ($exitCode !== 0 && !($tolerateFailedTests && $groupFailedTests !== [] && filesize($coverageFile) > 0)) {
                     throw new ProcessFailedException($process);
                 }
 
-                $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
-                $linesByTest = [...$linesByTest, ...new CoverageReader($this->configuration)->linesByTest($coverageFile, $junit)];
+                $linesByTest = [...$linesByTest, ...$reader->linesByTest($coverageFile, $junit)];
+                $failedTests = [...$failedTests, ...$groupFailedTests];
                 $secondsByFile = [...$secondsByFile, ...$junit->secondsByFile()];
             }
 
             $this->recordDurations($secondsByFile);
 
-            return $linesByTest;
+            return ['linesByTest' => $linesByTest, 'failedTests' => $failedTests];
         } finally {
             foreach ($runs as [$process, $coverageFile, $junitFile]) {
                 $process->stop();

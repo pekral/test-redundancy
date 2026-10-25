@@ -125,6 +125,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
         }
       ],
       "coveredLines": 4,
+      "failedTests": [],
       "file": "tests/CalculatorTest.php",
       "testCases": 6,
       "testsWithoutSourceLines": []
@@ -133,6 +134,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
   "summary": {
     "byAction": { "delete": 1, "merge-into-dataset": 1, "review-dataset-row": 1, "review": 0 },
     "candidates": 3,
+    "failedTests": 0,
     "seconds": 0,
     "skippedFiles": 1,
     "staleMap": null,
@@ -147,7 +149,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 
 | Field | Meaning |
 | --- | --- |
-| `files` | Only the files with a candidate or a test without source lines. `summary.testFiles` counts every analysed file, and `summary.testCases` every test case, a skipped file included. |
+| `files` | Only the files with a candidate, a test without source lines or a failed test. `summary.testFiles` counts every analysed file, and `summary.testCases` every test case, a skipped file included. |
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. A single test that runs every line of the candidate and has an empty `differsBy` is preferred, so a test that passes the values of a dataset row is covered by that row, and the action is `delete`. That preferred single test can be a kept test, or a candidate that this report removes after this one. The action of that candidate then decides whether the shared input stays. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
@@ -156,10 +158,24 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
+| `failedTests` | The test cases that failed in the coverage run, each as `{"test": …, "message": …}` with the failure message. The analysis leaves them out: a failed test case is never a candidate and never a covering test, and it is not counted in `testCases`. See [Failed tests](#failed-tests). |
+| `summary.failedTests` | The number of failed test cases in the report. |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
 | `summary.skippedFiles` | The number of test files `analyse` did not run, because each declares one test case and no dataset — see [Test files with a single test case](#test-files-with-a-single-test-case). They count in `summary.testFiles` and `summary.testCases` as one test case each and have no candidate. |
 | `workflow` | The rules an agent follows for the whole report. |
+
+### Failed tests
+
+A failing test case does not discard the run. `analyse` leaves every failed or errored test case out of the analysis, so
+it is never a candidate and never a covering test. Leaving out a covering test can only remove candidates, so the
+result stays safe. The JSON report lists each of them with its failure message in `failedTests`, and the text format
+prints a `Failed tests` list for the file. The coverage of every other test case is complete, and the measured durations
+of every worker group that finished are stored for the next run.
+
+`analyse` exits with `1` while a test case fails, so CI still notices it. Fix the failed tests and run `analyse` again
+to include them. A process that ends without a coverage file or a JUnit log, such as a fatal error or a timeout, still
+aborts the run. `map` and `verify` still abort when a test case fails.
 
 ### When a candidate is `review`, not `delete`
 

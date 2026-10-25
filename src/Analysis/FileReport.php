@@ -12,6 +12,7 @@ final readonly class FileReport implements JsonSerializable
     /**
      * @param list<\Pekral\TestRedundancy\Analysis\Candidate> $candidates
      * @param list<string> $testsWithoutSourceLines
+     * @param array<string, string> $failedTests the failure message by the test case that failed and is left out of the analysis
      */
     public function __construct(
         public string $testFile,
@@ -20,6 +21,7 @@ final readonly class FileReport implements JsonSerializable
         public array $candidates,
         public array $testsWithoutSourceLines,
         public bool $skipped = false,
+        public array $failedTests = [],
     ) {
     }
 
@@ -30,13 +32,14 @@ final readonly class FileReport implements JsonSerializable
 
     public function hasFindings(): bool
     {
-        return $this->candidates !== [] || $this->testsWithoutSourceLines !== [];
+        return $this->candidates !== [] || $this->testsWithoutSourceLines !== [] || $this->failedTests !== [];
     }
 
     /**
      * @return array{
      *     candidates: list<\Pekral\TestRedundancy\Analysis\Candidate>,
      *     coveredLines: int,
+     *     failedTests: list<array{message: string, test: string}>,
      *     file: string,
      *     testCases: int,
      *     testsWithoutSourceLines: list<string>,
@@ -47,6 +50,11 @@ final readonly class FileReport implements JsonSerializable
         return [
             'candidates' => $this->candidates,
             'coveredLines' => $this->coveredLines,
+            'failedTests' => array_map(
+                static fn (string $test, string $message): array => ['message' => $message, 'test' => $test],
+                array_keys($this->failedTests),
+                $this->failedTests,
+            ),
             'file' => $this->testFile,
             'testCases' => $this->testCases,
             'testsWithoutSourceLines' => $this->testsWithoutSourceLines,

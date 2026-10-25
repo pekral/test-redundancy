@@ -17,9 +17,10 @@ final readonly class RedundancyAnalyzer
 
     /**
      * @param array<string, array<string, array<string, true>>> $testsByFile
+     * @param array<string, string> $failedTests the failure message by the key of every test case left out of the analysis
      * @return list<\Pekral\TestRedundancy\Analysis\FileReport>
      */
-    public function analyze(array $testsByFile, ?CoverageMap $map): array
+    public function analyze(array $testsByFile, ?CoverageMap $map, array $failedTests = []): array
     {
         $analyzedTests = array_filter(array_merge([], ...array_values($testsByFile)), static fn (array $lines): bool => $lines !== []);
         $fixedTests = $this->fixedTests($analyzedTests, $testsByFile, $map);
@@ -45,16 +46,44 @@ final readonly class RedundancyAnalyzer
                 );
             }
 
-            $reports[] = new FileReport(
-                $testFile,
-                count($tests),
-                count(array_merge([], ...array_values($tests))),
-                $candidates,
-                array_map(TestKey::testCase(...), array_keys(array_filter($tests, static fn (array $lines): bool => $lines === []))),
-            );
+            $reports[] = $this->fileReport($testFile, $tests, $candidates, $failedTests);
         }
 
         return $reports;
+    }
+
+    /**
+     * @param array<string, array<string, true>> $tests
+     * @param list<\Pekral\TestRedundancy\Analysis\Candidate> $candidates
+     * @param array<string, string> $failedTests
+     */
+    private function fileReport(string $testFile, array $tests, array $candidates, array $failedTests): FileReport
+    {
+        return new FileReport(
+            $testFile,
+            count($tests),
+            count(array_merge([], ...array_values($tests))),
+            $candidates,
+            array_map(TestKey::testCase(...), array_keys(array_filter($tests, static fn (array $lines): bool => $lines === []))),
+            failedTests: $this->failedTestsOf($testFile, $failedTests),
+        );
+    }
+
+    /**
+     * @param array<string, string> $failedTests
+     * @return array<string, string>
+     */
+    private function failedTestsOf(string $testFile, array $failedTests): array
+    {
+        $failedTestsOfFile = [];
+
+        foreach ($failedTests as $testKey => $message) {
+            if (TestKey::file($testKey) === $testFile) {
+                $failedTestsOfFile[TestKey::testCase($testKey)] = $message;
+            }
+        }
+
+        return $failedTestsOfFile;
     }
 
     /**

@@ -196,12 +196,14 @@ it('serializes a candidate and a file report for an agent', function (): void {
         'byAction' => ['delete' => 0, 'merge-into-dataset' => 0, 'review-dataset-row' => 1, 'review' => 0],
         'seconds' => 4,
         'staleMap' => ['commit' => 'abc123', 'changedSourceFiles' => ['src/Foo.php']],
+        'failedTests' => 0,
     ])->and($json['files'])->toEqual([
         [
             'file' => 'tests/FooTest.php',
             'testCases' => 2,
             'coveredLines' => 5,
             'testsWithoutSourceLines' => [],
+            'failedTests' => [],
             'candidates' => [
                 [
                     'test' => 'it works › empty',
@@ -219,9 +221,10 @@ it('serializes a candidate and a file report for an agent', function (): void {
             'testCases' => 1,
             'coveredLines' => 0,
             'testsWithoutSourceLines' => ['it reads the config'],
+            'failedTests' => [],
             'candidates' => [],
         ],
-    ])->and($json['workflow'])->toHaveCount(6)
+    ])->and($json['workflow'])->toHaveCount(7)
         ->and(valueAt(decodedJson((string) json_encode(candidate('it works', ['it also works'], differsBy: null))), 'steps.0'))->toContain(
             'could not be parsed',
         )
