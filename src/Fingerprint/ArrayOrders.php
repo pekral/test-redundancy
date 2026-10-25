@@ -9,7 +9,12 @@ use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\ConstFetch;
+use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\CloningVisitor;
+use PhpParser\NodeVisitorAbstract;
 use PhpParser\PrettyPrinter\Standard;
 
 final class ArrayOrders
@@ -99,12 +104,29 @@ final class ArrayOrders
     private static function elementOf(ArrayItem $item, array $readProperties): ?array
     {
         if (self::isComposite($item->value)) {
-            return [$item->value, new Standard()->prettyPrintExpr($item->value)];
+            return [$item->value, self::sourceOf($item->value)];
         }
 
         $element = TokenCollector::nameOf($item->value, $readProperties);
 
         return $element !== null && TokenCollector::carriesContract($element[0]) ? $element : null;
+    }
+
+    private static function sourceOf(Expr $element): string
+    {
+        $normalized = new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
+
+            public function leaveNode(Node $node): ?Node
+            {
+                $node->setAttributes([]);
+
+                return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
+            }
+
+        })->traverse([$element])[0];
+        assert($normalized instanceof Expr);
+
+        return new Standard()->prettyPrintExpr($normalized);
     }
 
     private static function isComposite(Expr $element): bool

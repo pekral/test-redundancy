@@ -2959,6 +2959,30 @@ it('keeps a dataset row or a test whose list has its elements in another order t
     ],
 ]);
 
+it('deletes a test whose list of arrays or calls is the list of its covering test written in another form', function (
+    string $list,
+    string $coveringList,
+): void {
+    $report = analyzeTokenTest(
+        source: <<<PHP
+            <?php
+            it('imports the rows', fn () => import({$list}));
+            it('imports the same rows', fn () => import({$coveringList}));
+            PHP,
+        linesByTest: ['it imports the rows' => ['src/Import.php:10'], 'it imports the same rows' => ['src/Import.php:10', 'src/Import.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it imports the rows')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+})->with([
+    'a comment inside a row' => ['[[/* first */ \'id\' => 1], [\'id\' => 2]]', '[[\'id\' => 1], [\'id\' => 2]]'],
+    'a constant in upper case' => ['[new Flag(TRUE), new Flag(false)]', '[new Flag(true), new Flag(false)]'],
+    'a hexadecimal integer' => ['[[\'n\' => 0x10], [\'n\' => 1]]', '[[\'n\' => 16], [\'n\' => 1]]'],
+    'a string in double quotes' => ['[[\'id\' => "a"], [\'id\' => \'b\']]', '[[\'id\' => \'a\'], [\'id\' => \'b\']]'],
+]);
+
 it('keeps the dataset rows that pass the same list in another order than the row that covers them', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
