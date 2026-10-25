@@ -130,10 +130,9 @@ final class OrderTokens
     {
         $expression = $statement instanceof Expression ? $statement->expr : null;
         $call = $expression instanceof Assign ? $expression->expr : $expression;
-        $token = $call instanceof CallLike ? TokenCollector::token($call) : null;
 
         return $call instanceof CallLike
-            && ($token === null || !TokenCollector::isAssertionToken($token))
+            && !NodeContext::isAssertionCall($call)
             && new NodeFinder()->findFirst($call, TokenCollector::isData(...)) !== null
             ? $call
             : null;
