@@ -24,6 +24,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   closure or test method reaches, and the type of that parameter must take the value; otherwise the action is `review`.
   A slot the body hard-codes is never row data, also in a list that the body builds around a parameter, such as the `5`
   in `f([$n, 5])` (#95).
+- An assertion keeps the literal arguments of its subject when the test asserts that subject with two or more
+  different argument lists. Before, the subject kept the calls of its chain but not their arguments, so two tests that
+  expect the same values for swapped arguments, such as `$mapping->get(1)` → `Column::VALUE` and `$mapping->get(2)` →
+  `Column::MIN_SPEND` against the reverse, had the same assertion tokens. `differsBy` listed only the inputs, and a
+  `merge-into-dataset` row built from it kept the expectations of the covering test, which contradict the candidate.
+  Now each such assertion also has a `bound:` token with the literal arguments of the subject and of the assertion,
+  e.g. `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, also for a named argument such as
+  `pipelineId: 99`. `differsBy` names the assertion that differs, and the candidate is `review` (#96).
 
 ## [0.1.5] - 2026-10-24
 

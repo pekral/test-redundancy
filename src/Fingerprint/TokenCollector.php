@@ -20,7 +20,6 @@ use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
-use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
@@ -34,6 +33,8 @@ final class TokenCollector
     public const string KEY_TOKEN_PATTERN = '/^(in:.*\/)?key:/';
 
     private const string KEY_PREFIX = 'key:';
+
+    private const string BOUND_PREFIX = 'bound:';
 
     private const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#\w+/)'
         . '(?:key:)?(?:value|const):~';
@@ -73,7 +74,11 @@ final class TokenCollector
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
         }
 
-        return self::sum($tokens, KeyOrders::tokens($nodeFinder, $nodes, $paths, $readProperties));
+        return self::sum(
+            $tokens,
+            KeyOrders::tokens($nodeFinder, $nodes, $paths, $readProperties),
+            self::boundAssertions($nodeFinder, $nodes, $assignedValues),
+        );
     }
 
     public static function isData(Node $node): bool
@@ -91,9 +96,34 @@ final class TokenCollector
 
     public static function isAssertionToken(string $token): bool
     {
-        return preg_match(self::DATA_TOKEN_PATTERN, $token) === 1
-            ? preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && self::isAssertion($matches[2])
-            : self::isAssertion(self::calledMethod($token));
+        return match (true) {
+            str_starts_with($token, self::BOUND_PREFIX) => true,
+            preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 => preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
+                && self::isAssertion($matches[2]),
+            default => self::isAssertion(self::calledMethod($token)),
+        };
+    }
+
+    public static function token(Node $node): ?string
+    {
+        return match (true) {
+            $node instanceof Scalar => self::scalar($node, ''),
+            $node instanceof UnaryMinus => $node->expr instanceof Scalar ? self::scalar($node->expr, '-') : null,
+            $node instanceof ConstFetch => 'value:' . $node->name->toLowerString(),
+            $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
+                ? sprintf('const:%s::%s', $node->class->toString(), $node->name->toString())
+                : null,
+            $node instanceof MethodCall, $node instanceof PropertyFetch => $node->name instanceof Identifier
+                ? self::negation($node->var) . 'call:' . $node->name->toString()
+                : null,
+            $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
+                ? sprintf('call:%s::%s', $node->class->toString(), $node->name->toString())
+                : null,
+            $node instanceof FuncCall => $node->name instanceof Name ? 'function:' . $node->name->toString() : null,
+            $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
+            $node instanceof Array_ => self::arrayToken($node),
+            default => null,
+        };
     }
 
     /**
@@ -252,62 +282,51 @@ final class TokenCollector
         return self::listLength($array) > 0 ? 'value:list-item' : 'value:[]';
     }
 
-    private static function token(Node $node): ?string
-    {
-        return match (true) {
-            $node instanceof Scalar => self::scalar($node, ''),
-            $node instanceof UnaryMinus => $node->expr instanceof Scalar ? self::scalar($node->expr, '-') : null,
-            $node instanceof ConstFetch => 'value:' . $node->name->toLowerString(),
-            $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
-                ? sprintf('const:%s::%s', $node->class->toString(), $node->name->toString())
-                : null,
-            $node instanceof MethodCall, $node instanceof PropertyFetch => $node->name instanceof Identifier
-                ? self::negation($node->var) . 'call:' . $node->name->toString()
-                : null,
-            $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
-                ? sprintf('call:%s::%s', $node->class->toString(), $node->name->toString())
-                : null,
-            $node instanceof FuncCall => $node->name instanceof Name ? 'function:' . $node->name->toString() : null,
-            $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
-            $node instanceof Array_ => self::arrayToken($node),
-            default => null,
-        };
-    }
-
     /**
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
      */
     private static function tokenWithSubject(Node $node, array $assignedValues): ?string
     {
         $token = self::token($node);
-        $subjectTokens = $token === null ? [] : array_filter(
-            array_map(self::subjectToken(...), AssertionSubject::candidates($node, self::calledMethod($token), $assignedValues)),
-            static fn (?string $subjectToken): bool => $subjectToken !== null,
-        );
-        $subject = $subjectTokens === [] ? '' : 'expect:' . reset($subjectTokens) . '/';
+        $subject = $token === null ? null : AssertionSubject::of($node, self::calledMethod($token), $assignedValues);
 
-        return $token === null ? null : $subject . $token;
+        return $token === null ? null : ($subject === null ? '' : 'expect:' . AssertionSubject::token($subject) . '/') . $token;
     }
 
-    private static function subjectToken(Expr $subject): ?string
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @return array<string, int>
+     */
+    private static function boundAssertions(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues): array
     {
-        $token = self::subjectPartToken($subject);
-        $receiver = match (true) {
-            !$subject instanceof MethodCall => null,
-            $subject->var instanceof Variable && is_string($subject->var->name) => 'variable:' . $subject->var->name,
-            default => self::subjectPartToken($subject->var),
-        };
+        $assertionsBySubject = [];
 
-        return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
+        foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
+            $token = self::token($node);
+            $subject = $token === null ? null : AssertionSubject::of($node, self::calledMethod($token), $assignedValues);
+
+            if ($token === null || $subject === null) {
+                continue;
+            }
+
+            $boundSubject = (string) AssertionSubject::token($subject, withLiteralArguments: true);
+            $assertionsBySubject[(string) AssertionSubject::token($subject)][] = [
+                $boundSubject,
+                self::BOUND_PREFIX . 'expect:' . $boundSubject . '/' . $token . AssertionSubject::literalArguments($node),
+            ];
+        }
+
+        return self::sum(...array_map(self::boundTokens(...), array_values($assertionsBySubject)));
     }
 
-    private static function subjectPartToken(Expr $part): ?string
+    /**
+     * @param list<array{string, string}> $assertions
+     * @return array<string, int>
+     */
+    private static function boundTokens(array $assertions): array
     {
-        $token = $part instanceof PropertyFetch && $part->name instanceof Identifier
-            ? 'property:' . $part->name->toString()
-            : self::token($part);
-
-        return $token === null || preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 ? null : $token;
+        return count(array_unique(array_column($assertions, 0))) > 1 ? array_count_values(array_column($assertions, 1)) : [];
     }
 
     /**

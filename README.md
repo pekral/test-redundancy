@@ -273,6 +273,16 @@ test lacks.
     `$sum = add(1, 2); expect($sum)->toBe(3);` has the same assertion tokens as `expect(add(1, 2))->toBe(3)`.
   - A literal, a constant, any other variable, a closure and any other expression give no subject. The assertion then
     keeps its token without the prefix, e.g. `call:toBe`.
+  - A test can assert one subject with two or more different literal argument lists, e.g. `$mapping->get(1)` and
+    `$mapping->get(2)`. Then each of these assertions also has a `bound:` token. The token keeps the literal arguments
+    of the subject and of the assertion as `#<position or name>:<literal>`, so each expected value stays bound to its
+    argument. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
+    `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, and
+    `expect($manager->consumePipelineSkip($event, pipelineId: 99))->toBeFalse()` has
+    `bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse`. A `bound:` token is not data,
+    so a candidate that expects the same values for swapped arguments, or another value for the same argument, is
+    `review`. A test that asserts each subject with one argument list has no `bound:` token, because its arguments and
+    its expected values already pair up.
 - **Array keys and values.** An array key carries a `key:` prefix and the path of its array, the same path a literal in
   the array has: `key:value:'x'` for `$options = ['x' => 1]` that the test never passes on,
   `in:function:store#0/key:value:'x'` for `store(['x' => 1])`, and `in:function:store#0/value:'user'/key:value:'x'` for

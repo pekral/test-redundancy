@@ -348,6 +348,97 @@ it('asks for a review of a test whose covering test makes the same assertion on 
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
+it('asks for a review of a test whose covering test expects the same values for swapped literal arguments of the subject', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('maps a large value', function (): void {
+                $mapping = detectColumns(['percentual', '10', '500']);
+                expect($mapping->get(1))->toBe(Column::VALUE)
+                    ->and($mapping->get(2))->toBe(Column::MIN_SPEND);
+            });
+            it('maps a zero value', function (): void {
+                $mapping = detectColumns(['percentual', '0', '50']);
+                expect($mapping->get(1))->toBe(Column::MIN_SPEND)
+                    ->and($mapping->get(2))->toBe(Column::VALUE);
+            });
+            PHP,
+        linesByTest: [
+            'it maps a large value' => ['src/Columns.php:10'],
+            'it maps a zero value' => ['src/Columns.php:10', 'src/Columns.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it maps a large value')
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:function:detectColumns#0/value:\'10\'',
+            'in:function:detectColumns#0/value:\'500\'',
+            'bound:expect:variable:mapping/call:get#0:2/call:toBe#0:Column::MIN_SPEND',
+            'bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE',
+        ])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('asks for a review of a test whose covering test expects its result for a named literal argument under another argument', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('does not skip the event for a different pipeline than the one that produced it', function (): void {
+                $manager = new SkipCacheManager();
+                $manager->storePipelineSkip($event, 42);
+                expect($manager->consumePipelineSkip($event, pipelineId: 99))->toBeFalse()
+                    ->and($manager->consumePipelineSkip($event, 42))->toBeTrue();
+            });
+            it('stores and consumes pipeline skip events once', function (): void {
+                $manager = new SkipCacheManager();
+                $manager->storePipelineSkip($event, 42);
+                expect($manager->consumePipelineSkip($event, 42))->toBeTrue()
+                    ->and($manager->consumePipelineSkip($event, 42))->toBeFalse();
+            });
+            PHP,
+        linesByTest: [
+            'it does not skip the event for a different pipeline than the one that produced it' => ['src/SkipCacheManager.php:10'],
+            'it stores and consumes pipeline skip events once' => ['src/SkipCacheManager.php:10', 'src/SkipCacheManager.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it does not skip the event for a different pipeline than the one that produced it')
+        ->and($report->candidates[0]->differsBy)->toContain(
+            'in:call:consumePipelineSkip#pipelineId/value:99',
+            'bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse',
+        )
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('never lists an assertion bound to the literal arguments of its subject as arrangement for a test without an assertion', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('detects the columns', function (): void {
+                detectColumns(['percentual', '10', '500']);
+            });
+            it('maps every column', function (): void {
+                $mapping = detectColumns(['percentual', '10', '500']);
+                expect($mapping->get(1))->toBe(Column::VALUE)
+                    ->and($mapping->get(2))->toBe(Column::MIN_SPEND);
+            });
+            PHP,
+        linesByTest: [
+            'it detects the columns' => ['src/Columns.php:10'],
+            'it maps every column' => ['src/Columns.php:10', 'src/Columns.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it detects the columns')
+        ->and($report->candidates[0]->coveringTokensForReview())->not->toContain(
+            'bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE',
+            'bound:expect:variable:mapping/call:get#0:2/call:toBe#0:Column::MIN_SPEND',
+        );
+});
+
 it('asks for a review of a test whose covering test makes a call it does not', function (): void {
     $project = temporaryDirectory();
     mkdir($project . '/tests');
