@@ -5,8 +5,12 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 use PhpParser\Node\ArrayItem;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Identifier;
@@ -105,6 +109,59 @@ final class NodeContext
         }
 
         return $loopBodies;
+    }
+
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @return array<int, true>
+     */
+    public static function assertionReads(NodeFinder $nodeFinder, Node|array $nodes): array
+    {
+        $reads = [];
+
+        foreach ($nodeFinder->findInstanceOf($nodes, CallLike::class) as $assertion) {
+            if (!self::isAssertionCall($assertion)) {
+                continue;
+            }
+
+            foreach ($assertion->getRawArgs() as $argument) {
+                $reads += $argument instanceof Arg ? self::readIds($nodeFinder, $argument->value) : [];
+            }
+        }
+
+        return $reads;
+    }
+
+    private static function isAssertionCall(CallLike $call): bool
+    {
+        $token = TokenCollector::token($call);
+
+        return $token !== null && TokenCollector::isAssertionToken($token);
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private static function readIds(NodeFinder $nodeFinder, Node $value): array
+    {
+        $arranged = [];
+
+        foreach ($nodeFinder->find($value, static fn (Node $node): bool => $node instanceof Closure || $node instanceof ArrowFunction
+            || ($node instanceof CallLike && !self::isAssertionCall($node))) as $node) {
+            $parts = $node instanceof CallLike ? array_values($node->getRawArgs()) : [$node];
+
+            foreach ($nodeFinder->find($parts, static fn (): bool => true) as $part) {
+                $arranged[spl_object_id($part)] = true;
+            }
+        }
+
+        $reads = [];
+
+        foreach ($nodeFinder->find($value, static fn (): bool => true) as $node) {
+            $reads[spl_object_id($node)] = true;
+        }
+
+        return array_diff_key($reads, $arranged);
     }
 
 }

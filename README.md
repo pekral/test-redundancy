@@ -200,6 +200,9 @@ aborts the run. `map` and `verify` still abort when a test case fails.
   creates, `call:andThrow` and `new:InvalidDomain` for a mock that throws, `function:strtoupper` for a wrapping call, or
   `function:ob_start` called twice. Such a call arranges another state of the code under test, so the tokens are listed
   in `coveringDiffersBy` and the action is `review`. An assertion, and a literal that is not an argument, do not count.
+  A call that the covering test only reads in an assertion, such as `activeState()` in `expect(activeState())->toBe(0)`
+  or `$order->total()` in `assertSame(5, $order->total())`, does not count either. A call inside a call that an
+  assertion receives still counts, as `strtoupper()` does in `expect(keepSubscribed(collect([strtoupper($email)])))`.
 - **No missing arrangement for a test without an assertion.** A candidate without an assertion asserts only that the
   code under test throws no exception for its input. When the covering test has a call, function, `new` expression or
   value that the candidate lacks, such as `function:createDomain` for a record it creates before the call under test,
@@ -373,6 +376,12 @@ test lacks.
   call itself already, as `function:recalculate` does for a call the other test does not make. A variable that the
   test assigns once and passes on is read as the value it holds, so `$url = fake()->url(); store($url)` has the call
   tokens of `fake()->url()` and the token of the position.
+- **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
+  `expect(activeState())` or `assertSame(5, $order->total())`, adds the token `read:` followed by its own token, such
+  as `read:function:activeState`, beside the token itself. The token counts how many of the calls are such reads, so
+  a difference can tell a call the covering test arranges from a call it only reads in an assertion. A call inside
+  another call that the assertion receives, or inside a closure, is not a read. A `read:` token is never listed in
+  `differsBy` or `coveringDiffersBy`.
 - **Enclosing calls.** A value that an argument passes on through an array or a nested call carries every enclosing
   call and array key, outermost first. `json_encode(json_encode(['test' => true]))` has the token
   `in:function:json_encode#0/function:json_encode#0/value:'test'/value:true`, and `json_encode(['test' => true])` has

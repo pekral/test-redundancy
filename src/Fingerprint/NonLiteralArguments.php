@@ -14,7 +14,7 @@ use PhpParser\NodeFinder;
 final class NonLiteralArguments
 {
 
-    public const string SUFFIX = 'non-literal';
+    private const string SUFFIX = 'non-literal';
 
     private const string POSITION_PATTERN = '~^(in:(?:.*/)?(?:call|function|new):[^/#]+#\w+/)' . self::SUFFIX . '$~';
 

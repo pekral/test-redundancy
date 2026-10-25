@@ -17,8 +17,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   function and `new` expression that the covering test makes and the candidate does not, or makes more times, and the
   candidate is `review`. An argument of a call that is not an assertion, whose value is not a literal, carries a new
   `non-literal` token with the call and the position, such as `in:function:logEvent#3/non-literal`, so an argument
-  position that only the covering test fills is listed too. A `merge-into-dataset` candidate keeps its action when the
-  covering test takes the position as a parameter (#99).
+  position that only the covering test fills is listed too. A call that the covering test only reads in an assertion
+  it adds, such as `expect(activeState())` or `assertSame(5, $order->total())`, is not an arrangement, so a candidate
+  with the same arrangement stays `delete`. A `merge-into-dataset` candidate keeps its action when the covering test
+  takes the position as a parameter (#99).
 - A failing test case no longer discards the coverage of the whole `analyse` run. Before, `CoverageRun` threw
   `ProcessFailedException` on the first worker group with a non-zero exit code, so the coverage of every other group
   was lost and the measured durations were not recorded. Now `analyse` leaves every failed or errored test case out of

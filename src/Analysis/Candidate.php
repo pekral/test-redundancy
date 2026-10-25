@@ -71,7 +71,7 @@ final readonly class Candidate implements JsonSerializable
         return match (true) {
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
-                $this->coveringDiffersBy ?? [],
+                $this->coveringTokens(),
                 fn (string $token): bool => (!self::isData($token) && !NonLiteralArguments::isToken($token))
                     || ($this->isInputKey($token) && !$this->isInValueDiffersByLists($token))
                     || $this->isInArgumentPositionOnlyTheCoveringTestFills(
@@ -264,11 +264,19 @@ final readonly class Candidate implements JsonSerializable
     {
         return array_values(
             array_filter(
-                $this->coveringDiffersBy ?? [],
+                $this->assertsNothing ? $this->coveringTokens() : $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => !TokenCollector::isAssertionToken($token)
                     && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
             ),
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function coveringTokens(): array
+    {
+        return array_map(TokenCollector::withoutRead(...), $this->coveringDiffersBy ?? []);
     }
 
     private function isInValueDiffersByLists(string $key): bool
