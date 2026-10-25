@@ -256,12 +256,14 @@ it('tells a literal under one array key from the same literal under another key'
         'function:store' => 1,
         'in:function:store#0/key:value:\'tags\'' => 1,
         'in:function:store#0/value:\'tags\'/value:list-item' => 2,
+        'in:value:\'tags\'/items:value:\'a\'>value:\'b\'' => 1,
         'in:value:\'tags\'/value:\'a\'' => 1,
         'in:value:\'tags\'/value:\'b\'' => 1,
     ],
     ],
     'literal in a list without a key' => ['store([false, false]);', [
         'function:store' => 1,
+        'in:function:store#0/items:value:false>value:false' => 1,
         'in:function:store#0/value:false' => 2,
         'in:function:store#0/value:list-item' => 2,
     ],
@@ -292,7 +294,7 @@ it('gives each pair of array keys a token, so the order of the keys counts', fun
 
     $orderTokens = array_filter(
         TokenCollector::collect($statements),
-        static fn (string $token): bool => preg_match('/(?<!-)>/', $token) === 1,
+        static fn (string $token): bool => preg_match('~(?:^|/)keys:~', $token) === 1,
         ARRAY_FILTER_USE_KEY,
     );
 
@@ -347,6 +349,37 @@ it('tells dataset rows that pass the same array with its keys in another order',
     expect([isset($before[$exactFirst]), isset($before[$variantFirst]), isset($after[$exactFirst]), isset($after[$variantFirst])])
         ->toBe([true, false, false, true]);
 });
+
+it('gives each pair of list elements a token, so the order of the elements counts', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    $orderTokens = array_filter(
+        TokenCollector::collect($statements),
+        static fn (string $token): bool => preg_match('~(?:^|/)items:~', $token) === 1,
+        ARRAY_FILTER_USE_KEY,
+    );
+
+    expect($orderTokens)->toEqual($expected);
+})->with([
+    'a list no call receives' => ['$ids = [1, 2];', ['items:value:1>value:2' => 1]],
+    'a list with an unpacked array' => ['store([...$ids, 1, 2]);', []],
+    'a map' => ['store([\'a\' => 1, \'b\' => 2]);', []],
+    'an array element' => ['store([[\'a\' => 1], 2, []]);', ['in:function:store#0/items:value:2>value:[]' => 1]],
+    'an enum case read through a property' => ['store([CouponType::FIXED->value, \'b\']);', [
+        'in:function:store#0/items:const:CouponType::FIXED->value>value:\'b\'' => 1,
+    ],
+    ],
+    'elements that no token names' => ['store([1, $item, 2]);', ['in:function:store#0/items:value:1>value:2' => 1]],
+    'one element' => ['store([1]);', []],
+    'the same elements in another order' => ['store([5, 3]);', ['in:function:store#0/items:value:5>value:3' => 1]],
+    'three elements' => ['store([1, 2, 3]);', [
+        'in:function:store#0/items:value:1>value:2' => 1,
+        'in:function:store#0/items:value:1>value:3' => 1,
+        'in:function:store#0/items:value:2>value:3' => 1,
+    ],
+    ],
+    'two elements passed to a call' => ['store([3, 5]);', ['in:function:store#0/items:value:3>value:5' => 1]],
+]);
 
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);

@@ -48,6 +48,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   count. This replaces the behaviour of #79 for a `merge-into-dataset`
   candidate: a key that the covering test passes only to an assertion now makes it `review`. A `delete` candidate is
   unchanged, so a covering test that only asserts more about the same input still leaves it `delete` (#97).
+- The order of the elements of a list literal is part of its fingerprint. Before, two dataset rows or tests that pass
+  the same list in another order, such as `['email', 'a', 'b']` and `['a', 'b', 'email']`, or `[3, 5]` and `[5, 3]`,
+  had the same tokens, so one of them was `delete` with an empty `differsBy`, and the boundary it protects, such as the
+  first or the last index, was lost. Now a list with two or more elements has one token for each pair of its elements,
+  the earlier element first, like the key-order tokens of #87, e.g. `in:function:store#0/items:value:3>value:5` for
+  `store([3, 5])`. Such rows and tests differ in `differsBy`, and the candidate is `review`. An element that the
+  covering test lacks adds no order token, so a test with a longer list stays `merge-into-dataset` (#98).
 
 ## [0.1.5] - 2026-10-24
 

@@ -2868,6 +2868,113 @@ it('lists the order token of a key whose pair the covering test has in another o
     expect($report->candidates[0]->differsBy)->toContain('in:function:store#0/keys:value:\'b\'>value:\'a\'');
 });
 
+it('keeps a dataset row or a test whose list has its elements in another order than its covering test', function (
+    string $source,
+    string $candidate,
+    string $covering,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: [$candidate => ['src/Feed.php:10'], $covering => ['src/Feed.php:10', 'src/Feed.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe($candidate)
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'dataset rows' => [
+        <<<'PHP'
+            <?php
+            it('does nothing when the licence returns the stored selection', function (array $shopIds): void {
+                $action->handle($shopIds);
+            })->with([
+                'the same selection' => [[3, 5]],
+                'the same selection in another order' => [[5, 3]],
+            ]);
+            PHP,
+        'it does nothing when the licence returns the stored selection › the same selection',
+        'it does nothing when the licence returns the stored selection › the same selection in another order',
+        ['in:call:handle#0/items:value:3>value:5'],
+    ],
+    'tests' => [
+        <<<'PHP'
+            <?php
+            it('returns the feeds of several lists in ascending order', fn () => feed([1, 2, 3]));
+            it('returns the feeds of several lists in descending order', fn () => feed([3, 2, 1]));
+            PHP,
+        'it returns the feeds of several lists in ascending order',
+        'it returns the feeds of several lists in descending order',
+        [
+            'in:function:feed#0/items:value:1>value:2',
+            'in:function:feed#0/items:value:1>value:3',
+            'in:function:feed#0/items:value:2>value:3',
+        ],
+    ],
+]);
+
+it('keeps the dataset rows that pass the same list in another order than the row that covers them', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('passes when the email column is present', function (array $rows): void {
+                validateEmailColumn($rows);
+            })->with([
+                'first column' => [[['email', 'a', 'b']]],
+                'last column' => [[['a', 'b', 'email']]],
+                'middle column' => [[['a', 'email', 'b']]],
+            ]);
+            PHP,
+        linesByTest: [
+            'it passes when the email column is present › first column' => ['src/Validator.php:10'],
+            'it passes when the email column is present › last column' => ['src/Validator.php:10'],
+            'it passes when the email column is present › middle column' => ['src/Validator.php:10', 'src/Validator.php:20'],
+        ],
+    );
+
+    expect(array_map(
+        static fn (Candidate $candidate): array => [$candidate->testCase(), $candidate->differsBy, $candidate->action()],
+        $report->candidates,
+    ))->toBe([
+        ['it passes when the email column is present › first column', ['items:value:\'email\'>value:\'a\''], Action::Review],
+        ['it passes when the email column is present › last column', ['items:value:\'b\'>value:\'email\''], Action::Review],
+    ]);
+});
+
+it('lists no order token for a list element that the covering test lacks, because the element is listed already', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores three ids', fn () => expect(store([1, 2, 3]))->toBeTrue());
+            it('stores two ids', fn () => expect(store([1, 2]))->toBeTrue());
+            PHP,
+        linesByTest: [
+            'it stores three ids' => ['src/Store.php:10'],
+            'it stores two ids' => ['src/Store.php:10', 'src/Store.php:20'],
+        ],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it stores three ids')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:3'])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('leaves the order of the list elements of a covering test out of coveringDiffersBy', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores two ids', fn () => store([1, 3]));
+            it('covers', fn () => store([1, 2, 3]));
+            PHP,
+        linesByTest: ['it stores two ids' => ['src/Store.php:10'], 'it covers' => ['src/Store.php:10', 'src/Store.php:20']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:2']);
+});
+
 const SHARED_ROW_STEP = 'This row belongs to the named dataset "collidingRows", which these tests also use: "it second", "it third". '
     . 'Deleting the row deletes it from each of them. '
     . 'Delete the row only when each of them stays covered without it; otherwise keep it, or give this test its own dataset.';

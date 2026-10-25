@@ -78,7 +78,7 @@ final class TokenCollector
 
         return self::sum(
             $tokens,
-            KeyOrders::tokens($nodeFinder, $nodes, $paths, $readProperties),
+            ArrayOrders::tokens($nodeFinder, $nodes, $paths, $readProperties),
             self::boundAssertions($nodeFinder, $nodes, $assignedValues),
         );
     }
@@ -132,12 +132,33 @@ final class TokenCollector
      * @param array<int, string> $readProperties
      * @return array{0: \PhpParser\Node, 1: string}|null
      */
-    public static function keyOf(ArrayItem $arrayItem, array $readProperties): ?array
+    public static function nameOf(?Expr $node, array $readProperties): ?array
     {
-        $key = $arrayItem->key === null ? null : NodeContext::enumCaseReadBy($arrayItem->key) ?? $arrayItem->key;
-        $keyToken = $key === null ? null : self::token($key);
+        $node = $node === null ? null : NodeContext::enumCaseReadBy($node) ?? $node;
+        $token = $node === null ? null : self::token($node);
 
-        return $key === null || $keyToken === null ? null : [$key, $keyToken . ($readProperties[spl_object_id($key)] ?? '')];
+        return $node === null || $token === null ? null : [$node, $token . ($readProperties[spl_object_id($node)] ?? '')];
+    }
+
+    public static function listLength(Node $node): int
+    {
+        $isListItem = static fn (ArrayItem $item): bool => $item->key === null && !$item->unpack;
+
+        return $node instanceof Array_ && array_all($node->items, $isListItem) ? count($node->items) : 0;
+    }
+
+    public static function carriesContract(Node $node): bool
+    {
+        return $node instanceof Scalar
+            || $node instanceof UnaryMinus
+            || $node instanceof ConstFetch
+            || $node instanceof ClassConstFetch
+            || ($node instanceof MethodCall && !self::isNegation($node))
+            || ($node instanceof PropertyFetch && self::callsExpectationMethod($node))
+            || $node instanceof StaticCall
+            || $node instanceof FuncCall
+            || $node instanceof New_
+            || ($node instanceof Array_ && $node->items === []);
     }
 
     /**
@@ -187,7 +208,7 @@ final class TokenCollector
      */
     private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem, array $readProperties): array
     {
-        $key = self::keyOf($arrayItem, $readProperties);
+        $key = self::nameOf($arrayItem->key, $readProperties);
 
         return $key === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
     }
@@ -256,27 +277,6 @@ final class TokenCollector
     private static function nodeIds(NodeFinder $nodeFinder, Node $node): array
     {
         return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
-    }
-
-    private static function carriesContract(Node $node): bool
-    {
-        return $node instanceof Scalar
-            || $node instanceof UnaryMinus
-            || $node instanceof ConstFetch
-            || $node instanceof ClassConstFetch
-            || ($node instanceof MethodCall && !self::isNegation($node))
-            || ($node instanceof PropertyFetch && self::callsExpectationMethod($node))
-            || $node instanceof StaticCall
-            || $node instanceof FuncCall
-            || $node instanceof New_
-            || ($node instanceof Array_ && $node->items === []);
-    }
-
-    private static function listLength(Node $node): int
-    {
-        $isListItem = static fn (ArrayItem $item): bool => $item->key === null && !$item->unpack;
-
-        return $node instanceof Array_ && array_all($node->items, $isListItem) ? count($node->items) : 0;
     }
 
     private static function arrayToken(Array_ $array): string
