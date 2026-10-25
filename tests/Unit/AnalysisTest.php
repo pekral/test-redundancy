@@ -1580,11 +1580,27 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::MergeIntoDataset,
     ],
+    'list item int for a parameter of type int the covering closure puts in a list beside a hard-coded int' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $n) => expect(f([$n, 5]))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f([6, 5]))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
     'list item int for a parameter of type string the covering closure puts in an expected list' => [
         <<<'PHP'
             <?php
             it('runs', fn (string $e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
             it('covers', fn () => expect(g())->toBe([2]));
+            PHP,
+        Action::Review,
+    ],
+    'list item int for the hard-coded int beside a parameter of type int in a covering closure list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $n) => expect(f([$n, 5]))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f([1, 6]))->toBeTrue());
             PHP,
         Action::Review,
     ],
@@ -1604,6 +1620,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::MergeIntoDataset,
     ],
+    'list item string for a parameter of type string the covering closure puts in an expected list beside a hard-coded string' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (string $e) => expect(g())->toBe([$e, 'x']))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['b', 'x']));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
     'list item string for a parameter without a type the covering closure puts in an expected list' => [
         <<<'PHP'
             <?php
@@ -1611,6 +1635,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('covers', fn () => expect(g())->toBe(['b']));
             PHP,
         Action::MergeIntoDataset,
+    ],
+    'list item string for the hard-coded string beside a parameter without a type in a covering expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($e) => expect(g())->toBe([$e, 'x']))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['b', 'c']));
+            PHP,
+        Action::Review,
     ],
     'longer list for a parameter without a type' => [
         <<<'PHP'
@@ -1657,6 +1689,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             <?php
             it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(find(5))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'shorter list than a covering expected list that hard-codes a string beside a parameter without a type' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($e) => expect(g())->toBe([$e, 'x']))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['b']));
             PHP,
         Action::Review,
     ],

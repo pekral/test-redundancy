@@ -47,15 +47,22 @@ final readonly class DatasetParameters
 
     private const string ARRAY_VALUE_PATTERN = '/^(?:key:|value:(?:\[\]|list-item)$|value:.+\/)/s';
 
-    private const array LIST_LENGTH_VALUES = ['value:list-item', 'value:[]'];
+    private const string LIST_ITEM_VALUE = 'value:list-item';
+
+    private const array LIST_LENGTH_VALUES = [self::LIST_ITEM_VALUE, 'value:[]'];
 
     /**
      * @param array<string, list<string>> $kindsByPosition
      * @param list<string> $arrayPositions
      * @param list<string> $bodyListPositions
+     * @param list<string> $bodyListLiterals
      */
-    private function __construct(private array $kindsByPosition, private array $arrayPositions, private array $bodyListPositions)
-    {
+    private function __construct(
+        private array $kindsByPosition,
+        private array $arrayPositions,
+        private array $bodyListPositions,
+        private array $bodyListLiterals,
+    ) {
     }
 
     /**
@@ -76,12 +83,25 @@ final readonly class DatasetParameters
             }
         }
 
+        $bodyListPositions = array_values(array_filter(
+            array_keys($kindsByPosition),
+            static fn (string $position): bool => in_array($position . self::LIST_ITEM_VALUE, $sentinelRowTokens, strict: true),
+        ));
+
         return new self(
             $kindsByPosition,
             arrayPositions: [],
-            bodyListPositions: array_values(array_filter(
-                array_keys($kindsByPosition),
-                static fn (string $position): bool => in_array($position . 'value:list-item', $sentinelRowTokens, strict: true),
+            bodyListPositions: $bodyListPositions,
+            bodyListLiterals: array_values(array_filter(
+                $sentinelRowTokens,
+                static fn (string $token): bool => preg_match(self::SENTINEL_TOKEN_PATTERN, $token) !== 1 && array_any(
+                    $bodyListPositions,
+                    static fn (string $position): bool => !in_array(
+                        self::valueAt($position, $token),
+                        [null, self::LIST_ITEM_VALUE],
+                        strict: true,
+                    ),
+                ),
             )),
         );
     }
@@ -97,7 +117,7 @@ final readonly class DatasetParameters
                 $candidateTokens,
                 static fn (string $token): bool => self::kindOf(self::valueAt($position, $token) ?? '') === 'array',
             ),
-        )), $this->bodyListPositions);
+        )), $this->bodyListPositions, $this->bodyListLiterals);
     }
 
     public function takes(string $token): bool
@@ -113,6 +133,11 @@ final readonly class DatasetParameters
 
             return $kind === null || in_array($kind, $kinds, strict: true);
         });
+    }
+
+    public function hardCodesInBodyList(string $token): bool
+    {
+        return in_array($token, $this->bodyListLiterals, strict: true);
     }
 
     /**
