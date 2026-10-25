@@ -3687,6 +3687,18 @@ it('asks for a review of a test that passes another variable or property to the 
             PHP_SOURCE,
         ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
     ],
+    'another property cast' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(connect((int) $this->enShop))->toBe(2);
+            });
+            it('covers the other case', function (): void {
+                expect(connect((int) $this->mainShop))->toBe(2);
+            });
+            PHP_SOURCE,
+        ['in:function:connect#0/property:enShop'],
+    ],
     'another static property' => [
         <<<'PHP_SOURCE'
             <?php
@@ -3710,6 +3722,18 @@ it('asks for a review of a test that passes another variable or property to the 
             });
             PHP_SOURCE,
         ['in:function:connect#0/variable:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+    ],
+    'another variable in a ternary' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(connect($primary ? $enShop : $fallback))->toBe(2);
+            });
+            it('covers the other case', function (): void {
+                expect(connect($primary ? $reconnected : $fallback))->toBe(2);
+            });
+            PHP_SOURCE,
+        ['in:function:connect#0/variable:enShop'],
     ],
 ]);
 
@@ -3763,6 +3787,18 @@ it('asks for a review of a test that asserts on another variable or property tha
         ->and($report->candidates[0]->differsBy)->toBe($differsBy)
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
+    'another negated property as the expected value' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(balanceOf($account))->toBe(-$account->debit);
+            });
+            it('covers the other case', function (): void {
+                expect(balanceOf($account))->toBe(-$account->credit);
+            });
+            PHP_SOURCE,
+        ['in:expect:function:balanceOf/call:toBe#0/property:debit'],
+    ],
     'another property as the expected value' => [
         <<<'PHP_SOURCE'
             <?php
@@ -3774,6 +3810,18 @@ it('asks for a review of a test that asserts on another variable or property tha
             });
             PHP_SOURCE,
         ['in:expect:variable:manager/call:connection/call:toBe#0/property:redisConnection'],
+    ],
+    'another property cast as the expected string' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(resolveUtm($campaign))->toBe((string) $campaign->title);
+            });
+            it('covers the other case', function (): void {
+                expect(resolveUtm($campaign))->toBe((string) $campaign->name);
+            });
+            PHP_SOURCE,
+        ['in:expect:function:resolveUtm/call:toBe#0/property:title'],
     ],
     'another property interpolated in the expected string' => [
         <<<'PHP_SOURCE'
