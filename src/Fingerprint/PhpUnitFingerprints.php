@@ -22,13 +22,24 @@ final class PhpUnitFingerprints
      */
     public static function of(array $statements): array
     {
+        return self::analyse($statements)->fingerprints;
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Stmt> $statements
+     */
+    public static function analyse(array $statements): FileFingerprints
+    {
         $fingerprints = [];
+        $datasetParameters = [];
 
         foreach (new NodeFinder()->findInstanceOf($statements, Class_::class) as $class) {
-            $fingerprints = [...$fingerprints, ...self::tests($class)];
+            $tests = self::tests($class);
+            $fingerprints = [...$fingerprints, ...$tests->fingerprints];
+            $datasetParameters = [...$datasetParameters, ...$tests->datasetParameters];
         }
 
-        return $fingerprints;
+        return new FileFingerprints($fingerprints, [], $datasetParameters);
     }
 
     /**
@@ -46,12 +57,10 @@ final class PhpUnitFingerprints
         );
     }
 
-    /**
-     * @return array<string, array<string, int>>
-     */
-    private static function tests(Class_ $class): array
+    private static function tests(Class_ $class): FileFingerprints
     {
         $fingerprints = [];
+        $datasetParameters = [];
 
         foreach ($class->getMethods() as $method) {
             if (!self::isTest($method)) {
@@ -60,13 +69,18 @@ final class PhpUnitFingerprints
 
             $provider = self::dataProviderName($method);
             $rows = $provider === null ? [] : self::providerRows($class->getMethod($provider));
-            $fingerprints = [
-                ...$fingerprints,
-                ...DatasetRows::fingerprints($method->name->toString(), $method->stmts ?? [], $method->params, $rows),
+            $rowFingerprints = DatasetRows::fingerprints($method->name->toString(), $method->stmts ?? [], $method->params, $rows);
+            $fingerprints = [...$fingerprints, ...$rowFingerprints];
+            $datasetParameters = [
+                ...$datasetParameters,
+                ...$rows === [] ? [] : array_fill_keys(
+                    array_keys($rowFingerprints),
+                    DatasetRows::parameters($method->stmts ?? [], $method->params),
+                ),
             ];
         }
 
-        return $fingerprints;
+        return new FileFingerprints($fingerprints, [], $datasetParameters);
     }
 
     private static function isTest(ClassMethod $method): bool

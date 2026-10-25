@@ -20,6 +20,13 @@ use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\NodeFinder;
 
+/**
+ * @phpstan-type Test array{
+ *     tokens: array<string, int>,
+ *     dataset: string|null,
+ *     parameters: \Pekral\TestRedundancy\Fingerprint\DatasetParameters|null,
+ * }
+ */
 final readonly class PestFingerprints
 {
 
@@ -52,7 +59,7 @@ final readonly class PestFingerprints
     {
         $tests = self::tests($statements);
 
-        return new FileFingerprints(self::fingerprints($tests), self::sharedDatasets($tests));
+        return new FileFingerprints(self::fingerprints($tests), self::sharedDatasets($tests), self::datasetParameters($tests));
     }
 
     /**
@@ -72,7 +79,7 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
+     * @return array<string, Test>
      */
     private function walk(array $statements, string $prefix): array
     {
@@ -88,7 +95,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
+     * @return array<string, Test>
      */
     private function expression(Node $expression, string $prefix): array
     {
@@ -103,7 +110,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
+     * @return array<string, Test>
      */
     private function test(Node $expression, string $prefix): array
     {
@@ -116,15 +123,17 @@ final readonly class PestFingerprints
 
         $isIt = $call->name instanceof Name && $call->name->toLowerString() === 'it';
         $test = self::argument($call, 1);
+        $body = $test === null ? [] : [$test];
+        $parameters = $test instanceof FunctionLike ? $test->getParams() : [];
+        $datasetParameters = $datasetRows === [] ? null : DatasetRows::parameters($body, $parameters);
 
         return array_map(
-            static fn (array $tokens): array => ['tokens' => TokenCollector::sum($tokens, $modifierTokens), 'dataset' => $dataset],
-            DatasetRows::fingerprints(
-                $prefix . ($isIt ? 'it ' : '') . $description,
-                $test === null ? [] : [$test],
-                $test instanceof FunctionLike ? $test->getParams() : [],
-                $datasetRows,
-            ),
+            static fn (array $tokens): array => [
+                'dataset' => $dataset,
+                'parameters' => $datasetParameters,
+                'tokens' => TokenCollector::sum($tokens, $modifierTokens),
+            ],
+            DatasetRows::fingerprints($prefix . ($isIt ? 'it ' : '') . $description, $body, $parameters, $datasetRows),
         );
     }
 
@@ -176,7 +185,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @param array<string, Test> $tests
      * @return array<string, array<string, int>>
      */
     private static function fingerprints(array $tests): array
@@ -185,7 +194,16 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @param array<string, Test> $tests
+     * @return array<string, \Pekral\TestRedundancy\Fingerprint\DatasetParameters>
+     */
+    private static function datasetParameters(array $tests): array
+    {
+        return array_filter(array_map(static fn (array $test): ?DatasetParameters => $test['parameters'], $tests));
+    }
+
+    /**
+     * @param array<string, Test> $tests
      * @return array<string, \Pekral\TestRedundancy\Fingerprint\SharedDataset>
      */
     private static function sharedDatasets(array $tests): array
@@ -207,7 +225,7 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array{tokens: array<string, int>, dataset: string|null}>
+     * @return array<string, Test>
      */
     private static function tests(array $statements): array
     {
@@ -217,7 +235,7 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @param array<string, array{tokens: array<string, int>, dataset: string|null}> $tests
+     * @param array<string, Test> $tests
      * @return array<string, array{name: string, tests: array<string, true>}>
      */
     private static function testsByDataset(array $tests): array

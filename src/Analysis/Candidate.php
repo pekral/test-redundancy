@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use JsonSerializable;
+use Pekral\TestRedundancy\Fingerprint\DatasetParameters;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Support\TestKey;
@@ -26,6 +27,7 @@ final readonly class Candidate implements JsonSerializable
         public array $unionOnlyLines,
         public bool $assertsNothing,
         public ?SharedDataset $sharedDataset = null,
+        public ?DatasetParameters $coveringDatasetParameters = null,
     ) {
     }
 
@@ -52,7 +54,9 @@ final readonly class Candidate implements JsonSerializable
             $this->differsBy === [] => Action::Review,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
-            $this->differsOnlyInDataFromOneTestOfTheSameFile() && $this->coveringTokensForReview() === [] => Action::MergeIntoDataset,
+            $this->differsOnlyInDataFromOneTestOfTheSameFile()
+                && $this->coveringTokensForReview() === []
+                && $this->coveringDatasetTakesDiffersBy() => Action::MergeIntoDataset,
             default => Action::Review,
         };
     }
@@ -262,6 +266,12 @@ final readonly class Candidate implements JsonSerializable
             && $this->nonDataTokens($this->differsBy) === []
             && !$this->isDatasetRow()
             && $this->isCoveredByOneTestOfTheSameFile();
+    }
+
+    private function coveringDatasetTakesDiffersBy(): bool
+    {
+        return $this->coveringDatasetParameters === null
+            || array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...));
     }
 
     private function isCoveredByOneTestOfTheSameFile(): bool

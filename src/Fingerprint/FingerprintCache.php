@@ -60,6 +60,16 @@ final class FingerprintCache
         return $this->fileOf($testKey)?->sharedDatasets[TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;
     }
 
+    /**
+     * @param list<string> $coveringTestKeys
+     */
+    public function datasetParameters(array $coveringTestKeys): ?DatasetParameters
+    {
+        return count($coveringTestKeys) === 1
+            ? $this->fileOf($coveringTestKeys[0])?->datasetParameters[TestKey::testCase($coveringTestKeys[0])] ?? null
+            : null;
+    }
+
     public function assertsNothing(string $testKey): bool
     {
         return array_filter(array_keys($this->of($testKey) ?? []), TokenCollector::isAssertionToken(...)) === [];

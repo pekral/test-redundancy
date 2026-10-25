@@ -65,6 +65,18 @@ final class DatasetRows
     /**
      * @param array<\PhpParser\Node> $body
      * @param array<\PhpParser\Node\Param> $parameters
+     */
+    public static function parameters(array $body, array $parameters): DatasetParameters
+    {
+        return DatasetParameters::fromSentinelRowTokens(
+            array_keys(self::rowTokens($body, $parameters, DatasetParameters::sentinelRow($parameters))),
+            $parameters,
+        );
+    }
+
+    /**
+     * @param array<\PhpParser\Node> $body
+     * @param array<\PhpParser\Node\Param> $parameters
      * @return array<string, int>
      */
     private static function rowTokens(array $body, array $parameters, Expr $row): array
