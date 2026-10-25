@@ -50,8 +50,9 @@ final readonly class DatasetParameters
     /**
      * @param array<string, list<string>> $kindsByPosition
      * @param list<string> $arrayPositions
+     * @param list<string> $bodyListPositions
      */
-    private function __construct(private array $kindsByPosition, private array $arrayPositions)
+    private function __construct(private array $kindsByPosition, private array $arrayPositions, private array $bodyListPositions)
     {
     }
 
@@ -73,7 +74,14 @@ final readonly class DatasetParameters
             }
         }
 
-        return new self($kindsByPosition, arrayPositions: []);
+        return new self(
+            $kindsByPosition,
+            arrayPositions: [],
+            bodyListPositions: array_values(array_filter(
+                array_keys($kindsByPosition),
+                static fn (string $position): bool => in_array($position . 'value:list-item', $sentinelRowTokens, strict: true),
+            )),
+        );
     }
 
     /**
@@ -82,12 +90,12 @@ final readonly class DatasetParameters
     public function forCandidate(array $candidateTokens): self
     {
         return new self($this->kindsByPosition, array_values(array_filter(
-            array_keys($this->kindsByPosition),
+            array_diff(array_keys($this->kindsByPosition), $this->bodyListPositions),
             static fn (string $position): bool => array_any(
                 $candidateTokens,
                 static fn (string $token): bool => self::kindOf(self::valueAt($position, $token) ?? '') === 'array',
             ),
-        )));
+        )), $this->bodyListPositions);
     }
 
     public function takes(string $token): bool

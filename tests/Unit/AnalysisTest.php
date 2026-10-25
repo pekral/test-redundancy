@@ -1548,6 +1548,38 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::Review,
     ],
+    'list item int for a parameter of type int the covering closure puts in a list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f([2]))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'list item int for a parameter of type string the covering closure puts in an expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (string $e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe([2]));
+            PHP,
+        Action::Review,
+    ],
+    'list item string for a parameter of type int the covering closure puts in a list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f(['x']))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'list item string for a parameter of type string the covering closure puts in an expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (string $e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['b']));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
     'null for a nullable parameter' => [
         <<<'PHP'
             <?php
