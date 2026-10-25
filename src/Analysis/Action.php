@@ -50,6 +50,12 @@ enum Action: string
         . 'Check whether that empty or missing input is a case of its own, for example a record that does not exist; '
         . 'keep this test when it is, and delete it only when it is not.';
 
+    public const string MISSING_CALL_STEP = 'The covering test %s makes the calls or creates the objects in coveringDiffersBy (%s), '
+        . 'and this test does not: without them, the code under test runs in another state. '
+        . 'Check whether the code under test behaves differently without one of them, '
+        . 'for example when a call throws, a record exists, or an output buffer is open; '
+        . 'keep this test when it does, and delete it only when it does not.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 

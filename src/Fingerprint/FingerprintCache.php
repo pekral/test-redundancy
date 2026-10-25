@@ -31,7 +31,9 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $difference = ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering);
+            $difference = NonLiteralArguments::withoutImplied(
+                ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering),
+            );
 
             if ($smallest === null || count($difference) < count($smallest)) {
                 $smallest = $difference;
@@ -49,10 +51,10 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : array_values(array_filter(
+        return $tokens === null ? null : NonLiteralArguments::withoutImplied(array_values(array_filter(
             $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']),
             static fn (string $token): bool => !ArrayOrders::isToken($token),
-        ));
+        )));
     }
 
     public function sharedDataset(string $testKey): ?SharedDataset

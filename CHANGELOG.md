@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `delete` candidate no longer ignores an arrangement that only its covering test has outside the literal arguments
+  of the code under test. Before, `coveringDiffersBy` listed only the array keys and the literal arguments, so a
+  covering test that arranges a mock that throws (`->andThrow(new InvalidDomain())`), a wrapping call
+  (`strtoupper($email)`), an extra arrangement call (`createVerifiedDomain()`, `ob_start()`), or an extra argument held in
+  a variable (`$url = fake()->url()`, `$campaign->id`) left the candidate `delete` with an empty `differsBy` and an empty
+  `coveringDiffersBy`, and the input class of the candidate was lost. Now `coveringDiffersBy` lists every call,
+  function and `new` expression that the covering test makes and the candidate does not, or makes more times, and the
+  candidate is `review`. An argument of a call that is not an assertion, whose value is not a literal, carries a new
+  `non-literal` token with the call and the position, such as `in:function:logEvent#3/non-literal`, so an argument
+  position that only the covering test fills is listed too. A `merge-into-dataset` candidate keeps its action when the
+  covering test takes the position as a parameter (#99).
 - A failing test case no longer discards the coverage of the whole `analyse` run. Before, `CoverageRun` threw
   `ProcessFailedException` on the first worker group with a non-zero exit code, so the coverage of every other group
   was lost and the measured durations were not recorded. Now `analyse` leaves every failed or errored test case out of

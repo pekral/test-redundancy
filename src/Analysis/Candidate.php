@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Analysis;
 use JsonSerializable;
 use Pekral\TestRedundancy\Fingerprint\AssertionSubject;
 use Pekral\TestRedundancy\Fingerprint\DatasetParameters;
+use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Support\TestKey;
@@ -71,9 +72,11 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
                 $this->coveringDiffersBy ?? [],
-                fn (string $token): bool => !self::isData($token)
+                fn (string $token): bool => (!self::isData($token) && !NonLiteralArguments::isToken($token))
                     || ($this->isInputKey($token) && !$this->isInValueDiffersByLists($token))
-                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: false))
+                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(
+                        NonLiteralArguments::positionOf($token) ?? TokenCollector::argumentPosition($token, ofAssertion: false),
+                    )
                     || $this->isExpectationOnlyTheCoveringTestHas($token),
             )),
             default => [],
@@ -231,14 +234,13 @@ final readonly class Candidate implements JsonSerializable
      */
     private function missingInputSteps(): array
     {
-        $arrangement = $this->otherCoveringTokens();
-
         return [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
-            ...($arrangement === [] ? [] : [
-                sprintf(Action::NO_ASSERTION_STEP, $this->quoted($this->coveredBy), implode(', ', $arrangement)),
-            ]),
+            ...$this->coveringTokenSteps(
+                $this->assertsNothing ? Action::NO_ASSERTION_STEP : Action::MISSING_CALL_STEP,
+                $this->otherCoveringTokens(),
+            ),
         ];
     }
 
@@ -263,9 +265,8 @@ final readonly class Candidate implements JsonSerializable
         return array_values(
             array_filter(
                 $this->coveringDiffersBy ?? [],
-                fn (string $token): bool => $this->assertsNothing
-                    ? !TokenCollector::isAssertionToken($token)
-                    : $this->isInputKey($token) || $this->isArgument($token),
+                fn (string $token): bool => !TokenCollector::isAssertionToken($token)
+                    && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
             ),
         );
     }
@@ -347,7 +348,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function isArgument(string $token): bool
     {
-        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null;
+        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null || NonLiteralArguments::isToken($token);
     }
 
     private function isKey(string $token): bool
