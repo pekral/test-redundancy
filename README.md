@@ -294,8 +294,8 @@ test lacks.
   - A property carries the token `property:<name>`. A call, a function call and a `new` expression carry their own
     token.
   - A method call also carries its receiver before its own token: a variable by its name as `variable:<name>`, also
-    when the test assigns it once, a property as `property:<name>`, and a call, a function call or a `new` expression
-    as its own token.
+    when the test assigns it once, a property as `property:<name>`, also a static or a nullsafe one such as
+    `self::$repository`, and a call, a function call or a `new` expression as its own token.
     `expect($moment->format('Y-m-d'))` has the subject `variable:moment/call:format`, and
     `expect($interval->applyTo($moment)->format('Y-m-d'))` has `call:applyTo/call:format`. Only the nearest receiver
     is kept. A literal or a constant as the receiver adds nothing, so `expect(Status::Active->label())` has the subject
@@ -385,7 +385,12 @@ test lacks.
   `property:<name>` for a property. `connect($this->enShop)` has the token `in:function:connect#0/property:enShop`,
   `recalculate($job, 5, $campaign->id)` has `in:function:recalculate#0/variable:job` and
   `in:function:recalculate#2/property:id`, and `expect(linksOf($account))->toContain($canvaUserId)` has
-  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. So two tests that pass or expect different
+  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. A static or a nullsafe property is a property
+  too: `connect(self::$enShop)` has `in:function:connect#0/property:enShop` and `connect($shop?->url)` has
+  `in:function:connect#0/property:url`. Each variable or property inside an operator or an interpolated string that is
+  the argument carries the position of that argument, so `toBe('no_segment_tag_' . $campaign->title)` and
+  `toBe("no_segment_tag_{$campaign->title}")` both have `in:expect:function:resolveUtm/call:toBe#0/property:title` for
+  `expect(resolveUtm($campaign))`. So two tests that pass or expect different
   variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
   receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
   carries no name, because each dataset row fills it with another value. A variable that the test assigns once and

@@ -18,8 +18,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`, so such tests differ in `differsBy` and the
   candidate is `review`. A `merge-into-dataset` candidate is also `review` when its covering test passes a variable or
   a property where the candidate passes a literal, such as `dispatchBulkStep($account->name)` against
-  `dispatchBulkStep('happypet')`. A parameter of the test closure or test method, which a dataset row fills, carries
-  no name (#100).
+  `dispatchBulkStep('happypet')`. A static or a nullsafe property, such as `self::$enShop` or `$shop?->url`, is named
+  as a property, and each variable or property inside an operator or an interpolated string that is the argument is
+  named at the position of that argument, such as `in:expect:function:resolveUtm/call:toBe#0/property:title` for
+  `toBe('no_segment_tag_' . $campaign->title)`. A parameter of the test closure or test method, which a dataset row
+  fills, carries no name (#100).
 - A `delete` candidate no longer ignores an arrangement that only its covering test has outside the literal arguments
   of the code under test. Before, `coveringDiffersBy` listed only the array keys and the literal arguments, so a
   covering test that arranges a mock that throws (`->andThrow(new InvalidDomain())`), a wrapping call
