@@ -9,10 +9,16 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\BinaryOp;
+use PhpParser\Node\Expr\BitwiseNot;
+use PhpParser\Node\Expr\BooleanNot;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\Cast;
 use PhpParser\Node\Expr\NullsafePropertyFetch;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticPropertyFetch;
+use PhpParser\Node\Expr\Ternary;
+use PhpParser\Node\Expr\UnaryMinus;
+use PhpParser\Node\Expr\UnaryPlus;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\InterpolatedString;
@@ -140,14 +146,27 @@ final class NonLiteralArguments
     private static function namesOf(Expr $value, array $parameters): array
     {
         return match (true) {
-            $value instanceof BinaryOp => [...self::namesOf($value->left, $parameters), ...self::namesOf($value->right, $parameters)],
-            $value instanceof InterpolatedString => array_merge([], ...array_map(
-                static fn (Expr $part): array => self::namesOf($part, $parameters),
-                array_values(array_filter($value->parts, static fn (Node $part): bool => $part instanceof Expr)),
-            )),
+            $value instanceof BinaryOp => self::namesOfEach([$value->left, $value->right], $parameters),
+            $value instanceof InterpolatedString => self::namesOfEach($value->parts, $parameters),
+            $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
+            $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
+                || $value instanceof BitwiseNot => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
             default => array_filter([self::identity($value)], is_string(...)),
         };
+    }
+
+    /**
+     * @param array<\PhpParser\Node|null> $values
+     * @param list<string> $parameters
+     * @return list<string>
+     */
+    private static function namesOfEach(array $values, array $parameters): array
+    {
+        return array_merge([], ...array_map(
+            static fn (Expr $value): array => self::namesOf($value, $parameters),
+            array_values(array_filter($values, static fn (?Node $value): bool => $value instanceof Expr)),
+        ));
     }
 
     /**

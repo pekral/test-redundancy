@@ -387,10 +387,13 @@ test lacks.
   `in:function:recalculate#2/property:id`, and `expect(linksOf($account))->toContain($canvaUserId)` has
   `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. A static or a nullsafe property is a property
   too: `connect(self::$enShop)` has `in:function:connect#0/property:enShop` and `connect($shop?->url)` has
-  `in:function:connect#0/property:url`. Each variable or property inside an operator or an interpolated string that is
-  the argument carries the position of that argument, so `toBe('no_segment_tag_' . $campaign->title)` and
-  `toBe("no_segment_tag_{$campaign->title}")` both have `in:expect:function:resolveUtm/call:toBe#0/property:title` for
-  `expect(resolveUtm($campaign))`. So two tests that pass or expect different
+  `in:function:connect#0/property:url`. Each variable or property inside an operator, a cast, a ternary or an
+  interpolated string that is the argument carries the position of that argument, so
+  `toBe('no_segment_tag_' . $campaign->title)`, `toBe("no_segment_tag_{$campaign->title}")` and
+  `toBe((string) $campaign->title)` all have `in:expect:function:resolveUtm/call:toBe#0/property:title` for
+  `expect(resolveUtm($campaign))`, and `connect($primary ? $enShop : -$debit)` has
+  `in:function:connect#0/variable:primary`, `in:function:connect#0/variable:enShop` and
+  `in:function:connect#0/variable:debit`. So two tests that pass or expect different
   variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
   receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
   carries no name, because each dataset row fills it with another value. A variable that the test assigns once and

@@ -48,6 +48,7 @@ it('collects every node that carries a contract', function (): void {
         'in:call:Foo::create#8/non-literal',
         'in:call:Foo::create#9/non-literal',
         'in:call:Foo::create#10/non-literal',
+        'in:call:Foo::create#10/variable:value',
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
@@ -1032,6 +1033,10 @@ it('names the variable or the property that an argument of a call or of an asser
         'connect($shop?->url);',
         ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:url'],
     ],
+    'property cast passed to the code under test' => [
+        'connect((int) $this->enShop);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+    ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
         ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/property:name'],
@@ -1066,6 +1071,10 @@ it('names the variable or the property that an argument of a call or of an asser
         '$this->assertSame($this->redisConnection, $connection);',
         ['call:assertSame', 'in:call:assertSame#0/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
     ],
+    'variable inside a short ternary passed to the code under test' => [
+        'store($name ?: \'none\');',
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/variable:name', 'value:\'none\''],
+    ],
     'variable passed to a Pest assertion' => [
         'expect(linksOf($account))->toContain($canvaUserId);',
         [
@@ -1078,6 +1087,30 @@ it('names the variable or the property that an argument of a call or of an asser
             'read:function:linksOf',
             'read:in:function:linksOf#0/non-literal',
             'read:in:function:linksOf#0/variable:account',
+        ],
+    ],
+    'variables and a property inside a ternary passed to the code under test' => [
+        'store($primary ? $this->enShop : $fallback);',
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/property:enShop',
+            'in:function:store#0/variable:fallback',
+            'in:function:store#0/variable:primary',
+        ],
+    ],
+    'variables inside a unary operator passed to the code under test' => [
+        'store(-$debit, +$credit, !$active, ~$mask);',
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/variable:debit',
+            'in:function:store#1/non-literal',
+            'in:function:store#1/variable:credit',
+            'in:function:store#2/non-literal',
+            'in:function:store#2/variable:active',
+            'in:function:store#3/non-literal',
+            'in:function:store#3/variable:mask',
         ],
     ],
 ]);
