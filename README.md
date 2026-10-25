@@ -329,6 +329,15 @@ test lacks.
   add no token (see *Local variables*): a test that passes the same item three times in one list lists the token in
   `differsBy` against a test that passes it once, and is not `delete`. A shorter list adds nothing to `differsBy`,
   because a token the candidate has fewer times is never listed.
+- **Order of list elements.** A list with two or more elements also carries one token for each pair of its elements,
+  with the earlier element first, like the order of array keys: `in:function:store#0/items:value:3>value:5` for
+  `store([3, 5])`, and `items:value:1>value:2` for `$ids = [1, 2]` that the test never passes on. A list with three
+  elements has three such tokens. The same elements in another order give other tokens, so two dataset rows or tests
+  whose lists differ only in the order of their elements, such as `[3, 5]` and `[5, 3]`, differ in `differsBy`, and the
+  candidate is `review`, not `delete`. An element takes part when it carries a token of its own: a literal, a constant,
+  an enum case, a call, a `new` expression or an empty array. A variable, a closure and a non-empty array add nothing.
+  An order token of an element that the covering test lacks is not listed, because that element is listed already, and
+  the order tokens of the covering test are never listed in `coveringDiffersBy`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its
