@@ -169,7 +169,7 @@ final class NodeContext
         return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
     }
 
-    private static function isAssertionCall(CallLike $call): bool
+    public static function isAssertionCall(CallLike $call): bool
     {
         $token = TokenCollector::token($call);
 
