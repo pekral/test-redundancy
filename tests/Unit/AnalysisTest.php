@@ -3370,6 +3370,20 @@ it('asks for a review of a test whose covering test arranges a call or an argume
             PHP_SOURCE,
         ['function:ob_start'],
     ],
+    'call read in an assertion with a non-literal argument' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                handle($event);
+            });
+            it('covers the arranged case', function (): void {
+                handle($event);
+
+                expect(roleOf($user))->toBe('admin');
+            });
+            PHP_SOURCE,
+        ['function:roleOf'],
+    ],
     'extra argument held in a variable that holds a call' => [
         <<<'PHP_SOURCE'
             <?php

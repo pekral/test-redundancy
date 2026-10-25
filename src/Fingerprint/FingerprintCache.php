@@ -73,7 +73,7 @@ final class FingerprintCache
             static fn (string $token): string => in_array($token, $onlyAssertionsRead, strict: true)
                 ? TokenCollector::readToken($token)
                 : $token,
-            NonLiteralArguments::withoutImplied($exceeding, $arranged),
+            NonLiteralArguments::withoutImplied($this->withoutReadPositions($exceeding, $onlyAssertionsRead), $arranged),
         );
     }
 
@@ -137,6 +137,20 @@ final class FingerprintCache
             $tokens,
             static fn (int $count, string $token): bool => !TokenCollector::isReadToken($token) && $count > ($other[$token] ?? 0),
             ARRAY_FILTER_USE_BOTH,
+        ));
+    }
+
+    /**
+     * @param list<string> $exceeding
+     * @param array<int, string> $onlyAssertionsRead
+     * @return list<string>
+     */
+    private function withoutReadPositions(array $exceeding, array $onlyAssertionsRead): array
+    {
+        return array_values(array_filter(
+            $exceeding,
+            static fn (string $token): bool => !NonLiteralArguments::isToken($token)
+                || !in_array($token, $onlyAssertionsRead, strict: true),
         ));
     }
 
