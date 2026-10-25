@@ -2899,6 +2899,50 @@ it('keeps a dataset row or a test whose list has its elements in another order t
         'it does nothing when the licence returns the stored selection › the same selection in another order',
         ['in:call:handle#0/items:value:3>value:5'],
     ],
+    'dataset rows of arrays' => [
+        <<<'PHP'
+            <?php
+            it('imports the rows', function (array $rows): void {
+                $importer->import($rows);
+            })->with([
+                'ascending ids' => [[['id' => 1], ['id' => 2]]],
+                'descending ids' => [[['id' => 2], ['id' => 1]]],
+            ]);
+            PHP,
+        'it imports the rows › ascending ids',
+        'it imports the rows › descending ids',
+        ['in:call:import#0/items:[\'id\' => 1]>[\'id\' => 2]'],
+    ],
+    'lists of lists' => [
+        <<<'PHP'
+            <?php
+            it('validates the email in the first row', fn () => validateEmailRow([['email', 'a'], ['b', 'c']]));
+            it('validates the email in the last row', fn () => validateEmailRow([['b', 'c'], ['email', 'a']]));
+            PHP,
+        'it validates the email in the first row',
+        'it validates the email in the last row',
+        ['in:function:validateEmailRow#0/items:[\'email\', \'a\']>[\'b\', \'c\']'],
+    ],
+    'new expressions with arguments' => [
+        <<<'PHP'
+            <?php
+            it('sums the amounts in ascending order', fn () => total([new Money(1), new Money(2)]));
+            it('sums the amounts in descending order', fn () => total([new Money(2), new Money(1)]));
+            PHP,
+        'it sums the amounts in ascending order',
+        'it sums the amounts in descending order',
+        ['in:function:total#0/items:new Money(1)>new Money(2)'],
+    ],
+    'static calls with arguments' => [
+        <<<'PHP'
+            <?php
+            it('sums the amounts in ascending order', fn () => total([Money::of(1), Money::of(2)]));
+            it('sums the amounts in descending order', fn () => total([Money::of(2), Money::of(1)]));
+            PHP,
+        'it sums the amounts in ascending order',
+        'it sums the amounts in descending order',
+        ['in:function:total#0/items:Money::of(1)>Money::of(2)'],
+    ],
     'tests' => [
         <<<'PHP'
             <?php

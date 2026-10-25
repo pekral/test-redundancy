@@ -6,8 +6,11 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
 use PhpParser\Node\ArrayItem;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\CallLike;
 use PhpParser\NodeFinder;
+use PhpParser\PrettyPrinter\Standard;
 
 final class ArrayOrders
 {
@@ -16,7 +19,8 @@ final class ArrayOrders
 
     private const string ITEMS_PREFIX = 'items:';
 
-    private const string PATTERN = "~^(?:in:(?:[^'/]|'(?:[^'\\\\]|\\\\.)*'|/)*/)?(?:" . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')~';
+    private const string PATTERN = '~^(?:in:(?:[^\'/]|\'(?:[^\'\\\\]|\\\\.)*\'|/)*/)?(?:'
+        . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')~';
 
     public static function isToken(string $token): bool
     {
@@ -94,9 +98,19 @@ final class ArrayOrders
      */
     private static function elementOf(ArrayItem $item, array $readProperties): ?array
     {
+        if (self::isComposite($item->value)) {
+            return [$item->value, new Standard()->prettyPrintExpr($item->value)];
+        }
+
         $element = TokenCollector::nameOf($item->value, $readProperties);
 
         return $element !== null && TokenCollector::carriesContract($element[0]) ? $element : null;
+    }
+
+    private static function isComposite(Expr $element): bool
+    {
+        return ($element instanceof Array_ && $element->items !== [])
+            || ($element instanceof CallLike && $element->getRawArgs() !== []);
     }
 
 }
