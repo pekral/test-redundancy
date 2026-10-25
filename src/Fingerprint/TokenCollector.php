@@ -313,7 +313,8 @@ final class TokenCollector
             $boundSubject = (string) AssertionSubject::token($subject, withLiteralArguments: true);
             $assertionsBySubject[(string) AssertionSubject::token($subject)][] = [
                 $boundSubject,
-                self::BOUND_PREFIX . 'expect:' . $boundSubject . '/' . $token . AssertionSubject::literalArguments($node),
+                self::BOUND_PREFIX . 'expect:' . $boundSubject . '/' . $token
+                    . AssertionSubject::literalArguments($node, self::calledMethod($token)),
             ];
         }
 

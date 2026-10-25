@@ -279,9 +279,11 @@ test lacks.
     argument. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
     `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, and
     `expect($manager->consumePipelineSkip($event, pipelineId: 99))->toBeFalse()` has
-    `bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse`. A `bound:` token is not data,
-    so a candidate that expects the same values for swapped arguments, or another value for the same argument, is
-    `review`. A test that asserts each subject with one argument list has no `bound:` token, because its arguments and
+    `bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse`. The failure message of the
+    assertion is left out, such as `'first'` in `toBe(Column::VALUE, 'first')` or in
+    `assertSame(Column::VALUE, $mapping->get(1), 'first')`, because it does not change the pairing. A `bound:` token is
+    not data, so a candidate that expects the same values for swapped arguments, or another value for the same
+    argument, is `review`. A test that asserts each subject with one argument list has no `bound:` token, because its arguments and
     its expected values already pair up.
 - **Array keys and values.** An array key carries a `key:` prefix and the path of its array, the same path a literal in
   the array has: `key:value:'x'` for `$options = ['x' => 1]` that the test never passes on,
