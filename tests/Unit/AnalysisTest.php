@@ -2026,6 +2026,37 @@ it('asks to merge a test whose expected value replaces the value under which its
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 });
 
+it('asks to merge a test whose expected empty list replaces the list in which its covering test expects elements', function (string $source): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: [
+            'it builds no items' => ['src/Builder.php:5'],
+            'it builds two items' => ['src/Builder.php:5', 'src/Builder.php:6'],
+        ],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it builds no items')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
+})->with([
+    'empty list as the whole expected value' => [
+        <<<'PHP'
+            <?php
+            it('builds no items', fn () => expect(build(1))->toBe([]));
+            it('builds two items', fn () => expect(build(2))->toBe(['x', 'y']));
+            PHP,
+    ],
+    'empty list under a key' => [
+        <<<'PHP'
+            <?php
+            it('builds no items', fn () => expect(build(1))->toBe(['items' => []]));
+            it('builds two items', fn () => expect(build(2))->toBe(['items' => ['x', 'y']]));
+            PHP,
+    ],
+]);
+
 it('asks to merge a test that passes an enum value to the argument its covering test passes another value to', function (
     string $source,
     string $enumValue,

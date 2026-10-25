@@ -225,7 +225,9 @@ with the values in `differsBy` would still expect it, so the case of the candida
 in `coveringDiffersBy`, the action is `review`, and the steps say to merge the candidate only into a row that takes its
 whole expected value as a value of its own. Three shapes count:
 
-- an expected list with more elements, `in:expect:function:resolve/call:toEqualCanonicalizing#0/value:list-item`;
+- an expected list with more elements, `in:expect:function:resolve/call:toEqualCanonicalizing#0/value:list-item`.
+  A list whose whole expected value `differsBy` already lists as empty, such as `in:expect:function:build/call:toBe#0/value:[]`
+  for `toBe([])` against `toBe(['x', 'y'])`, does not count;
 - an expected array key that the candidate lacks, such as `in:expect:new:Context/call:toArray/call:toBe#0/key:value:'impersonator_email'`
   for `toBe(['impersonated' => false])` against `toBe(['impersonated' => true, 'impersonator_email' => 'a@b.cz'])`.
   A key nested in an expected value that `differsBy` already lists does not count;
