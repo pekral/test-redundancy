@@ -168,7 +168,7 @@ final readonly class CoverageReader
      */
     private static function splitDataset(string $method): array
     {
-        if (preg_match('/^(.*?)(?: with data set |#)(.*)$/s', $method, $matches) !== 1) {
+        if (preg_match('/^(.*?)(?: with data set #(?=\d+$)| with data set |#)(.*)$/s', $method, $matches) !== 1) {
             return [$method, null];
         }
 

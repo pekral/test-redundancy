@@ -263,6 +263,20 @@ it('leaves a failing test case out of the analysis and lists it with the failure
         ->toBe(['tests/GreeterTest.php']);
 });
 
+it('leaves a failing row of a dataset with integer keys out of the analysis', function (): void {
+    $project = phpunitProjectWith([
+        'yield \'jane\' => ' => 'yield ',
+        'yield \'john\' => [\'John\', \'Hello, John!\']' => 'yield [\'John\', \'Hello, nobody!\']',
+    ]);
+
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
+
+    expect(array_keys($reports[0]->failedTests))->toBe(['testGreetsByName › 1'])
+        ->and($reports[0]->testCases)->toBe(3)
+        ->and(array_keys(candidatesOf($reports)))->toBe(['tests/GreeterTest.php :: testGreetsJane'])
+        ->and($reports[0]->candidates[0]->coveredBy)->toBe(['testGreetsByName › 0']);
+});
+
 it('keeps the coverage of every worker group and records every duration when a test case fails in one group', function (): void {
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('pest'), $project);

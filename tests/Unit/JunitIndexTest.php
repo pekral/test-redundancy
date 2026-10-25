@@ -143,6 +143,26 @@ it('reports a failed test case by the key of the coverage report', function (): 
     removeDirectory($root);
 });
 
+it('reports a failed PHPUnit test case of an integer dataset key by the key of the coverage report', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    $index = junitIndex(<<<'XML'
+        <testsuites>
+            <testcase name="testErrors with data set #1" file="tests/FooTest.php" class="Tests\FooTest">
+                <error type="Error">failed</error>
+            </testcase>
+        </testsuites>
+        XML, $root);
+
+    expect(array_keys(new CoverageReader(Configuration::load($root))->failedTests($index)))
+        ->toBe([CoverageReader::testKeyOf('Tests\FooTest::testErrors#1', $index)])
+        ->and(CoverageReader::testKeyOf('Tests\FooTest::testErrors with data set #1', $index))
+        ->toBe('tests/FooTest.php :: testErrors › 1');
+
+    removeDirectory($root);
+});
+
 it('leaves a failed test case out of the lines and does not count it as a test without coverage', function (): void {
     $root = temporaryDirectory();
     mkdir($root . '/tests', recursive: true);
