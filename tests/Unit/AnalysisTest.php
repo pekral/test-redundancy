@@ -3031,6 +3031,60 @@ it('merges into a dataset a test whose list of arrays or calls has another value
     ],
 ]);
 
+it('reviews a test whose list has the elements of the list of its covering test in another order and another value differs', function (
+    string $source,
+    string $orderToken,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it handles the list' => ['src/List.php:10'], 'it handles the other list' => ['src/List.php:10', 'src/List.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it handles the list')
+        ->and($report->candidates[0]->differsBy)->toContain($orderToken)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'another argument next to the rows' => [
+        <<<'PHP'
+            <?php
+            it('handles the list', fn () => import([['id' => 1], ['id' => 2]], 'a'));
+            it('handles the other list', fn () => import([['id' => 2], ['id' => 1]], 'b'));
+            PHP,
+        'in:function:import#0/items:[\'id\' => 1]>[\'id\' => 2]',
+    ],
+    'another argument of another call' => [
+        <<<'PHP'
+            <?php
+            it('handles the list', function (): void {
+                store([3, 5]);
+                flag(true);
+            });
+            it('handles the other list', function (): void {
+                store([5, 3]);
+                flag(false);
+            });
+            PHP,
+        'in:function:store#0/items:value:3>value:5',
+    ],
+    'another element next to the swapped elements' => [
+        <<<'PHP'
+            <?php
+            it('handles the list', fn () => store([1, 2, 4]));
+            it('handles the other list', fn () => store([2, 1, 3]));
+            PHP,
+        'in:function:store#0/items:value:1>value:2',
+    ],
+    'another expected value' => [
+        <<<'PHP'
+            <?php
+            it('handles the list', fn () => expect(sortIds([3, 5]))->toBe('x'));
+            it('handles the other list', fn () => expect(sortIds([5, 3]))->toBe('y'));
+            PHP,
+        'in:function:sortIds#0/items:value:3>value:5',
+    ],
+]);
+
 it('keeps the dataset rows that pass the same list in another order than the row that covers them', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

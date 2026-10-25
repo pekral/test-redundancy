@@ -56,9 +56,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `store([3, 5])`. A non-empty array, and a call or a `new` expression with arguments, is named by its normalized
   source code, e.g. `items:new Money(1)>new Money(2)`, so a list of rows or of objects counts its order too, and the
   same data written with other quotes, another integer base, another constant case or a comment stays the same
-  element. Rows and tests whose lists differ only in order differ in `differsBy`, and the candidate is `review`. When
-  `differsBy` lists a value, a constant or a key, it lists no order token of a list, so a test whose list has another
-  or an extra element of any kind stays `merge-into-dataset` (#98).
+  element. Rows and tests whose lists differ only in order differ in `differsBy`, and the candidate is `review`.
+  `differsBy` lists an order token only when the covering test has the same two elements in the other order, so a
+  test whose list has another or an extra element of any kind stays `merge-into-dataset`, and a test that swaps
+  elements the covering test also has is `review`, also when another value differs (#98).
 
 ## [0.1.5] - 2026-10-24
 
