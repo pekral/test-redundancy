@@ -40,7 +40,7 @@ final class FingerprintCache
             }
         }
 
-        return $smallest ?? array_keys($tokens['own']);
+        return $smallest ?? array_values(array_filter(array_keys($tokens['own']), static fn (string $token): bool => !TokenCollector::isReadToken($token)));
     }
 
     /**
@@ -51,10 +51,24 @@ final class FingerprintCache
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
 
-        return $tokens === null ? null : NonLiteralArguments::withoutImplied(array_values(array_filter(
-            $this->exceeding(TokenCollector::sum(...$tokens['covering']), $tokens['own']),
+        if ($tokens === null) {
+            return null;
+        }
+
+        $covering = TokenCollector::sum(...$tokens['covering']);
+        $exceeding = array_values(array_filter(
+            $this->exceeding($covering, $tokens['own']),
             static fn (string $token): bool => !ArrayOrders::isToken($token),
-        )));
+        ));
+        $onlyAssertionsRead = array_filter(
+            $exceeding,
+            fn (string $token): bool => $this->arranged($covering, $token) <= $this->arranged($tokens['own'], $token),
+        );
+
+        return array_map(
+            static fn (string $token): string => in_array($token, $onlyAssertionsRead, strict: true) ? TokenCollector::readToken($token) : $token,
+            NonLiteralArguments::withoutImplied($exceeding),
+        );
     }
 
     public function sharedDataset(string $testKey): ?SharedDataset
@@ -113,9 +127,19 @@ final class FingerprintCache
      */
     private function exceeding(array $tokens, array $other): array
     {
-        return array_keys(
-            array_filter($tokens, static fn (int $count, string $token): bool => $count > ($other[$token] ?? 0), ARRAY_FILTER_USE_BOTH),
-        );
+        return array_keys(array_filter(
+            $tokens,
+            static fn (int $count, string $token): bool => !TokenCollector::isReadToken($token) && $count > ($other[$token] ?? 0),
+            ARRAY_FILTER_USE_BOTH,
+        ));
+    }
+
+    /**
+     * @param array<string, int> $counts
+     */
+    private function arranged(array $counts, string $token): int
+    {
+        return ($counts[$token] ?? 0) - ($counts[TokenCollector::readToken($token)] ?? 0);
     }
 
     /**

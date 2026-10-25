@@ -41,6 +41,8 @@ final class TokenCollector
 
     private const string BOUND_PREFIX = 'bound:';
 
+    private const string READ_PREFIX = 'read:';
+
     private const string ARGUMENT_POSITION_PATTERN = '~^in:.*(?:call|function|new):(?:[^/#]*::)?[^/#:]+#\w+/(?=(?:value|const):)~';
 
     /**
@@ -60,6 +62,7 @@ final class TokenCollector
         $arrayKeys = NodeContext::arrayKeys($nodeFinder, $nodes);
         $paths = self::paths($nodeFinder, $nodes, $assignedValues, $readProperties);
         $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
+        $assertionReads = NodeContext::assertionReads($nodeFinder, $nodes);
         $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths);
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
@@ -74,6 +77,11 @@ final class TokenCollector
             $prefixedToken = self::prefix($arrayKeys, $paths, $node, $token) . $token;
             $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
             $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
+
+            if (isset($assertionReads[spl_object_id($node)]) && preg_match(self::DATA_TOKEN_PATTERN, $prefixedToken) !== 1) {
+                $readToken = self::READ_PREFIX . $prefixedToken;
+                $tokens[$readToken] = ($tokens[$readToken] ?? 0) + 1;
+            }
         }
 
         return self::sum(
@@ -96,10 +104,25 @@ final class TokenCollector
             && preg_match(self::ARGUMENT_POSITION_PATTERN, $token, $position) === 1 ? $position[0] : null;
     }
 
+    public static function isReadToken(string $token): bool
+    {
+        return str_starts_with($token, self::READ_PREFIX);
+    }
+
+    public static function readToken(string $token): string
+    {
+        return self::READ_PREFIX . $token;
+    }
+
+    public static function withoutRead(string $token): string
+    {
+        return self::isReadToken($token) ? substr($token, strlen(self::READ_PREFIX)) : $token;
+    }
+
     public static function isAssertionToken(string $token): bool
     {
         return match (true) {
-            str_starts_with($token, self::BOUND_PREFIX) => true,
+            str_starts_with($token, self::BOUND_PREFIX), self::isReadToken($token) => true,
             preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 => preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
                 && self::isAssertion($matches[2]),
             default => self::isAssertion(self::calledMethod($token)),

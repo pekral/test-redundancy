@@ -3443,6 +3443,52 @@ it('asks for a review of a test whose covering test arranges a call or an argume
             PHP_SOURCE,
         ['function:strtoupper'],
     ],
+    'wrapping call inside an expectation' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(keepSubscribed(collect([$subscriber->email])))->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                expect(keepSubscribed(collect([strtoupper($subscriber->email)])))->toBeTrue();
+            });
+            PHP_SOURCE,
+        ['function:strtoupper'],
+    ],
+]);
+
+it('still deletes a test whose covering test only reads a call in an assertion it adds', function (string $assertion): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                handle($event);
+
+                expect($event->handled)->toBeTrue();
+            });
+            it('covers the asserting case', function (): void {
+                handle($event);
+
+                expect($event->handled)->toBeTrue();
+                %s
+            });
+            PHP_SOURCE, $assertion),
+        linesByTest: ['it covers the plain case' => ['src/Handler.php:5'], 'it covers the asserting case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
+        ->and(valueAt($json, 'action'))->toBe('delete')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([]);
+})->with([
+    'function call passed to a negated expectation' => ['expect(activeState())->not->toBe(1);'],
+    'function call passed to a PHPUnit assertion' => ['$this->assertNotSame(1, activeState());'],
+    'function call passed to expect' => ['expect(activeState())->toBe(0);'],
+    'function call with an argument passed to expect' => ['expect(roleOf($user))->toBe(\'admin\');'],
+    'method call on a receiver passed to expect' => ['expect($user->fresh()->name)->toBe(\'x\');'],
+    'method call passed to a PHPUnit assertion' => ['$this->assertSame(5, $order->total());'],
+    'method chain passed to and' => ['expect($event)->and($list->items()->count())->toBe(2);'],
 ]);
 
 it('still deletes a test whose covering test arranges the same calls and passes a non-literal value at the same positions', function (): void {
