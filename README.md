@@ -338,11 +338,13 @@ test lacks.
   an enum case, a call or a `new` expression without arguments, or an empty array. A non-empty array, and a call or a
   `new` expression with arguments, take part by their source code, e.g.
   `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
-  `items:['id' => 1]>['id' => 2]` for two rows of a dataset. A variable and a closure add nothing. An order token of a
-  literal, a constant, an enum case or an empty array that the covering test lacks is not listed, because that element
-  is listed already. A list with more calls, `new` expressions or non-empty arrays than the list of the covering test
-  lists their order tokens, so such a test is `review`, not `merge-into-dataset`. The order tokens of the covering test
-  are never listed in `coveringDiffersBy`.
+  `items:['id' => 1]>['id' => 2]` for two rows of a dataset. That source code is normalized: the quotes of a string,
+  the base of an integer, the case of a constant and a comment do not change it, so `["id" => 0x10]` and
+  `['id' => 16]` are the same element. A variable and a closure add nothing. When `differsBy` lists a value, a
+  constant or a key, the order tokens of the lists are not listed, because the element that changes the order is
+  listed already. So a test whose list has another or an extra element of any kind stays `merge-into-dataset`, and a
+  test whose list differs only in the order of its elements is `review`. The order tokens of the covering test are
+  never listed in `coveringDiffersBy`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its
