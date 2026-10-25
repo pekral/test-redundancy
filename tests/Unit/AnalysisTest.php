@@ -4015,6 +4015,22 @@ it('asks for a review of a test that passes optional arguments its covering test
             PHP_SOURCE,
         'in:function:store#2/value:\'opened\'',
     ],
+    'positional argument of a function called in a loop' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                foreach ([1, 2] as $limit) {
+                    expect(store('john@example.com', $limit, 'opened'))->toBe(1);
+                }
+            });
+            it('covers the default case', function (): void {
+                foreach ([1, 2] as $limit) {
+                    expect(store('john@example.com', $limit))->toBe(1);
+                }
+            });
+            PHP_SOURCE,
+        'in:function:store#2/value:\'opened\'',
+    ],
     'positional argument of a variable that holds the action' => [
         <<<'PHP_SOURCE'
             <?php
