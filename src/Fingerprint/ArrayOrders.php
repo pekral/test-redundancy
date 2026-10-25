@@ -24,12 +24,12 @@ final class ArrayOrders
 
     private const string ITEMS_PREFIX = 'items:';
 
-    private const string PATTERN = '~^(?:in:(?:[^\'/]|\'(?:[^\'\\\\]|\\\\.)*\'|/)*/)?(?:'
+    private const string PATTERN = '~^(?:in:(?:[^\'/]|\'(?:[^\'\\\\]|\\\\.)*\'|/)*/)?('
         . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')~';
 
     public static function isToken(string $token): bool
     {
-        return preg_match(self::PATTERN, $token) === 1;
+        return self::prefixOf($token) !== null;
     }
 
     /**
@@ -38,23 +38,29 @@ final class ArrayOrders
      */
     public static function withoutImplied(array $difference): array
     {
-        $ordered = [];
+        $listsData = array_any(
+            $difference,
+            static fn (string $token): bool => !self::isToken($token) && preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1,
+        );
+        $keys = [];
 
         foreach ($difference as $token) {
             if (preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token, $matches) === 1) {
-                $ordered[] = [($matches[1] ?? '') . self::KEYS_PREFIX, substr($token, strlen($matches[0]))];
-            } elseif (preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token, $matches) === 1) {
-                $ordered[] = [$matches[1] . self::ITEMS_PREFIX, substr($token, strlen($matches[1]))];
+                $keys[] = [($matches[1] ?? '') . self::KEYS_PREFIX, substr($token, strlen($matches[0]))];
             }
         }
 
         return array_values(array_filter(
             $difference,
-            static fn (string $token): bool => !self::isToken($token) || !array_any(
-                $ordered,
-                static fn (array $node): bool => str_starts_with($token, $node[0] . $node[1] . '>')
-                    || (str_starts_with($token, $node[0]) && str_ends_with($token, '>' . $node[1])),
-            ),
+            static fn (string $token): bool => match (self::prefixOf($token)) {
+                null => true,
+                self::ITEMS_PREFIX => !$listsData,
+                default => !array_any(
+                    $keys,
+                    static fn (array $key): bool => str_starts_with($token, $key[0] . $key[1] . '>')
+                        || (str_starts_with($token, $key[0]) && str_ends_with($token, '>' . $key[1])),
+                ),
+            },
         ));
     }
 
@@ -127,6 +133,11 @@ final class ArrayOrders
         assert($normalized instanceof Expr);
 
         return new Standard()->prettyPrintExpr($normalized);
+    }
+
+    private static function prefixOf(string $token): ?string
+    {
+        return preg_match(self::PATTERN, $token, $matches) === 1 ? $matches[1] : null;
     }
 
     private static function isComposite(Expr $element): bool

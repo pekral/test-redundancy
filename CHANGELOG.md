@@ -53,11 +53,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   had the same tokens, so one of them was `delete` with an empty `differsBy`, and the boundary it protects, such as the
   first or the last index, was lost. Now a list with two or more elements has one token for each pair of its elements,
   the earlier element first, like the key-order tokens of #87, e.g. `in:function:store#0/items:value:3>value:5` for
-  `store([3, 5])`. A non-empty array, and a call or a `new` expression with arguments, is named by its source code,
-  e.g. `items:new Money(1)>new Money(2)`, so a list of rows or of objects counts its order too. Such rows and tests
-  differ in `differsBy`, and the candidate is `review`. A literal, a constant or an empty array that the covering test
-  lacks adds no order token, so a test with a longer list of them stays `merge-into-dataset`. A test with a longer list
-  of arrays, calls or `new` expressions is `review` (#98).
+  `store([3, 5])`. A non-empty array, and a call or a `new` expression with arguments, is named by its normalized
+  source code, e.g. `items:new Money(1)>new Money(2)`, so a list of rows or of objects counts its order too, and the
+  same data written with other quotes, another integer base, another constant case or a comment stays the same
+  element. Rows and tests whose lists differ only in order differ in `differsBy`, and the candidate is `review`. When
+  `differsBy` lists a value, a constant or a key, it lists no order token of a list, so a test whose list has another
+  or an extra element of any kind stays `merge-into-dataset` (#98).
 
 ## [0.1.5] - 2026-10-24
 

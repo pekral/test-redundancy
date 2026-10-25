@@ -2983,6 +2983,54 @@ it('deletes a test whose list of arrays or calls is the list of its covering tes
     'a string in double quotes' => ['[[\'id\' => "a"], [\'id\' => \'b\']]', '[[\'id\' => \'a\'], [\'id\' => \'b\']]'],
 ]);
 
+it('merges into a dataset a test whose list of arrays or calls has another value than the list of its covering test', function (
+    string $source,
+    string $candidate,
+    string $covering,
+    string $dataToken,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: [$candidate => ['src/Money.php:10'], $covering => ['src/Money.php:10', 'src/Money.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe($candidate)
+        ->and($report->candidates[0]->differsBy)->toBe([$dataToken])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+})->with([
+    'new expressions with another argument' => [
+        <<<'PHP'
+            <?php
+            it('sums two amounts', fn () => total([new Money(1), new Money(2)]));
+            it('sums two other amounts', fn () => total([new Money(1), new Money(3)]));
+            PHP,
+        'it sums two amounts',
+        'it sums two other amounts',
+        'in:new:Money#0/value:2',
+    ],
+    'rows with another value' => [
+        <<<'PHP'
+            <?php
+            it('imports two rows', fn () => import([['id' => 1], ['id' => 2]]));
+            it('imports two other rows', fn () => import([['id' => 1], ['id' => 3]]));
+            PHP,
+        'it imports two rows',
+        'it imports two other rows',
+        'in:value:\'id\'/value:2',
+    ],
+    'static calls with another argument' => [
+        <<<'PHP'
+            <?php
+            it('sums two amounts', fn () => total([Money::of(1), Money::of(2)]));
+            it('sums two other amounts', fn () => total([Money::of(1), Money::of(3)]));
+            PHP,
+        'it sums two amounts',
+        'it sums two other amounts',
+        'in:call:Money::of#0/value:2',
+    ],
+]);
+
 it('keeps the dataset rows that pass the same list in another order than the row that covers them', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
