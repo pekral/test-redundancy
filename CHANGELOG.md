@@ -43,8 +43,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`in:expect:new:Context/call:toArray/call:toBe#0/key:value:'impersonator_email'`), and the assertion argument at a
   position where `differsBy` lists no value (`in:call:toThrow#1/value:'vocatives_cz.csv:2'`). A new step says to merge
   the candidate only into a row that takes its whole expected value as a value of its own. A key nested in an expected
-  value that `differsBy` already lists, the failure message of an assertion, and an expected value that a parameter of
-  the covering dataset row reaches do not count. This replaces the behaviour of #79 for a `merge-into-dataset`
+  value that `differsBy` already lists, a list whose whole expected value `differsBy` already lists as empty (`value:[]`),
+  the failure message of an assertion, and an expected value that a parameter of the covering dataset row reaches do not
+  count. This replaces the behaviour of #79 for a `merge-into-dataset`
   candidate: a key that the covering test passes only to an assertion now makes it `review`. A `delete` candidate is
   unchanged, so a covering test that only asserts more about the same input still leaves it `delete` (#97).
 

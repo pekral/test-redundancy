@@ -286,11 +286,17 @@ final readonly class Candidate implements JsonSerializable
         return $position !== null && !array_any($this->differsBy ?? [], static fn (string $own): bool => str_starts_with($own, $position));
     }
 
+    private function isListOnlyTheCoveringTestExpects(string $token): bool
+    {
+        return str_ends_with($token, TokenCollector::LIST_ITEM)
+            && !in_array(substr($token, 0, -strlen(TokenCollector::LIST_ITEM)) . 'value:[]', $this->differsBy ?? [], strict: true);
+    }
+
     private function isExpectationOnlyTheCoveringTestHas(string $token): bool
     {
         return $this->isExpectation($token)
             && $this->coveringDatasetParameters?->takes($token) !== true
-            && (str_ends_with($token, TokenCollector::LIST_ITEM)
+            && ($this->isListOnlyTheCoveringTestExpects($token)
                 || ($this->isKey($token) && !$this->isInValueDiffersByLists($token))
                 || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: true)));
     }
