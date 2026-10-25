@@ -361,6 +361,19 @@ test lacks.
   extra element of any kind stays `merge-into-dataset`, and a test that swaps elements the covering test also has is
   `review`, also when another value differs. The order tokens of the covering test are never listed in
   `coveringDiffersBy`.
+- **Order of arranging calls.** A test whose body makes two or more calls with literal input also carries one token
+  for each pair of these calls, with the earlier call first, like the order of list elements:
+  `calls:store(1)>store(2)` for `store(1); store(2);`. A call takes part when it is a statement of the test body, or
+  the value assigned in one, when it is not an assertion, and when its arguments hold a literal or a constant. A call
+  is named by its normalized source code, like a composite list element, without the variable it is assigned to:
+  `$matching = Model::factory()->create(['c_fields' => null])` takes part as
+  `Model::factory()->create(['c_fields' => null])`. A test with three such calls has three such tokens. Two tests or
+  dataset rows that make the same calls in another order, such as two tests that create the same records in another
+  order, differ in `differsBy`, and the candidate is `review`, not `delete`. Two tests that make the same calls in the
+  same order under other variable names have the same tokens. A call without literal input, an assertion, and a
+  statement that is not a call add nothing. `differsBy` lists an order token only when the covering test makes the
+  same two calls in the other order, so a test that makes another or an extra call keeps its action. The order tokens
+  of the covering test are never listed in `coveringDiffersBy`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its

@@ -426,6 +426,49 @@ it('gives each pair of list elements a token, so the order of the elements count
     'two elements passed to a call' => ['store([3, 5]);', ['in:function:store#0/items:value:3>value:5' => 1]],
 ]);
 
+it('gives each pair of arranging calls with literal input a token, so the order of the calls counts', function (string $body, array $expected): void {
+    $fingerprints = fingerprintsOf('<?php it(\'arranges\', function (): void { ' . $body . ' });');
+
+    $orderTokens = array_filter(
+        $fingerprints['it arranges'],
+        static fn (string $token): bool => str_starts_with($token, 'calls:'),
+        ARRAY_FILTER_USE_KEY,
+    );
+
+    expect($orderTokens)->toEqual($expected);
+})->with([
+    'a call without literal input' => ['store(1); refresh($model); store(2);', ['calls:store(1)>store(2)' => 1]],
+    'a call written in another form' => ['store("a"); store(0x10); /* note */ store(NULL);', [
+        'calls:store(16)>store(null)' => 1,
+        'calls:store(\'a\')>store(16)' => 1,
+        'calls:store(\'a\')>store(null)' => 1,
+    ],
+    ],
+    'an assertion' => ['store(1); expect(load(1))->toBe(1); $this->assertSame(2, load(2)); store(2);', ['calls:store(1)>store(2)' => 1]],
+    'a statement that is not a call' => ['$limit = 5; store(1);', []],
+    'calls assigned to variables' => ['$first = Model::factory()->create([\'a\' => 1]); $second = new Order(2);', [
+        'calls:Model::factory()->create([\'a\' => 1])>new Order(2)' => 1,
+    ],
+    ],
+    'one arranging call' => ['store(1);', []],
+    'the same calls in another order' => ['store(2); store(1);', ['calls:store(2)>store(1)' => 1]],
+    'two arranging calls' => ['store(1); store(2);', ['calls:store(1)>store(2)' => 1]],
+]);
+
+it('reads no order token of arranging calls as an assertion', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/ArrangeTest.php', <<<'PHP'
+        <?php
+        it('arranges', function (): void {
+            store('status:expected');
+            store('b');
+        });
+        PHP);
+
+    expect(new FingerprintCache($project)->assertsNothing('tests/ArrangeTest.php :: it arranges'))->toBeTrue();
+});
+
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 

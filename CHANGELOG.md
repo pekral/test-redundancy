@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The order of the calls that arrange a test is part of its fingerprint. Before, the tokens of a test did not depend on
+  the order of its statements, so two tests that create the same records in another order, such as
+  `JsonFloatScopeTest` with the matching row first and the row with `null` last, had the same tokens. One of them was
+  `delete` with an empty `differsBy`, and the order the test protects was lost. Now a test body with two or more calls
+  that carry literal input and are not assertions has one token for each pair of these calls, the earlier call first,
+  like the list-order tokens of #98, e.g. `calls:store(1)>store(2)` for `store(1); store(2);`. A call is named by its
+  normalized source code without the variable it is assigned to, so two tests that make the same calls in the same
+  order under other variable names still match. Tests and dataset rows that make the same calls in another order differ
+  in `differsBy`, and the candidate is `review`. `differsBy` lists an order token only when the covering test makes the
+  same two calls in the other order, so a test that makes another or an extra call keeps its action. An order token is
+  never read as an assertion (#101).
 - A variable or a property that a test passes to a call or to an assertion now carries a token that names it. Before,
   an argument that was not a literal carried only the `non-literal` token of its position, and an argument of an
   assertion carried nothing, so two tests that pass different objects, such as `connect($this->enShop)` and

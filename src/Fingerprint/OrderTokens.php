@@ -8,24 +8,28 @@ use PhpParser\Node;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Name;
+use PhpParser\Node\Stmt\Expression;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\PrettyPrinter\Standard;
 
-final class ArrayOrders
+final class OrderTokens
 {
 
     private const string KEYS_PREFIX = 'keys:';
 
     private const string ITEMS_PREFIX = 'items:';
 
+    private const string CALLS_PREFIX = 'calls:';
+
     private const string PATTERN = '~^(?:in:(?:[^\'/]|\'(?:[^\'\\\\]|\\\\.)*\'|/)*/)?('
-        . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')~';
+        . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . '|' . self::CALLS_PREFIX . ')~';
 
     public static function isToken(string $token): bool
     {
@@ -54,12 +58,12 @@ final class ArrayOrders
 
                 return match (true) {
                     $prefix === null => true,
-                    str_ends_with($prefix, self::ITEMS_PREFIX) => self::isReversedIn($prefix, substr($token, strlen($prefix)), $covering),
-                    default => !array_any(
+                    str_ends_with($prefix, self::KEYS_PREFIX) => !array_any(
                         $keys,
                         static fn (array $key): bool => str_starts_with($token, $key[0] . $key[1] . '>')
                             || (str_starts_with($token, $key[0]) && str_ends_with($token, '>' . $key[1])),
                     ),
+                    default => self::isReversedIn($prefix, substr($token, strlen($prefix)), $covering),
                 };
             },
         ));
@@ -71,7 +75,7 @@ final class ArrayOrders
      * @param array<int, string> $readProperties
      * @return array<string, int>
      */
-    public static function tokens(NodeFinder $nodeFinder, Node|array $nodes, array $paths, array $readProperties): array
+    public static function ofArrays(NodeFinder $nodeFinder, Node|array $nodes, array $paths, array $readProperties): array
     {
         $orders = [];
 
@@ -83,16 +87,56 @@ final class ArrayOrders
                 static fn (ArrayItem $item): ?array => $orderedNodeOf($item, $readProperties),
                 $array->items,
             )));
+            $orders = TokenCollector::sum($orders, self::pairs(array_map(
+                static fn (array $orderedNode): array => [NodeContext::pathPrefix($paths, $orderedNode[0]) . $prefix, $orderedNode[1]],
+                $orderedNodes,
+            )));
+        }
 
-            foreach ($orderedNodes as $position => [$node, $token]) {
-                foreach (array_slice($orderedNodes, 0, $position) as [, $earlierToken]) {
-                    $orderToken = NodeContext::pathPrefix($paths, $node) . $prefix . $earlierToken . '>' . $token;
-                    $orders[$orderToken] = ($orders[$orderToken] ?? 0) + 1;
-                }
+        return $orders;
+    }
+
+    /**
+     * @param array<\PhpParser\Node> $statements
+     * @return array<string, int>
+     */
+    public static function ofArrangingCalls(array $statements): array
+    {
+        return self::pairs(array_map(
+            static fn (Expr $call): array => [self::CALLS_PREFIX, self::sourceOf($call)],
+            array_values(array_filter(array_map(self::arrangingCallOf(...), $statements))),
+        ));
+    }
+
+    /**
+     * @param list<array{0: string, 1: string}> $orderedNames
+     * @return array<string, int>
+     */
+    private static function pairs(array $orderedNames): array
+    {
+        $orders = [];
+
+        foreach ($orderedNames as $position => [$prefix, $name]) {
+            foreach (array_slice($orderedNames, 0, $position) as [, $earlierName]) {
+                $orderToken = $prefix . $earlierName . '>' . $name;
+                $orders[$orderToken] = ($orders[$orderToken] ?? 0) + 1;
             }
         }
 
         return $orders;
+    }
+
+    private static function arrangingCallOf(Node $statement): ?Expr
+    {
+        $expression = $statement instanceof Expression ? $statement->expr : null;
+        $call = $expression instanceof Assign ? $expression->expr : $expression;
+        $token = $call instanceof CallLike ? TokenCollector::token($call) : null;
+
+        return $call instanceof CallLike
+            && ($token === null || !TokenCollector::isAssertionToken($token))
+            && new NodeFinder()->findFirst($call, TokenCollector::isData(...)) !== null
+            ? $call
+            : null;
     }
 
     /**
