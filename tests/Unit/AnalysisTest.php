@@ -380,6 +380,67 @@ it('asks for a review of a test whose covering test expects the same values for 
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
+it(
+    'asks to merge a test whose covering test pairs the same arguments of the subject with the same values under another message',
+    function (string $source, string $messageArgument): void {
+        $report = analyzeTokenTest(
+            source: $source,
+            linesByTest: [
+                'testMapsALargeValue' => ['src/Columns.php:10'],
+                'testMapsAZeroValue' => ['src/Columns.php:10', 'src/Columns.php:20'],
+            ],
+        );
+
+        expect($report->candidates)->toHaveCount(1)
+            ->and($report->candidates[0]->testCase())->toBe('testMapsALargeValue')
+            ->and($report->candidates[0]->differsBy)->toBe([
+                'in:function:detectColumns#0/value:\'10\'',
+                'in:function:detectColumns#0/value:\'500\'',
+                'in:expect:variable:mapping/call:get/' . $messageArgument . '/value:\'first\'',
+                'in:expect:variable:mapping/call:get/' . $messageArgument . '/value:\'second\'',
+            ])
+            ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+    },
+)->with([
+    'pest toBe' => [
+        <<<'PHP'
+            <?php
+            test('testMapsALargeValue', function (): void {
+                $mapping = detectColumns(['percentual', '10', '500']);
+                expect($mapping->get(1))->toBe(Column::VALUE, 'first')
+                    ->and($mapping->get(2))->toBe(Column::MIN_SPEND, 'second');
+            });
+            test('testMapsAZeroValue', function (): void {
+                $mapping = detectColumns(['percentual', '0', '50']);
+                expect($mapping->get(1))->toBe(Column::VALUE, message: 'one')
+                    ->and($mapping->get(2))->toBe(Column::MIN_SPEND, message: 'two');
+            });
+            PHP,
+        'call:toBe#1',
+    ],
+    'phpunit assertSame' => [
+        <<<'PHP'
+            <?php
+            final class ColumnsTest extends TestCase
+            {
+                public function testMapsALargeValue(): void
+                {
+                    $mapping = detectColumns(['percentual', '10', '500']);
+                    $this->assertSame(Column::VALUE, $mapping->get(1), 'first');
+                    $this->assertSame(Column::MIN_SPEND, $mapping->get(2), 'second');
+                }
+                public function testMapsAZeroValue(): void
+                {
+                    $mapping = detectColumns(['percentual', '0', '50']);
+                    $this->assertSame(Column::VALUE, $mapping->get(1), 'one');
+                    $this->assertSame(Column::MIN_SPEND, $mapping->get(2), 'two');
+                }
+            }
+            PHP,
+        'call:assertSame#2',
+    ],
+]);
+
 it('asks for a review of a test whose covering test expects its result for a named literal argument under another argument', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

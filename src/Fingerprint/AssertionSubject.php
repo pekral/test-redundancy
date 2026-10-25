@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use Pest\Expectation;
+use Pest\Mixins\Expectation as ExpectationMixin;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
@@ -15,9 +17,14 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
+use PHPUnit\Framework\Assert;
+use ReflectionMethod;
+use ReflectionParameter;
 
 final class AssertionSubject
 {
+
+    private const string MESSAGE_PARAMETER = 'message';
 
     /**
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
@@ -42,19 +49,15 @@ final class AssertionSubject
         return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
     }
 
-    public static function literalArguments(Node $call): string
+    public static function literalArguments(Node $call, ?string $assertionMethod = null): string
     {
         $arguments = '';
+        $messagePosition = $assertionMethod === null ? null : self::messagePosition($assertionMethod);
 
         foreach ($call instanceof CallLike ? $call->getRawArgs() : [] as $position => $argument) {
-            $literal = $argument instanceof Arg && TokenCollector::isData($argument->value)
-                ? (string) TokenCollector::token($argument->value)
-                : null;
-            $arguments .= $literal === null ? '' : sprintf(
-                '#%s:%s',
-                $argument->name?->toString() ?? $position,
-                substr($literal, (int) strpos($literal, ':') + 1),
-            );
+            $arguments .= $argument instanceof Arg && !self::fillsMessage($argument, $position, $messagePosition)
+                ? self::literalArgument($argument, $position)
+                : '';
         }
 
         return $arguments;
@@ -110,6 +113,36 @@ final class AssertionSubject
             ),
             static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
         )), -1);
+    }
+
+    private static function messagePosition(string $assertionMethod): ?int
+    {
+        $class = array_find(
+            [ExpectationMixin::class, Expectation::class, Assert::class],
+            static fn (string $class): bool => method_exists($class, $assertionMethod),
+        );
+
+        return $class === null ? null : array_find(
+            new ReflectionMethod($class, $assertionMethod)->getParameters(),
+            static fn (ReflectionParameter $parameter): bool => $parameter->getName() === self::MESSAGE_PARAMETER,
+        )?->getPosition();
+    }
+
+    private static function literalArgument(Arg $argument, int $position): string
+    {
+        $literal = TokenCollector::isData($argument->value) ? (string) TokenCollector::token($argument->value) : null;
+
+        return $literal === null ? '' : sprintf(
+            '#%s:%s',
+            $argument->name?->toString() ?? $position,
+            substr($literal, (int) strpos($literal, ':') + 1),
+        );
+    }
+
+    private static function fillsMessage(Arg $argument, int $position, ?int $messagePosition): bool
+    {
+        return $messagePosition !== null
+            && ($argument->name === null ? $position === $messagePosition : $argument->name->toString() === self::MESSAGE_PARAMETER);
     }
 
     private static function partToken(Expr $part, bool $withLiteralArguments): ?string

@@ -31,7 +31,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `merge-into-dataset` row built from it kept the expectations of the covering test, which contradict the candidate.
   Now each such assertion also has a `bound:` token with the literal arguments of the subject and of the assertion,
   e.g. `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, also for a named argument such as
-  `pipelineId: 99`. `differsBy` names the assertion that differs, and the candidate is `review` (#96).
+  `pipelineId: 99`. The token leaves out the failure message of the assertion, so two tests that pair the same
+  arguments with the same values under another message stay `merge-into-dataset`. `differsBy` names the assertion
+  that differs, and the candidate is `review` (#96).
 
 ## [0.1.5] - 2026-10-24
 
