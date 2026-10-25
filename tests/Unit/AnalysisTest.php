@@ -3687,6 +3687,18 @@ it('asks for a review of a test that passes another variable or property to the 
             PHP_SOURCE,
         ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
     ],
+    'another static property' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(connect(self::$enShop))->toBe(2);
+            });
+            it('covers the other case', function (): void {
+                expect(connect(self::$mainShop))->toBe(1);
+            });
+            PHP_SOURCE,
+        ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+    ],
     'another variable' => [
         <<<'PHP_SOURCE'
             <?php
@@ -3762,6 +3774,30 @@ it('asks for a review of a test that asserts on another variable or property tha
             });
             PHP_SOURCE,
         ['in:expect:variable:manager/call:connection/call:toBe#0/property:redisConnection'],
+    ],
+    'another property interpolated in the expected string' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(resolveUtm($campaign))->toBe("no_segment_tag_{$campaign->title}");
+            });
+            it('covers the other case', function (): void {
+                expect(resolveUtm($campaign))->toBe("tag_{$campaign->name}");
+            });
+            PHP_SOURCE,
+        ['in:expect:function:resolveUtm/call:toBe#0/property:title'],
+    ],
+    'another property joined to a string as the expected value' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(resolveUtm($campaign))->toBe('no_segment_tag_' . $campaign->title);
+            });
+            it('covers the other case', function (): void {
+                expect(resolveUtm($campaign))->toBe('tag_' . $campaign->name);
+            });
+            PHP_SOURCE,
+        ['in:expect:function:resolveUtm/call:toBe#0/property:title', 'value:\'no_segment_tag_\''],
     ],
     'variable the covering test expects only negated' => [
         <<<'PHP_SOURCE'

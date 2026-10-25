@@ -1028,6 +1028,18 @@ it('names the variable or the property that an argument of a call or of an asser
 
     expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing($expected);
 })->with([
+    'nullsafe property passed to the code under test' => [
+        'connect($shop?->url);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:url'],
+    ],
+    'property interpolated in a string passed to the code under test' => [
+        'store("tag_{$campaign->name}");',
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/property:name'],
+    ],
+    'property joined to a string passed to a PHPUnit assertion' => [
+        '$this->assertSame(\'a\' . $x->title, $y);',
+        ['call:assertSame', 'in:call:assertSame#0/property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
+    ],
     'property of a variable passed by name' => [
         'articlesFor(articleId: $article->post_id);',
         ['function:articlesFor', 'in:function:articlesFor#articleId/non-literal', 'in:function:articlesFor#articleId/property:post_id'],
@@ -1035,6 +1047,20 @@ it('names the variable or the property that an argument of a call or of an asser
     'property passed to the code under test' => [
         'connect($this->enShop);',
         ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+    ],
+    'static property passed to the code under test' => [
+        'connect(self::$enShop);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+    ],
+    'variable and property joined by operators passed to the code under test' => [
+        'store($prefix . $campaign->title . \'_\');',
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/property:title',
+            'in:function:store#0/variable:prefix',
+            'value:\'_\'',
+        ],
     ],
     'variable and property passed to a PHPUnit assertion' => [
         '$this->assertSame($this->redisConnection, $connection);',

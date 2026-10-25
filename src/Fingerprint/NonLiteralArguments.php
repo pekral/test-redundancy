@@ -8,10 +8,14 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\NullsafePropertyFetch;
 use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Expr\StaticPropertyFetch;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\Scalar\InterpolatedString;
 use PhpParser\NodeFinder;
 
 final class NonLiteralArguments
@@ -53,7 +57,8 @@ final class NonLiteralArguments
     {
         return match (true) {
             $value instanceof Variable && is_string($value->name) => 'variable:' . $value->name,
-            $value instanceof PropertyFetch && $value->name instanceof Identifier => 'property:' . $value->name->toString(),
+            ($value instanceof PropertyFetch || $value instanceof NullsafePropertyFetch || $value instanceof StaticPropertyFetch)
+                && $value->name instanceof Identifier => 'property:' . $value->name->toString(),
             default => null,
         };
     }
@@ -122,10 +127,7 @@ final class NonLiteralArguments
         return array_merge([], ...array_map(
             static fn (Expr $value): array => array_map(
                 static fn (string $suffix): string => NodeContext::pathPrefix($paths, $value) . $suffix,
-                array_values(array_filter(
-                    [$isAssertion ? null : self::SUFFIX, self::nameOf($value, $parameters)],
-                    static fn (?string $suffix): bool => $suffix !== null,
-                )),
+                [...($isAssertion ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
             ),
             $callToken === null ? [] : self::nonLiteralValues($call),
         ));
@@ -133,12 +135,19 @@ final class NonLiteralArguments
 
     /**
      * @param list<string> $parameters
+     * @return list<string>
      */
-    private static function nameOf(Expr $value, array $parameters): ?string
+    private static function namesOf(Expr $value, array $parameters): array
     {
-        $isParameter = $value instanceof Variable && in_array($value->name, $parameters, strict: true);
-
-        return $isParameter ? null : self::identity($value);
+        return match (true) {
+            $value instanceof BinaryOp => [...self::namesOf($value->left, $parameters), ...self::namesOf($value->right, $parameters)],
+            $value instanceof InterpolatedString => array_merge([], ...array_map(
+                static fn (Expr $part): array => self::namesOf($part, $parameters),
+                array_values(array_filter($value->parts, static fn (Node $part): bool => $part instanceof Expr)),
+            )),
+            $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
+            default => array_filter([self::identity($value)], is_string(...)),
+        };
     }
 
     /**
