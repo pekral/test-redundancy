@@ -3334,6 +3334,23 @@ it('asks for a review of a test whose covering test arranges a call or an argume
         ->and(valueAt($json, 'action'))->toBe('review')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy);
 })->with([
+    'argument position of a call that the covering test also reads in an assertion' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $repo->restore($id);
+
+                expect($repo->exists($id))->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                $repo->restore($id, $user);
+
+                expect($repo->exists($id))->toBeTrue();
+                expect($repo->restore($id))->toBeFalse();
+            });
+            PHP_SOURCE,
+        ['in:call:restore#1/non-literal'],
+    ],
     'call made more times' => [
         <<<'PHP_SOURCE'
             <?php
