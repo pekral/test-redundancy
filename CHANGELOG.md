@@ -34,6 +34,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `pipelineId: 99`. The token leaves out the failure message of the assertion, so two tests that pair the same
   arguments with the same values under another message stay `merge-into-dataset`. `differsBy` names the assertion
   that differs, and the candidate is `review` (#96).
+- A `merge-into-dataset` candidate whose expected value is smaller than the expected value of its covering test is
+  `review`. Before, an expected list without an element, an expected array without a key, or an assertion without an
+  argument that only the covering test passes produced no token: `differsBy` named only the inputs and the values both
+  tests expect, and a row built from it kept the larger expectation of the covering test, so the point of the candidate
+  was lost. Now `coveringDiffersBy` lists the longer expected list
+  (`in:expect:function:resolve/call:toEqualCanonicalizing#0/value:list-item`), the expected key the candidate lacks
+  (`in:expect:new:Context/call:toArray/call:toBe#0/key:value:'impersonator_email'`), and the assertion argument at a
+  position where `differsBy` lists no value (`in:call:toThrow#1/value:'vocatives_cz.csv:2'`). A new step says to merge
+  the candidate only into a row that takes its whole expected value as a value of its own. A key nested in an expected
+  value that `differsBy` already lists, the failure message of an assertion, and an expected value that a parameter of
+  the covering dataset row reaches do not count. This replaces the behaviour of #79 for a `merge-into-dataset`
+  candidate: a key that the covering test passes only to an assertion now makes it `review`. A `delete` candidate is
+  unchanged, so a covering test that only asserts more about the same input still leaves it `delete` (#97).
 
 ## [0.1.5] - 2026-10-24
 

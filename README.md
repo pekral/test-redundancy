@@ -216,11 +216,25 @@ and the steps ask whether the code under test reads one of these keys. A key nes
 already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
-`merge-into-dataset`. A key that test passes only to an assertion does not count either, because it is not input to
-the code under test. When that test passes an argument at a position where `differsBy` lists no value, such as
+`merge-into-dataset`. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
 action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
+The same holds for the expected value of an assertion. When that test expects more than the candidate does, a row
+with the values in `differsBy` would still expect it, so the case of the candidate would be lost. Such tokens are listed
+in `coveringDiffersBy`, the action is `review`, and the steps say to merge the candidate only into a row that takes its
+whole expected value as a value of its own. Three shapes count:
+
+- an expected list with more elements, `in:expect:function:resolve/call:toEqualCanonicalizing#0/value:list-item`;
+- an expected array key that the candidate lacks, such as `in:expect:new:Context/call:toArray/call:toBe#0/key:value:'impersonator_email'`
+  for `toBe(['impersonated' => false])` against `toBe(['impersonated' => true, 'impersonator_email' => 'a@b.cz'])`.
+  A key nested in an expected value that `differsBy` already lists does not count;
+- an assertion argument at a position where `differsBy` lists no value, such as the message
+  `in:call:toThrow#1/value:'vocatives_cz.csv:2'` of `toThrow(InvalidArgumentException::class, 'vocatives_cz.csv:2')`.
+  The failure message of an assertion, such as the `$message` of `toBe()` or `assertSame()`, does not count.
+
+When that test is a dataset row whose parameter reaches the expected value, the row replaces the whole expected value, so
+none of these shapes counts.
 When that test is a dataset row, a new row can pass only the values that the parameters of its closure or test method
 take. Each value in `differsBy` must sit at a position that a parameter reaches, and the type of that parameter must take
 the value. Otherwise the action is `review`, because a row with the value would land in another parameter, would be

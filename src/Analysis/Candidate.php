@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use JsonSerializable;
+use Pekral\TestRedundancy\Fingerprint\AssertionSubject;
 use Pekral\TestRedundancy\Fingerprint\DatasetParameters;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
@@ -72,7 +73,8 @@ final readonly class Candidate implements JsonSerializable
                 $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => !self::isData($token)
                     || ($this->isInputKey($token) && !$this->isInValueDiffersByLists($token))
-                    || $this->isInArgumentPositionOnlyTheCoveringTestFills($token),
+                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: false))
+                    || $this->isExpectationOnlyTheCoveringTestHas($token),
             )),
             default => [],
         };
@@ -125,6 +127,7 @@ final readonly class Candidate implements JsonSerializable
         $steps = [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
+            ...$this->missingExpectationSteps(),
             ...$sharedSteps,
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
@@ -205,6 +208,24 @@ final readonly class Candidate implements JsonSerializable
     /**
      * @return list<string>
      */
+    private function coveringExpectations(): array
+    {
+        return array_values(array_filter($this->coveringTokensForReview(), $this->isExpectation(...)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function missingExpectationSteps(): array
+    {
+        return $this->coveringExpectations() === []
+            ? []
+            : [sprintf(Action::MISSING_EXPECTATION_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringExpectations()))];
+    }
+
+    /**
+     * @return list<string>
+     */
     private function missingInputSteps(): array
     {
         $arrangement = $this->otherCoveringTokens();
@@ -223,7 +244,12 @@ final readonly class Candidate implements JsonSerializable
      */
     private function otherCoveringTokens(): array
     {
-        return array_values(array_diff($this->coveringTokensForReview(), $this->coveringKeys(), $this->coveringArguments()));
+        return array_values(array_diff(
+            $this->coveringTokensForReview(),
+            $this->coveringKeys(),
+            $this->coveringArguments(),
+            $this->coveringExpectations(),
+        ));
     }
 
     /**
@@ -252,11 +278,18 @@ final readonly class Candidate implements JsonSerializable
         );
     }
 
-    private function isInArgumentPositionOnlyTheCoveringTestFills(string $token): bool
+    private function isInArgumentPositionOnlyTheCoveringTestFills(?string $position): bool
     {
-        $position = TokenCollector::argumentPositionOfCodeUnderTest($token);
-
         return $position !== null && !array_any($this->differsBy ?? [], static fn (string $own): bool => str_starts_with($own, $position));
+    }
+
+    private function isExpectationOnlyTheCoveringTestHas(string $token): bool
+    {
+        return $this->isExpectation($token)
+            && $this->coveringDatasetParameters?->takes($token) !== true
+            && (str_ends_with($token, TokenCollector::LIST_ITEM)
+                || ($this->isKey($token) && !$this->isInValueDiffersByLists($token))
+                || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: true)));
     }
 
     private function differsOnlyInDataFromOneTestOfTheSameFile(): bool
@@ -300,12 +333,22 @@ final readonly class Candidate implements JsonSerializable
 
     private function isInputKey(string $token): bool
     {
-        return preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token) === 1 && !TokenCollector::isAssertionToken($token);
+        return $this->isKey($token) && !TokenCollector::isAssertionToken($token);
     }
 
     private function isArgument(string $token): bool
     {
-        return TokenCollector::argumentPositionOfCodeUnderTest($token) !== null;
+        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null;
+    }
+
+    private function isKey(string $token): bool
+    {
+        return preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token) === 1;
+    }
+
+    private function isExpectation(string $token): bool
+    {
+        return self::isData($token) && TokenCollector::isAssertionToken($token) && !AssertionSubject::isFailureMessage($token);
     }
 
     private static function isData(string $token): bool
