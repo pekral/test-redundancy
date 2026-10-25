@@ -31,15 +31,17 @@ final class NonLiteralArguments
 
     private const string IDENTITY = '(?:variable|property):[^/]+';
 
+    private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
+
     private const string POSITION = '(in:(?:.*/)?(?:call|function|new):[^/#]+#\w+/)';
 
     private const string POSITION_PATTERN = '~^' . self::POSITION . self::SUFFIX . '$~';
 
     private const string IDENTITY_POSITION_PATTERN = '~^' . self::POSITION . self::IDENTITY . '$~';
 
-    private const string CALL_PATTERN = '~((?:call|function|new):[^/#]+)#\w+/(?:' . self::SUFFIX . '|' . self::IDENTITY . ')$~';
+    private const string CALL_PATTERN = '~' . self::CALL . '(?:' . self::SUFFIX . '|' . self::IDENTITY . ')$~';
 
-    private const string POSITION_CALL_PATTERN = '~((?:call|function|new):[^/#]+)#\w+/$~';
+    private const string POSITION_CALL_PATTERN = '~' . self::CALL . '$~';
 
     public static function isToken(string $token): bool
     {
@@ -69,7 +71,16 @@ final class NonLiteralArguments
      */
     public static function isCallOfPositionMadeBy(string $position, array $tokens): bool
     {
-        return preg_match(self::POSITION_CALL_PATTERN, $position, $matches) === 1 && in_array($matches[1], $tokens, strict: true);
+        return preg_match(self::POSITION_CALL_PATTERN, $position, $matches) === 1
+            && array_intersect(self::madeAs($matches[1]), $tokens) !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function madeAs(string $call): array
+    {
+        return [$call, 'loop:' . $call];
     }
 
     public static function identityPositionOf(string $token): ?string
