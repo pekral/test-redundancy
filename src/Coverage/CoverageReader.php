@@ -47,8 +47,6 @@ final readonly class CoverageReader
     }
 
     /**
-     * The failure message of every failed or errored test case, by test key.
-     *
      * @return array<string, string>
      */
     public function failedTests(JunitIndex $junit): array

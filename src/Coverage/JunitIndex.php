@@ -82,8 +82,6 @@ final readonly class JunitIndex
     }
 
     /**
-     * The failure message of every failed or errored test case, by the test id (class::name).
-     *
      * @return array<string, string>
      */
     public function failureByTestId(): array

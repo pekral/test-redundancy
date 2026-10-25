@@ -17,7 +17,7 @@ final readonly class RedundancyAnalyzer
 
     /**
      * @param array<string, array<string, array<string, true>>> $testsByFile
-     * @param array<string, string> $failedTests the failure message by the key of every test case left out of the analysis
+     * @param array<string, string> $failedTests
      * @return list<\Pekral\TestRedundancy\Analysis\FileReport>
      */
     public function analyze(array $testsByFile, ?CoverageMap $map, array $failedTests = []): array
