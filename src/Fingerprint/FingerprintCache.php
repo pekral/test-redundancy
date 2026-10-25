@@ -63,11 +63,13 @@ final class FingerprintCache
     /**
      * @param list<string> $coveringTestKeys
      */
-    public function datasetParameters(array $coveringTestKeys): ?DatasetParameters
+    public function datasetParameters(string $testKey, array $coveringTestKeys): ?DatasetParameters
     {
-        return count($coveringTestKeys) === 1
+        $parameters = count($coveringTestKeys) === 1
             ? $this->fileOf($coveringTestKeys[0])?->datasetParameters[TestKey::testCase($coveringTestKeys[0])] ?? null
             : null;
+
+        return $parameters?->forCandidate(array_keys($this->of($testKey) ?? []));
     }
 
     public function assertsNothing(string $testKey): bool

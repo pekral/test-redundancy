@@ -43,7 +43,7 @@ final readonly class RedundancyAnalyzer
                     $differsBy === [] ? $this->linesOnlyTheUnionReaches($testKey, $tests[$testKey], $coveredBy, $coverPool) : [],
                     $this->fingerprints->assertsNothing($testKey),
                     $this->fingerprints->sharedDataset($testKey),
-                    $this->fingerprints->datasetParameters($coveredBy),
+                    $this->fingerprints->datasetParameters($testKey, $coveredBy),
                 );
             }
 

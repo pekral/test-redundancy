@@ -24,21 +24,20 @@ final readonly class DatasetParameters
     private const array VALUE_KINDS = ['null', 'bool', 'int', 'float', 'string', 'array'];
 
     private const array KINDS_BY_TYPE = [
-        'array' => self::VALUE_KINDS,
+        'array' => ['array'],
         'bool' => ['bool'],
-        'callable' => self::VALUE_KINDS,
+        'callable' => ['string', 'array'],
         'false' => ['bool'],
         'float' => ['int', 'float'],
         'int' => ['int'],
-        'iterable' => self::VALUE_KINDS,
+        'iterable' => ['array'],
         'mixed' => self::VALUE_KINDS,
         'null' => ['null'],
         'string' => ['string'],
         'true' => ['bool'],
     ];
 
-    private const array KIND_PATTERNS = [
-        'array' => '/^value:(?:\[\]|list-item)$/',
+    private const array SCALAR_KIND_PATTERNS = [
         'bool' => '/^value:(?:true|false)$/',
         'float' => '/^value:-?\d+\.\d+(?:E[+-]\d+)?$/',
         'int' => '/^value:-?\d+$/',
@@ -46,10 +45,13 @@ final readonly class DatasetParameters
         'string' => '/^value:\'(?:[^\'\\\\]|\\\\.)*\'$/s',
     ];
 
+    private const string ARRAY_VALUE_PATTERN = '/^(?:key:|value:(?:\[\]|list-item)$|value:.+\/)/s';
+
     /**
      * @param array<string, list<string>> $kindsByPosition
+     * @param list<string> $arrayPositions
      */
-    private function __construct(private array $kindsByPosition)
+    private function __construct(private array $kindsByPosition, private array $arrayPositions)
     {
     }
 
@@ -71,15 +73,35 @@ final readonly class DatasetParameters
             }
         }
 
-        return new self($kindsByPosition);
+        return new self($kindsByPosition, arrayPositions: []);
+    }
+
+    /**
+     * @param list<string> $candidateTokens
+     */
+    public function forCandidate(array $candidateTokens): self
+    {
+        return new self($this->kindsByPosition, array_values(array_filter(
+            array_keys($this->kindsByPosition),
+            static fn (string $position): bool => array_any(
+                $candidateTokens,
+                static fn (string $token): bool => self::kindOf(self::valueAt($position, $token) ?? '') === 'array',
+            ),
+        )));
     }
 
     public function takes(string $token): bool
     {
-        return array_any($this->kindsByPosition, static function (array $kinds, string $position) use ($token): bool {
-            $value = substr($token, strlen($position));
+        return array_any($this->kindsByPosition, function (array $kinds, string $position) use ($token): bool {
+            $value = self::valueAt($position, $token);
 
-            return str_starts_with($token, $position) && !str_starts_with($value, 'in:') && self::takesKind($kinds, $value);
+            if ($value === null) {
+                return false;
+            }
+
+            $kind = in_array($position, $this->arrayPositions, strict: true) ? 'array' : self::kindOf($value);
+
+            return $kind === null || in_array($kind, $kinds, strict: true);
         });
     }
 
@@ -115,14 +137,17 @@ final readonly class DatasetParameters
         };
     }
 
-    /**
-     * @param list<string> $kinds
-     */
-    private static function takesKind(array $kinds, string $value): bool
+    private static function valueAt(string $position, string $token): ?string
     {
-        $kind = array_find_key(self::KIND_PATTERNS, static fn (string $pattern): bool => preg_match($pattern, $value) === 1);
+        $value = substr($token, strlen($position));
 
-        return $kind === null || in_array($kind, $kinds, strict: true);
+        return str_starts_with($token, $position) && !str_starts_with($value, 'in:') ? $value : null;
+    }
+
+    private static function kindOf(string $value): ?string
+    {
+        return array_find_key(self::SCALAR_KIND_PATTERNS, static fn (string $pattern): bool => preg_match($pattern, $value) === 1)
+            ?? (preg_match(self::ARRAY_VALUE_PATTERN, $value) === 1 ? 'array' : null);
     }
 
 }

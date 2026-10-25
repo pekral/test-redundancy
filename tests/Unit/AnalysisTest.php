@@ -1496,6 +1496,22 @@ it('merges a test into a covering dataset only when each value in differsBy reac
         ->and($report->candidates[0]->testCase())->toBe('it covers')
         ->and($report->candidates[0]->action())->toBe($action);
 })->with([
+    'another keyed array for a parameter of type array' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (array $opts) => expect(f($opts))->toBeTrue())->with(['row' => [['a' => 1]]]);
+            it('covers', fn () => expect(f(['a' => 2]))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'another list for a parameter of type array' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
+            it('covers', fn () => expect(find([3, 4]))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
     'argument the covering closure does not pass' => [
         <<<'PHP'
             <?php
@@ -1524,6 +1540,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::Review,
     ],
+    'keyed array for a parameter of type int' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $a) => expect(f($a))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f(['a' => 1]))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
     'null for a nullable parameter' => [
         <<<'PHP'
             <?php
@@ -1532,11 +1556,35 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::MergeIntoDataset,
     ],
+    'null for a parameter of type array' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
+            it('covers', fn () => expect(find(null))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'null for a parameter of type callable' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (callable $f) => expect(apply($f))->toBeTrue())->with(['row' => ['strlen']]);
+            it('covers', fn () => expect(apply(null))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
     'null for a parameter of type int' => [
         <<<'PHP'
             <?php
             it('runs', fn (int $reminderCode) => expect(type($reminderCode))->toBe('reminder'))->with(['row' => [1]]);
             it('covers', fn () => expect(type(null))->toBe('reminder'));
+            PHP,
+        Action::Review,
+    ],
+    'scalar for a parameter of type array' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
+            it('covers', fn () => expect(find(5))->toBeTrue());
             PHP,
         Action::Review,
     ],
@@ -1547,6 +1595,22 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('covers', fn () => expect(label('inactive'))->toBeTrue());
             PHP,
         Action::Review,
+    ],
+    'string for a parameter of type iterable' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (iterable $items) => expect(sum($items))->toBe(3))->with(['row' => [[1, 2]]]);
+            it('covers', fn () => expect(sum('abc'))->toBe(3));
+            PHP,
+        Action::Review,
+    ],
+    'string with a slash for a parameter of type string' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (string $url) => expect(fetch($url))->toBeTrue())->with(['row' => ['http://a.cz/x']]);
+            it('covers', fn () => expect(fetch('http://a.cz/y'))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
     ],
     'value for a parameter without a type' => [
         <<<'PHP'
