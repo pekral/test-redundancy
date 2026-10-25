@@ -21,16 +21,43 @@ final class AssertionSubject
 
     /**
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
-     * @return list<\PhpParser\Node\Expr>
      */
-    public static function candidates(Node $assertion, string $method, array $assignedValues): array
+    public static function of(Node $assertion, string $method, array $assignedValues): ?Expr
     {
-        return array_values(array_filter(array_map(
-            static fn (?Expr $subject): ?Expr => $subject instanceof Variable && is_string($subject->name)
-                ? $assignedValues[$subject->name] ?? $subject
-                : $subject,
-            self::subjects($assertion, $method),
-        )));
+        return array_find(
+            self::candidates($assertion, $method, $assignedValues),
+            static fn (Expr $subject): bool => self::token($subject) !== null,
+        );
+    }
+
+    public static function token(Expr $subject, bool $withLiteralArguments = false): ?string
+    {
+        $token = self::partToken($subject, $withLiteralArguments);
+        $receiver = match (true) {
+            !$subject instanceof MethodCall => null,
+            $subject->var instanceof Variable && is_string($subject->var->name) => 'variable:' . $subject->var->name,
+            default => self::partToken($subject->var, $withLiteralArguments),
+        };
+
+        return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
+    }
+
+    public static function literalArguments(Node $call): string
+    {
+        $arguments = '';
+
+        foreach ($call instanceof CallLike ? $call->getRawArgs() : [] as $position => $argument) {
+            $literal = $argument instanceof Arg && TokenCollector::isData($argument->value)
+                ? (string) TokenCollector::token($argument->value)
+                : null;
+            $arguments .= $literal === null ? '' : sprintf(
+                '#%s:%s',
+                $argument->name?->toString() ?? $position,
+                substr($literal, (int) strpos($literal, ':') + 1),
+            );
+        }
+
+        return $arguments;
     }
 
     public static function isExpectationChain(Expr $node): bool
@@ -40,6 +67,20 @@ final class AssertionSubject
             $node instanceof MethodCall, $node instanceof PropertyFetch => self::isExpectationChain($node->var),
             default => false,
         };
+    }
+
+    /**
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @return list<\PhpParser\Node\Expr>
+     */
+    private static function candidates(Node $assertion, string $method, array $assignedValues): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (?Expr $subject): ?Expr => $subject instanceof Variable && is_string($subject->name)
+                ? $assignedValues[$subject->name] ?? $subject
+                : $subject,
+            self::subjects($assertion, $method),
+        )));
     }
 
     /**
@@ -69,6 +110,19 @@ final class AssertionSubject
             ),
             static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
         )), -1);
+    }
+
+    private static function partToken(Expr $part, bool $withLiteralArguments): ?string
+    {
+        $token = $part instanceof PropertyFetch && $part->name instanceof Identifier
+            ? 'property:' . $part->name->toString()
+            : TokenCollector::token($part);
+
+        return match (true) {
+            $token === null || preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,
+            $withLiteralArguments => $token . self::literalArguments($part),
+            default => $token,
+        };
     }
 
     private static function expectedValue(Expr $chain): ?Expr
