@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `merge-into-dataset` candidate is now `review` when it passes an optional argument that its covering test omits.
+  Before, a candidate such as `new PredictedData(date: $date, newCustomersForecastCount: 24)` was merged into the
+  covering test `new PredictedData(date: $date)`, which relies on the default `= null`. A dataset row passes every
+  argument, so the case "the argument is omitted, the default applies" disappeared, and `coveringDiffersBy` did not
+  name the omission. The same held for a positional argument, such as the third argument of
+  `($action)('john@example.com', 20, $events)` against `($action)('john@example.com', 20)`. Now the action is
+  `review`, and a new step lists the arguments of the candidate that the covering test omits and says to merge only when
+  the row passes them as a spread array that is empty for the covering row. A call of a variable, such as
+  `$action(...)` or `($action)(...)`, has the token `function:$action` now, so its arguments carry a position like the
+  arguments of a named function (#102).
 - The order of the calls that arrange a test is part of its fingerprint. Before, the tokens of a test did not depend on
   the order of its statements, so two tests that create the same records in another order, such as
   `JsonFloatScopeTest` with the matching row first and the row with `null` last, had the same tokens. One of them was

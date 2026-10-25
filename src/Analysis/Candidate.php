@@ -20,6 +20,7 @@ final readonly class Candidate implements JsonSerializable
      * @param list<string>|null $differsBy
      * @param list<string>|null $coveringDiffersBy
      * @param list<string> $unionOnlyLines
+     * @param list<string> $omittedByCovering
      */
     public function __construct(
         public string $testKey,
@@ -30,6 +31,7 @@ final readonly class Candidate implements JsonSerializable
         public bool $assertsNothing,
         public ?SharedDataset $sharedDataset = null,
         public ?DatasetParameters $coveringDatasetParameters = null,
+        public array $omittedByCovering = [],
     ) {
     }
 
@@ -58,7 +60,8 @@ final readonly class Candidate implements JsonSerializable
             $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
             $this->differsOnlyInDataFromOneTestOfTheSameFile()
                 && $this->coveringTokensForReview() === []
-                && $this->coveringDatasetTakesDiffersBy() => Action::MergeIntoDataset,
+                && $this->coveringDatasetTakesDiffersBy()
+                && $this->omittedByCovering === [] => Action::MergeIntoDataset,
             default => Action::Review,
         };
     }
@@ -74,9 +77,7 @@ final readonly class Candidate implements JsonSerializable
                 $this->coveringTokens(),
                 fn (string $token): bool => (!self::isData($token) && !NonLiteralArguments::isToken($token))
                     || ($this->isInputKey($token) && !$this->isInValueDiffersByLists($token))
-                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(
-                        NonLiteralArguments::positionOf($token) ?? TokenCollector::argumentPosition($token, ofAssertion: false),
-                    )
+                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(NonLiteralArguments::argumentPositionOf($token))
                     || $this->isExpectationOnlyTheCoveringTestHas($token),
             )),
             default => [],
@@ -131,6 +132,7 @@ final readonly class Candidate implements JsonSerializable
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
             ...$this->missingExpectationSteps(),
+            ...$this->coveringTokenSteps(Action::OMITTED_ARGUMENT_STEP, $this->omittedByCovering),
             ...$sharedSteps,
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
