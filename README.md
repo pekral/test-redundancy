@@ -335,9 +335,14 @@ test lacks.
   elements has three such tokens. The same elements in another order give other tokens, so two dataset rows or tests
   whose lists differ only in the order of their elements, such as `[3, 5]` and `[5, 3]`, differ in `differsBy`, and the
   candidate is `review`, not `delete`. An element takes part when it carries a token of its own: a literal, a constant,
-  an enum case, a call, a `new` expression or an empty array. A variable, a closure and a non-empty array add nothing.
-  An order token of an element that the covering test lacks is not listed, because that element is listed already, and
-  the order tokens of the covering test are never listed in `coveringDiffersBy`.
+  an enum case, a call or a `new` expression without arguments, or an empty array. A non-empty array, and a call or a
+  `new` expression with arguments, take part by their source code, e.g.
+  `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
+  `items:['id' => 1]>['id' => 2]` for two rows of a dataset. A variable and a closure add nothing. An order token of a
+  literal, a constant, an enum case or an empty array that the covering test lacks is not listed, because that element
+  is listed already. A list with more calls, `new` expressions or non-empty arrays than the list of the covering test
+  lists their order tokens, so such a test is `review`, not `merge-into-dataset`. The order tokens of the covering test
+  are never listed in `coveringDiffersBy`.
 - **Call arguments.** A literal, constant or empty array passed straight to a call or a `new` expression carries the
   call and the argument position, e.g. `in:function:store#0/value:true` and `in:function:store#1/value:false` for
   `store(true, false)`, so the same literals at swapped positions are different tokens. A named argument carries its

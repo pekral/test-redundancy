@@ -364,7 +364,12 @@ it('gives each pair of list elements a token, so the order of the elements count
     'a list no call receives' => ['$ids = [1, 2];', ['items:value:1>value:2' => 1]],
     'a list with an unpacked array' => ['store([...$ids, 1, 2]);', []],
     'a map' => ['store([\'a\' => 1, \'b\' => 2]);', []],
-    'an array element' => ['store([[\'a\' => 1], 2, []]);', ['in:function:store#0/items:value:2>value:[]' => 1]],
+    'an array element' => ['store([[\'a\' => 1], 2, []]);', [
+        'in:function:store#0/items:value:2>value:[]' => 1,
+        'in:function:store#0/items:[\'a\' => 1]>value:2' => 1,
+        'in:function:store#0/items:[\'a\' => 1]>value:[]' => 1,
+    ],
+    ],
     'an enum case read through a property' => ['store([CouponType::FIXED->value, \'b\']);', [
         'in:function:store#0/items:const:CouponType::FIXED->value>value:\'b\'' => 1,
     ],
