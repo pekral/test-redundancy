@@ -9,6 +9,7 @@ use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
 use Pekral\TestRedundancy\Analysis\Verification;
 use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
+use Pekral\TestRedundancy\Coverage\CoverageResult;
 use Pekral\TestRedundancy\Coverage\CoverageRun;
 use Pekral\TestRedundancy\Coverage\TestRunner;
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
@@ -60,8 +61,8 @@ final readonly class TestRedundancy
         $skipped = array_filter($testFiles, $this->declaresSingleTestCase(...));
         $analysed = array_values(array_diff($testFiles, $skipped));
         $runPaths = $skipped === [] && count($requestedPaths) === 1 ? $requestedPaths : $analysed;
-        $run = $analysed === [] ? ['linesByTest' => [], 'failedTests' => []] : $this->coverageRun->run($runPaths);
-        $testsByFile = $this->testsByFile($analysed, $run['linesByTest']);
+        $run = $analysed === [] ? new CoverageResult([], []) : $this->coverageRun->run($runPaths);
+        $testsByFile = $this->testsByFile($analysed, $run->linesByTest);
         $this->saveBaseline([...array_fill_keys($testFiles, []), ...$testsByFile], across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
         $reports = [];
@@ -70,7 +71,7 @@ final readonly class TestRedundancy
             $reports = [
                 ...$reports,
                 ...(isset($testsByFile[$testFile])
-                    ? $analyzer->analyze([$testFile => $testsByFile[$testFile]], map: null, failedTests: $run['failedTests'])
+                    ? $analyzer->analyze([$testFile => $testsByFile[$testFile]], map: null, failedTests: $run->failedTests)
                     : [FileReport::skipped($testFile)]),
             ];
         }
@@ -104,8 +105,8 @@ final readonly class TestRedundancy
 
         if ($unmapped !== []) {
             $run = $this->coverageRun->run($unmapped);
-            $testsByFile = [...$testsByFile, ...$this->testsByFile($unmapped, $run['linesByTest'])];
-            $failedTests = $run['failedTests'];
+            $testsByFile = [...$testsByFile, ...$this->testsByFile($unmapped, $run->linesByTest)];
+            $failedTests = $run->failedTests;
         }
 
         $this->saveBaseline($testsByFile, across: true);

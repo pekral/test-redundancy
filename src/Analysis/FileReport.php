@@ -12,7 +12,7 @@ final readonly class FileReport implements JsonSerializable
     /**
      * @param list<\Pekral\TestRedundancy\Analysis\Candidate> $candidates
      * @param list<string> $testsWithoutSourceLines
-     * @param array<string, string> $failedTests the failure message by the test case that failed and is left out of the analysis
+     * @param array<string, string> $failedTests
      */
     public function __construct(
         public string $testFile,
