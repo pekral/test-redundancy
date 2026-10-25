@@ -1456,6 +1456,129 @@ it('asks to merge a test whose literal arguments its covering test passes at swa
         ->and($reports[0]->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
+it('reviews, and does not merge, a test whose value the covering dataset closure hard-codes in its body', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('appends vars to http links', function (string $content, string $vars, string $expected, bool $replace = false): void {
+                expect(Content::addVarsToUrlQuery($content, $vars, true, $replace))->toBe($expected);
+            })->with([
+                'http link gets query appended' => ['<a href="http://a.cz">x</a>', 'test=true', '<a href="http://a.cz?test=true">x</a>'],
+            ]);
+
+            it('keeps encoded merge tags when containsMergeTags is false', function (): void {
+                expect(Content::addVarsToUrlQuery('<a href="http://a.cz">x</a>', 'tag=%2A%7C', false))
+                    ->toBe('<a href="http://a.cz?tag=%2A%7C">x</a>');
+            });
+            PHP,
+        linesByTest: [
+            'it keeps encoded merge tags when containsMergeTags is false' => ['src/Content.php:10'],
+            'it appends vars to http links › http link gets query appended' => ['src/Content.php:10', 'src/Content.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it keeps encoded merge tags when containsMergeTags is false')
+        ->and($report->candidates[0]->differsBy)->toContain('in:call:Content::addVarsToUrlQuery#2/value:false')
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('merges a test into a covering dataset only when each value in differsBy reaches a closure parameter that takes it', function (
+    string $source,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers' => ['src/Foo.php:10'], 'it runs › row' => ['src/Foo.php:10', 'src/Foo.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers')
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'argument the covering closure does not pass' => [
+        <<<'PHP'
+            <?php
+            it('runs', function (string $subject): void {
+                expect(validate($subject))->toBeFalse();
+            })->with(['row' => ['*|X|*']]);
+            it('covers', fn () => expect(validate('*|Y|*', 'subject'))->toBeFalse());
+            PHP,
+        Action::Review,
+    ],
+    'expected value under a key the covering closure hard-codes' => [
+        <<<'PHP'
+            <?php
+            it('runs', function (Type $type, string $expectedKey): void {
+                expect(build($type, null))->toBe([$expectedKey => null]);
+            })->with(['row' => [Type::LEAD, 'lead_id']]);
+            it('covers', fn () => expect(build(Type::PERSON, 7))->toBe(['person_id' => 7]));
+            PHP,
+        Action::Review,
+    ],
+    'float for a parameter of type int or string' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int|string $id) => expect(find($id))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(find(1.5))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'null for a nullable parameter' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (?int $reminderCode) => expect(type($reminderCode))->toBe('reminder'))->with(['row' => [1]]);
+            it('covers', fn () => expect(type(null))->toBe('reminder'));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'null for a parameter of type int' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (int $reminderCode) => expect(type($reminderCode))->toBe('reminder'))->with(['row' => [1]]);
+            it('covers', fn () => expect(type(null))->toBe('reminder'));
+            PHP,
+        Action::Review,
+    ],
+    'string for an enum parameter' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (Status $status) => expect(label($status))->toBeTrue())->with(['row' => [Status::ACTIVE]]);
+            it('covers', fn () => expect(label('inactive'))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'value for a parameter without a type' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($value) => expect(store($value))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(store(null))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+]);
+
+it('reviews, and does not merge, a test whose value the data provider test hard-codes in its body', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            final class CalculatorTest extends TestCase
+            {
+                #[DataProvider('sums')]
+                public function testAdds(int $first, int $second, int $sum): void { self::assertSame($sum, add($first, $second, false)); }
+                public static function sums(): iterable { yield 'one and two' => [1, 2, 3]; }
+                public function testAddsRounded(): void { self::assertSame(3, add(1, 2, true)); }
+            }
+            PHP,
+        linesByTest: ['testAddsRounded' => ['src/Calculator.php:10'], 'testAdds › one and two' => ['src/Calculator.php:10', 'src/Calculator.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('testAddsRounded')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:add#2/value:true'])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
 it('asks to merge a test whose covering test sets an array key it lacks only in an assertion', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

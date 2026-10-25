@@ -14,8 +14,13 @@ final class ContractFingerprints
     {
         $statements = self::statements($testFile);
         $pest = PestFingerprints::analyse($statements);
+        $phpUnit = PhpUnitFingerprints::analyse($statements);
 
-        return new FileFingerprints([...$pest->fingerprints, ...PhpUnitFingerprints::of($statements)], $pest->sharedDatasets);
+        return new FileFingerprints(
+            [...$pest->fingerprints, ...$phpUnit->fingerprints],
+            $pest->sharedDatasets,
+            [...$pest->datasetParameters, ...$phpUnit->datasetParameters],
+        );
     }
 
     public static function declaresSingleTestCase(string $testFile): bool

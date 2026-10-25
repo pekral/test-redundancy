@@ -220,9 +220,16 @@ already lists does not count, because a row replaces the whole value. For exampl
 the code under test. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
-action is `review`, and the steps ask whether the code under test behaves differently without one of these values. A
-candidate whose `differsBy` holds only data against several covering tests or against a test
-of another file is `review` too, and so is a dataset row whose covering test is not a row of the same dataset.
+action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
+When that test is a dataset row, a new row can pass only the values that the parameters of its closure or test method
+take. Each value in `differsBy` must sit at a position that a parameter reaches, and the type of that parameter must take
+the value. Otherwise the action is `review`, because a row with the value would land in another parameter, would be
+dropped, or would throw a `TypeError`, and the case of the candidate would be lost. This applies to a value at a position
+that the body hard-codes, such as `false` against the literal `true` in `addVarsToUrlQuery($content, $vars, true)`, to an
+argument that the body does not pass, and to a value that the parameter type does not take, such as `null` for
+`int $code`. A constant is taken by every type, because its value is not known. A candidate whose `differsBy` holds only
+data against several covering tests or against a test of another file is `review` too, and so is a dataset row whose
+covering test is not a row of the same dataset.
 
 ### How `differsBy` names a difference
 

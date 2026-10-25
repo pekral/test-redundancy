@@ -16,6 +16,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   file, counts them in `summary.failedTests`, and the text format prints a `Failed tests` list. `analyse` exits with `1`
   while a test case fails. A process that ends without a coverage file or a JUnit log still aborts the run, and `map`
   and `verify` still abort when a test case fails (#93).
+- A test is no longer `merge-into-dataset` into a dataset row when a value in its `differsBy` cannot become row data.
+  Before, the steps asked to add a row with the values in `differsBy` even when the covering closure hard-codes the
+  value in its body, does not pass the argument at all, or declares a parameter type that does not take the value, such
+  as `null` for `int $reminderCode`. Such a row lands in another parameter, is dropped, or throws a `TypeError`, so the
+  case of the candidate was lost. Now each value in `differsBy` must sit at a position that a parameter of the covering
+  closure or test method reaches, and the type of that parameter must take the value; otherwise the action is `review`
+  (#95).
 
 ## [0.1.5] - 2026-10-24
 
