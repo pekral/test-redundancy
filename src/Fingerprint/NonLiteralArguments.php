@@ -46,8 +46,7 @@ final class NonLiteralArguments
 
         return array_values(array_filter(
             $difference,
-            static fn (string $token): bool => preg_match(self::CALL_PATTERN, $token, $matches) !== 1
-                || !in_array($matches[1], $calls, strict: true),
+            static fn (string $token): bool => !in_array(self::callOf($token), $calls, strict: true),
         ));
     }
 
