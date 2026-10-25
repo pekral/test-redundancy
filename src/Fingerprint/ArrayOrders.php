@@ -120,7 +120,7 @@ final class ArrayOrders
 
     private static function sourceOf(Expr $element): string
     {
-        $normalized = new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
+        return new Standard()->prettyPrint(new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
 
             public function leaveNode(Node $node): ?Node
             {
@@ -129,10 +129,7 @@ final class ArrayOrders
                 return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
             }
 
-        })->traverse([$element])[0];
-        assert($normalized instanceof Expr);
-
-        return new Standard()->prettyPrintExpr($normalized);
+        })->traverse([$element]));
     }
 
     private static function prefixOf(string $token): ?string
