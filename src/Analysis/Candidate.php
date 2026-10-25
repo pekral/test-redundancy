@@ -271,7 +271,8 @@ final readonly class Candidate implements JsonSerializable
     private function coveringDatasetTakesDiffersBy(): bool
     {
         return $this->coveringDatasetParameters === null
-            || array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...));
+            || (array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...))
+                && !array_any($this->coveringDiffersBy ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
     }
 
     private function isCoveredByOneTestOfTheSameFile(): bool

@@ -227,7 +227,9 @@ the value. Otherwise the action is `review`, because a row with the value would 
 dropped, or would throw a `TypeError`, and the case of the candidate would be lost. This applies to a value at a position
 that the body hard-codes, such as `false` against the literal `true` in `addVarsToUrlQuery($content, $vars, true)`, to an
 argument that the body does not pass, and to a value that the parameter type does not take, such as `null` for
-`int $code`. A constant is taken by every type, because its value is not known. A candidate whose `differsBy` holds only
+`int $code`. A slot the body hard-codes is never row data, also in a list that the body builds around a parameter: in
+`f([$n, 5])`, a row changes only the slot of `$n`, so a candidate that lacks the `5` there, such as `f([1, 6])`, is
+`review`. A constant is taken by every type, because its value is not known. A candidate whose `differsBy` holds only
 data against several covering tests or against a test of another file is `review` too, and so is a dataset row whose
 covering test is not a row of the same dataset.
 
