@@ -1480,7 +1480,11 @@ it('still deletes a test whose covering test passes a value it lacks only to an 
             ],
         ),
         'testAddsOneAndTwo',
-        ['expect:function:add/call:self::assertSame', 'in:expect:function:add/call:self::assertSame#0/value:3'],
+        [
+            'in:expect:function:add/call:self::assertSame#1/variable:sum',
+            'expect:function:add/call:self::assertSame',
+            'in:expect:function:add/call:self::assertSame#0/value:3',
+        ],
     ],
     'phpunit exception expectation' => [
         fn (): FileReport => analyzeTokenTest(
@@ -3541,7 +3545,7 @@ it('still deletes a test whose covering test only reads a call in an assertion i
     'method chain passed to and' => ['expect($event)->and($list->items()->count())->toBe(2);'],
 ]);
 
-it('still deletes a test whose covering test arranges the same calls and passes a non-literal value at the same positions', function (): void {
+it('still deletes a test whose covering test makes the same calls with the same variables and properties at the same positions', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP_SOURCE'
             <?php
@@ -3553,7 +3557,7 @@ it('still deletes a test whose covering test arranges the same calls and passes 
             });
             it('covers the arranged case', function (): void {
                 $domain = createDomain();
-                $counted = recalculate($other, $other->campaign->id);
+                $counted = recalculate($job, $other->campaign->id);
 
                 expect($counted)->toBe(1);
                 expect($counted)->not->toBeNull();
@@ -3588,7 +3592,7 @@ it('asks for a review of a test that passes a non-literal argument its covering 
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it covers the arranged case')
-        ->and($report->candidates[0]->differsBy)->toBe(['in:function:recalculate#2/non-literal'])
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:recalculate#2/non-literal', 'in:function:recalculate#2/property:id'])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -3656,3 +3660,123 @@ it('asks for a review of a test that differs only in data from a covering test t
         ->and($report->candidates[0]->coveringTokensForReview())->toBe(['in:function:store#1/non-literal'])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
+
+it('asks for a review of a test that passes another variable or property to the code under test than its covering test', function (
+    string $source,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Builder.php:5'], 'it covers the other case' => ['src/Builder.php:5', 'src/Builder.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'another property' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(connect($this->enShop))->toBe(2);
+            });
+            it('covers the other case', function (): void {
+                expect(connect($this->mainShop))->toBe(1);
+            });
+            PHP_SOURCE,
+        ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+    ],
+    'another variable' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(connect($enShop))->toBe(2);
+            });
+            it('covers the other case', function (): void {
+                expect(connect($reconnected))->toBe(1);
+            });
+            PHP_SOURCE,
+        ['in:function:connect#0/variable:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+    ],
+]);
+
+it('asks for a review of a test that passes a literal where its covering test passes a variable or a property', function (
+    string $source,
+    array $coveringTokensForReview,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Pipeline.php:5'], 'it covers the other case' => ['src/Pipeline.php:5', 'src/Pipeline.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe($coveringTokensForReview)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'property of a record the covering test creates' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(dispatchBulkStep('happypet'))->toBe(1);
+            });
+            it('covers the other case', function (): void {
+                expect(dispatchBulkStep($account->name))->toBe(2);
+            });
+            PHP_SOURCE,
+        ['in:function:dispatchBulkStep#0/property:name'],
+    ],
+    'property passed by name' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(articlesFor(articleId: 5))->toHaveCount(1);
+            });
+            it('covers the other case', function (): void {
+                expect(articlesFor(articleId: $article->post_id))->toHaveCount(2);
+            });
+            PHP_SOURCE,
+        ['in:function:articlesFor#articleId/property:post_id'],
+    ],
+]);
+
+it('asks for a review of a test that asserts on another variable or property than its covering test', function (string $source, array $differsBy): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Store.php:5'], 'it covers the other case' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'another property as the expected value' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect($manager->connection())->toBe($this->redisConnection);
+            });
+            it('covers the other case', function (): void {
+                expect($manager->connection())->toBe($second);
+            });
+            PHP_SOURCE,
+        ['in:expect:variable:manager/call:connection/call:toBe#0/property:redisConnection'],
+    ],
+    'variable the covering test expects only negated' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                store($account, $canvaUserId);
+
+                expect(linksOf($account))->toContain($canvaUserId);
+            });
+            it('covers the other case', function (): void {
+                store($account, $canvaUserId);
+
+                expect(linksOf($account))->toContain($otherCanvaUserId)->not->toContain($canvaUserId);
+            });
+            PHP_SOURCE,
+        ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId'],
+    ],
+]);

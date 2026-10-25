@@ -126,9 +126,13 @@ final class DatasetRows
         $boundReads = self::passedOnFirstReads($body, $assignments);
         $values = [...array_filter($assignedValues, self::isBindable(...)), ...array_intersect_key($assignedValues, $boundReads)];
         $binder = new ParameterBinder($values, array_values(array_intersect_key($assignments, $values)), $boundReads);
+        $parameterNames = array_values(array_filter(
+            array_map(static fn (Param $parameter): ?string => self::variableName($parameter->var), $parameters),
+            static fn (?string $name): bool => $name !== null,
+        ));
 
         return TokenCollector::sum(
-            TokenCollector::collect($binder->bind($body), $assignedValues),
+            TokenCollector::collect($binder->bind($body), $assignedValues, $parameterNames),
             TokenCollector::collect(array_values(array_diff_key($values, $binder->boundNames()))),
         );
     }

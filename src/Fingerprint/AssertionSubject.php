@@ -40,11 +40,9 @@ final class AssertionSubject
     public static function token(Expr $subject, bool $withLiteralArguments = false): ?string
     {
         $token = self::partToken($subject, $withLiteralArguments);
-        $receiver = match (true) {
-            !$subject instanceof MethodCall => null,
-            $subject->var instanceof Variable && is_string($subject->var->name) => 'variable:' . $subject->var->name,
-            default => self::partToken($subject->var, $withLiteralArguments),
-        };
+        $receiver = $subject instanceof MethodCall
+            ? NonLiteralArguments::identity($subject->var) ?? self::partToken($subject->var, $withLiteralArguments)
+            : null;
 
         return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
     }
@@ -153,9 +151,7 @@ final class AssertionSubject
 
     private static function partToken(Expr $part, bool $withLiteralArguments): ?string
     {
-        $token = $part instanceof PropertyFetch && $part->name instanceof Identifier
-            ? 'property:' . $part->name->toString()
-            : TokenCollector::token($part);
+        $token = $part instanceof PropertyFetch ? NonLiteralArguments::identity($part) : TokenCollector::token($part);
 
         return match (true) {
             $token === null || preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,

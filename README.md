@@ -227,7 +227,11 @@ and the steps ask whether the code under test reads one of these keys. A key nes
 already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
-`merge-into-dataset`. When that test passes an argument at a position where `differsBy` lists no value, such as
+`merge-into-dataset`. When that test passes a variable or a property that the candidate does not pass, such as
+`in:function:dispatchBulkStep#0/property:name` for `dispatchBulkStep($account->name)` against
+`dispatchBulkStep('happypet')`, a row with the values in `differsBy` would still pass that variable or property, so the
+case of the candidate would be lost: the name tokens (see *Argument names*) are listed in `coveringDiffersBy` and the
+action is `review`. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
 action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
@@ -370,12 +374,25 @@ test lacks.
   positions is a different token.
 - **Non-literal arguments.** An argument of a call that is not an assertion, whose value is not a literal, a constant,
   an enum case, a list or a map, carries the call and the position followed by `non-literal`, such as
-  `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, not the
-  variable, so `recalculate($job, 5, $campaign->id)` and `recalculate($job, 5, $other)` have the same token, and a test
-  that lacks the position differs from the one that fills it. The token is left out of a difference that names the
-  call itself already, as `function:recalculate` does for a call the other test does not make. A variable that the
+  `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, so a
+  test that lacks the position differs from the one that fills it. The variable or the property at the position has a
+  token of its own (see *Argument names*). Both tokens are left out of a difference that names the call itself
+  already, as `function:recalculate` does for a call the other test does not make. A variable that the
   test assigns once and passes on is read as the value it holds, so `$url = fake()->url(); store($url)` has the call
   tokens of `fake()->url()` and the token of the position.
+- **Argument names.** A variable or a property passed straight to a call, a function call, a `new` expression or an
+  assertion carries the call and the position followed by its name: `variable:<name>` for a variable and
+  `property:<name>` for a property. `connect($this->enShop)` has the token `in:function:connect#0/property:enShop`,
+  `recalculate($job, 5, $campaign->id)` has `in:function:recalculate#0/variable:job` and
+  `in:function:recalculate#2/property:id`, and `expect(linksOf($account))->toContain($canvaUserId)` has
+  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. So two tests that pass or expect different
+  variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
+  receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
+  carries no name, because each dataset row fills it with another value. A variable that the test assigns once and
+  passes on where it first reads it carries no name there, because that read is counted as the value the variable
+  holds. A later read of the variable carries the name. A name that only the covering test has does not turn a
+  `delete` candidate into `review`: the candidate passes another value at the same position, or the position token
+  already lists the argument.
 - **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
   `expect(activeState())` or `assertSame(5, $order->total())`, adds the token `read:` followed by its own token, such
   as `read:function:activeState`, beside the token itself. The token counts how many of the calls are such reads, so
