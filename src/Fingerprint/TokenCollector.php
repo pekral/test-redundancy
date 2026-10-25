@@ -76,12 +76,7 @@ final class TokenCollector
             $token .= $readProperties[spl_object_id($node)] ?? '';
             $prefixedToken = self::prefix($arrayKeys, $paths, $node, $token) . $token;
             $prefixedToken = self::loopPrefix($loopBodies, $node, $prefixedToken) . $prefixedToken;
-            $tokens[$prefixedToken] = ($tokens[$prefixedToken] ?? 0) + max(1, self::listLength($node));
-
-            if (isset($assertionReads[spl_object_id($node)]) && preg_match(self::DATA_TOKEN_PATTERN, $prefixedToken) !== 1) {
-                $readToken = self::READ_PREFIX . $prefixedToken;
-                $tokens[$readToken] = ($tokens[$readToken] ?? 0) + 1;
-            }
+            $tokens = self::sum($tokens, self::counted($node, $prefixedToken, isset($assertionReads[spl_object_id($node)])));
         }
 
         return self::sum(
@@ -233,7 +228,7 @@ final class TokenCollector
     {
         $key = self::nameOf($arrayItem->key, $readProperties);
 
-        return $key === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
+        return $key === null ? [] : array_fill_keys(NodeContext::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
     }
 
     /**
@@ -250,7 +245,7 @@ final class TokenCollector
         foreach ($callToken === null ? [] : $arguments as $position => $argument) {
             if ($argument instanceof Arg) {
                 $segment = $callToken . '#' . ($argument->name?->toString() ?? $position);
-                $segments += array_fill_keys(self::argumentValueIds($argument->value, $isAssertion, isArgument: true), $segment);
+                $segments += array_fill_keys(NodeContext::argumentValueIds($argument->value, $isAssertion, isArgument: true), $segment);
             }
         }
 
@@ -258,48 +253,15 @@ final class TokenCollector
     }
 
     /**
-     * @return list<int>
+     * @return array<string, int>
      */
-    private static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
+    private static function counted(Node $node, string $token, bool $isAssertionRead): array
     {
-        $passedItems = match (true) {
-            $value instanceof Array_ => array_filter(
-                $value->items,
-                static fn (ArrayItem $item): bool => $item->key !== null || $isArgument,
-            ),
-            $value instanceof CallLike && !$isAssertion => array_filter(
-                $value->getRawArgs(),
-                static fn (Node $argument): bool => $argument instanceof Arg,
-            ),
-            default => [],
-        };
+        $counts = [$token => max(1, self::listLength($node))];
 
-        return array_merge(self::valueIds($value), ...array_map(
-            static fn (ArrayItem|Arg $item): array => match (true) {
-                $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
-                $item->key === null => self::valueIds($item->value),
-                default => [...self::valueIds($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
-            },
-            array_values($passedItems),
-        ));
-    }
-
-    /**
-     * @return list<int>
-     */
-    private static function valueIds(Expr $value): array
-    {
-        $enumCase = NodeContext::enumCaseReadBy($value);
-
-        return $enumCase === null ? [spl_object_id($value)] : [spl_object_id($value), spl_object_id($enumCase)];
-    }
-
-    /**
-     * @return array<int>
-     */
-    private static function nodeIds(NodeFinder $nodeFinder, Node $node): array
-    {
-        return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
+        return $isAssertionRead && preg_match(self::DATA_TOKEN_PATTERN, $token) !== 1
+            ? [...$counts, self::READ_PREFIX . $token => 1]
+            : $counts;
     }
 
     private static function arrayToken(Array_ $array): string
