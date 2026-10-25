@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A variable or a property that a test passes to a call or to an assertion now carries a token that names it. Before,
+  an argument that was not a literal carried only the `non-literal` token of its position, and an argument of an
+  assertion carried nothing, so two tests that pass different objects, such as `connect($this->enShop)` and
+  `connect($this->mainShop)`, or expect different variables, such as `toContain($canvaUserId)` and
+  `toContain($otherCanvaUserId)`, looked the same when their literals matched, and the candidate was `delete` or
+  `merge-into-dataset`. Now the argument carries the call, the position and `variable:<name>` or `property:<name>`,
+  such as `in:function:connect#0/property:enShop` and
+  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`, so such tests differ in `differsBy` and the
+  candidate is `review`. A `merge-into-dataset` candidate is also `review` when its covering test passes a variable or
+  a property where the candidate passes a literal, such as `dispatchBulkStep($account->name)` against
+  `dispatchBulkStep('happypet')`. A parameter of the test closure or test method, which a dataset row fills, carries
+  no name (#100).
 - A `delete` candidate no longer ignores an arrangement that only its covering test has outside the literal arguments
   of the code under test. Before, `coveringDiffersBy` listed only the array keys and the literal arguments, so a
   covering test that arranges a mock that throws (`->andThrow(new InvalidDomain())`), a wrapping call

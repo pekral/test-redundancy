@@ -56,14 +56,17 @@ it('collects the Pest negation as part of the call it negates', function (): voi
 
     expect(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
         'function:expect',
+        'in:function:expect#0/variable:value',
         'not:call:toBeEmpty',
         'call:toBeArray',
     ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not()->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
         'function:expect',
+        'in:function:expect#0/variable:value',
         'not:call:toBeEmpty',
         'call:toBeArray',
     ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->toBeEmpty();'))))->toEqualCanonicalizing([
         'function:expect',
+        'in:function:expect#0/variable:value',
         'call:toBeEmpty',
     ]);
 });
@@ -71,13 +74,29 @@ it('collects the Pest negation as part of the call it negates', function (): voi
 it('collects a Pest assertion written as a property like its call form', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 
-    expect(TokenCollector::collect($statements))->toBe($expected);
+    expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
-    'assertion' => ['expect($value)->toBeEmpty;', ['call:toBeEmpty' => 1, 'function:expect' => 1]],
-    'assertion after and' => ['\\expect($value)->and($other)->toBeTrue;', ['call:toBeTrue' => 1, 'call:and' => 1, 'function:expect' => 1]],
-    'assertion on a higher-order property' => ['expect($user)->name->toBeString;', ['call:toBeString' => 1, 'function:expect' => 1]],
-    'assertion on each item' => ['expect($items)->each->toBeInt;', ['call:toBeInt' => 1, 'call:each' => 1, 'function:expect' => 1]],
-    'negated assertion' => ['expect($value)->not->toBeEmpty;', ['not:call:toBeEmpty' => 1, 'function:expect' => 1]],
+    'assertion' => ['expect($value)->toBeEmpty;', ['in:function:expect#0/variable:value' => 1, 'call:toBeEmpty' => 1, 'function:expect' => 1]],
+    'assertion after and' => ['\\expect($value)->and($other)->toBeTrue;', [
+        'call:and' => 1,
+        'call:toBeTrue' => 1,
+        'function:expect' => 1,
+        'in:call:and#0/variable:other' => 1,
+        'in:function:expect#0/variable:value' => 1,
+    ],
+    ],
+    'assertion on a higher-order property' => [
+        'expect($user)->name->toBeString;',
+        ['in:function:expect#0/variable:user' => 1, 'call:toBeString' => 1, 'function:expect' => 1],
+    ],
+    'assertion on each item' => [
+        'expect($items)->each->toBeInt;',
+        ['in:function:expect#0/variable:items' => 1, 'call:toBeInt' => 1, 'call:each' => 1, 'function:expect' => 1],
+    ],
+    'negated assertion' => [
+        'expect($value)->not->toBeEmpty;',
+        ['in:function:expect#0/variable:value' => 1, 'not:call:toBeEmpty' => 1, 'function:expect' => 1],
+    ],
 ]);
 
 it('collects no property fetch that runs no Pest assertion', function (): void {
@@ -86,7 +105,7 @@ it('collects no property fetch that runs no Pest assertion', function (): void {
         . 'expect($user)->name->email; expect($user)->{$name};',
     );
 
-    expect(TokenCollector::collect($statements))->toBe(['function:expect' => 2]);
+    expect(TokenCollector::collect($statements))->toBe(['in:function:expect#0/variable:user' => 2, 'function:expect' => 2]);
 });
 
 it('collects the subject of an assertion in the assertion tokens', function (string $body, array $expected): void {
@@ -114,6 +133,7 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     'actual argument written twice' => ['$x = 1; $x = bar(); self::assertEquals(new Money(5), $x);', [
         'call:self::assertEquals' => 1,
         'function:bar' => 1,
+        'in:call:self::assertEquals#1/variable:x' => 1,
         'in:new:Money#0/value:5' => 1,
         'new:Money' => 1,
         'read:new:Money' => 1,
@@ -154,6 +174,7 @@ it('collects the subject of an assertion in the assertion tokens', function (str
         'expect:property:order/call:toBeGreaterThan' => 1,
         'function:expect' => 1,
         'in:expect:property:order/call:toBeGreaterThan#0/value:0' => 1,
+        'in:function:expect#0/property:order' => 1,
     ],
     ],
     'value passed to and' => ['expect($user)->toBeTrue()->and(load())->not->toBeEmpty();', [
@@ -162,6 +183,7 @@ it('collects the subject of an assertion in the assertion tokens', function (str
         'expect:function:load/not:call:toBeEmpty' => 1,
         'function:expect' => 1,
         'function:load' => 1,
+        'in:function:expect#0/variable:user' => 1,
         'read:function:load' => 1,
     ],
     ],
@@ -590,7 +612,7 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable a closure captures by reference' => [
         '$email = \'a\'; $notify = function () use (&$email): void { notify($email); };',
-        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'in:function:notify#0/variable:email' => 1, 'value:\'a\'' => 1],
     ],
     'variable a closure captures by value' => [
         '$email = \'a\'; $notify = function () use ($email): void { notify($email); };',
@@ -598,12 +620,24 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable assigned a list with an object and read twice' => [
         '$contacts = [new Contact()]; notify($contacts); notify($contacts);',
-        ['function:notify' => 2, 'in:function:notify#0/non-literal' => 2, 'new:Contact' => 1, 'value:list-item' => 1],
+        [
+            'function:notify' => 2,
+            'in:function:notify#0/non-literal' => 2,
+            'in:function:notify#0/variable:contacts' => 2,
+            'new:Contact' => 1,
+            'value:list-item' => 1,
+        ],
     ],
     'variable assigned a literal once' => ['$email = \'a\'; notify($email);', ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1]],
     'variable assigned a literal twice' => [
         '$email = \'a\'; $email = \'b\'; notify($email);',
-        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
+        [
+            'function:notify' => 1,
+            'in:function:notify#0/non-literal' => 1,
+            'in:function:notify#0/variable:email' => 1,
+            'value:\'a\'' => 1,
+            'value:\'b\'' => 1,
+        ],
     ],
     'variable assigned a map and read once' => [
         '$options = [\'a\' => 1]; notify($options);',
@@ -619,7 +653,13 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable the test appends to' => [
         '$emails = []; $emails[] = \'a\'; notify($emails);',
-        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1, 'value:[]' => 1],
+        [
+            'function:notify' => 1,
+            'in:function:notify#0/non-literal' => 1,
+            'in:function:notify#0/variable:emails' => 1,
+            'value:[]' => 1,
+            'value:\'a\'' => 1,
+        ],
     ],
     'variable the test never reads' => ['$email = \'a\'; notify();', ['function:notify' => 1, 'value:\'a\'' => 1]],
 ]);
@@ -651,6 +691,7 @@ it('keeps the tokens of a call result without a path when the test first reads i
         'in:function:client#0/value:\'a\'/value:1' => 1,
         'in:function:client#0/key:value:\'a\'' => 1,
         'in:call:send#0/non-literal' => 1,
+        'in:call:send#0/variable:id' => 1,
         'loop:call:send' => 1,
     ]);
 });
@@ -915,8 +956,10 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'function:expect' => 1,
             'function:roleOf' => 1,
             'in:function:roleOf#0/non-literal' => 1,
+            'in:function:roleOf#0/variable:user' => 1,
             'read:function:roleOf' => 1,
             'read:in:function:roleOf#0/non-literal' => 1,
+            'read:in:function:roleOf#0/variable:user' => 1,
         ],
     ],
     'call that wraps a variable' => [
@@ -925,6 +968,7 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'function:store' => 1,
             'function:strtoupper' => 1,
             'in:function:store#0/function:strtoupper#0/non-literal' => 1,
+            'in:function:store#0/function:strtoupper#0/variable:email' => 1,
             'in:function:store#0/non-literal' => 1,
         ],
     ],
@@ -940,20 +984,31 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'in:function:store#4/const:Size::Large->value' => 1,
         ],
     ],
-    'named argument' => ['store(enabled: $flag);', ['function:store' => 1, 'in:function:store#enabled/non-literal' => 1]],
+    'named argument' => [
+        'store(enabled: $flag);',
+        ['function:store' => 1, 'in:function:store#enabled/non-literal' => 1, 'in:function:store#enabled/variable:flag' => 1],
+    ],
     'new expression' => ['store(new Money());', ['function:store' => 1, 'new:Money' => 1, 'in:function:store#0/non-literal' => 1]],
-    'Pest assertion' => ['expect($actual)->toBe($expected);', ['function:expect' => 1, 'call:toBe' => 1]],
-    'PHPUnit assertion' => ['$this->assertSame($expected, $actual);', ['call:assertSame' => 1]],
-    'property' => ['$campaign->add($campaign->id);', ['call:add' => 1, 'in:call:add#0/non-literal' => 1]],
-    'variable' => ['store($id);', ['function:store' => 1, 'in:function:store#0/non-literal' => 1]],
+    'Pest assertion' => [
+        'expect($actual)->toBe($expected);',
+        ['function:expect' => 1, 'call:toBe' => 1, 'in:function:expect#0/variable:actual' => 1, 'in:call:toBe#0/variable:expected' => 1],
+    ],
+    'PHPUnit assertion' => [
+        '$this->assertSame($expected, $actual);',
+        ['call:assertSame' => 1, 'in:call:assertSame#0/variable:expected' => 1, 'in:call:assertSame#1/variable:actual' => 1],
+    ],
+    'property' => ['$campaign->add($campaign->id);', ['call:add' => 1, 'in:call:add#0/non-literal' => 1, 'in:call:add#0/property:id' => 1]],
+    'variable' => ['store($id);', ['function:store' => 1, 'in:function:store#0/non-literal' => 1, 'in:function:store#0/variable:id' => 1]],
 ]);
 
-it('lists no non-literal argument token of a call that the token list names already', function (): void {
+it('lists no non-literal or name token of an argument of a call that the token list names already', function (): void {
     $difference = [
         'function:store',
         'in:function:store#0/non-literal',
+        'in:function:store#0/property:enShop',
         'loop:call:Batch::import',
         'in:call:Batch::import#1/non-literal',
+        'in:call:Batch::import#1/variable:rows',
         'in:function:store#1/function:wrap#0/non-literal',
         'in:function:load#0/non-literal',
         'value:1',
@@ -967,3 +1022,43 @@ it('lists no non-literal argument token of a call that the token list names alre
         'value:1',
     ]);
 });
+
+it('names the variable or the property that an argument of a call or of an assertion passes', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing($expected);
+})->with([
+    'property of a variable passed by name' => [
+        'articlesFor(articleId: $article->post_id);',
+        ['function:articlesFor', 'in:function:articlesFor#articleId/non-literal', 'in:function:articlesFor#articleId/property:post_id'],
+    ],
+    'property passed to the code under test' => [
+        'connect($this->enShop);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+    ],
+    'variable and property passed to a PHPUnit assertion' => [
+        '$this->assertSame($this->redisConnection, $connection);',
+        ['call:assertSame', 'in:call:assertSame#0/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
+    ],
+    'variable passed to a Pest assertion' => [
+        'expect(linksOf($account))->toContain($canvaUserId);',
+        [
+            'expect:function:linksOf/call:toContain',
+            'function:expect',
+            'function:linksOf',
+            'in:expect:function:linksOf/call:toContain#0/variable:canvaUserId',
+            'in:function:linksOf#0/non-literal',
+            'in:function:linksOf#0/variable:account',
+            'read:function:linksOf',
+            'read:in:function:linksOf#0/non-literal',
+            'read:in:function:linksOf#0/variable:account',
+        ],
+    ],
+]);
+
+it('tells an assertion from the code under test by the call a name token belongs to', function (string $token, bool $isAssertion): void {
+    expect(TokenCollector::isAssertionToken($token))->toBe($isAssertion);
+})->with([
+    'variable passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId', true],
+    'variable passed to the code under test whose name starts like an assertion' => ['in:function:store#0/variable:expected', false],
+]);

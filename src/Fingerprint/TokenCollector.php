@@ -48,9 +48,10 @@ final class TokenCollector
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node>|null $nodes
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param list<string> $parameters
      * @return array<string, int>
      */
-    public static function collect(null|Node|array $nodes, array $assignedValues = []): array
+    public static function collect(null|Node|array $nodes, array $assignedValues = [], array $parameters = []): array
     {
         if ($nodes === null) {
             return [];
@@ -63,7 +64,7 @@ final class TokenCollector
         $paths = self::paths($nodeFinder, $nodes, $assignedValues, $readProperties);
         $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
         $assertionReads = NodeContext::assertionReads($nodeFinder, $nodes);
-        $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths, $assertionReads);
+        $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths, $assertionReads, $parameters);
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
         foreach ($nodeFinder->find($nodes, $carriesToken) as $node) {
@@ -120,7 +121,7 @@ final class TokenCollector
             str_starts_with($token, self::BOUND_PREFIX), self::isReadToken($token) => true,
             preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 => preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
                 && self::isAssertion($matches[2]),
-            default => self::isAssertion(self::calledMethod($token)),
+            default => self::isAssertion(self::calledMethod(NonLiteralArguments::callOf($token) ?? $token)),
         };
     }
 

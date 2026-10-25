@@ -266,6 +266,7 @@ final readonly class Candidate implements JsonSerializable
             array_filter(
                 $this->assertsNothing ? $this->coveringTokens() : $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => !TokenCollector::isAssertionToken($token)
+                    && NonLiteralArguments::identityPositionOf($token) === null
                     && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
             ),
         );
