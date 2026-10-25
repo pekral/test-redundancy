@@ -47,6 +47,8 @@ final readonly class DatasetParameters
 
     private const string ARRAY_VALUE_PATTERN = '/^(?:key:|value:(?:\[\]|list-item)$|value:.+\/)/s';
 
+    private const array LIST_LENGTH_VALUES = ['value:list-item', 'value:[]'];
+
     /**
      * @param array<string, list<string>> $kindsByPosition
      * @param list<string> $arrayPositions
@@ -103,7 +105,7 @@ final readonly class DatasetParameters
         return array_any($this->kindsByPosition, function (array $kinds, string $position) use ($token): bool {
             $value = self::valueAt($position, $token);
 
-            if ($value === null) {
+            if ($value === null || $this->isBodyListLength($position, $value)) {
                 return false;
             }
 
@@ -122,6 +124,11 @@ final readonly class DatasetParameters
             static fn (int $parameter): ArrayItem => new ArrayItem(new String_(self::SENTINEL . $parameter)),
             array_keys(array_values($parameters)),
         ));
+    }
+
+    private function isBodyListLength(string $position, string $value): bool
+    {
+        return in_array($position, $this->bodyListPositions, strict: true) && in_array($value, self::LIST_LENGTH_VALUES, strict: true);
     }
 
     /**
