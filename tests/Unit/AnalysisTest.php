@@ -3149,6 +3149,107 @@ it('leaves the order of the list elements of a covering test out of coveringDiff
         ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:2']);
 });
 
+it('reviews a test that arranges the records of its covering test in another order', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('keeps only the records above the compared float', function (): void {
+                $matching = Model::factory()->create(['c_fields' => json_encode(10.5)]);
+                $withNull = Model::factory()->create(['c_fields' => null]);
+
+                expect(Model::query()->aboveFloat(10.0)->pluck('id')->all())->toContain($matching->id)->not->toContain($withNull->id);
+            });
+            it('excludes null values regardless of the insertion order', function (): void {
+                $withNull = Model::factory()->create(['c_fields' => null]);
+                $matching = Model::factory()->create(['c_fields' => json_encode(10.5)]);
+
+                expect(Model::query()->aboveFloat(10.0)->pluck('id')->all())->toContain($matching->id)->not->toContain($withNull->id);
+            });
+            PHP,
+        linesByTest: [
+            'it keeps only the records above the compared float' => ['src/Scope.php:10'],
+            'it excludes null values regardless of the insertion order' => ['src/Scope.php:10', 'src/Scope.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it keeps only the records above the compared float')
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'calls:Model::factory()->create([\'c_fields\' => json_encode(10.5)])>Model::factory()->create([\'c_fields\' => null])',
+        ])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('reviews a dataset row that arranges the records of its sibling row in another order', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores', function (int $first, int $second): void {
+                store($first);
+                store($second);
+            })->with([
+                'ascending' => [1, 2],
+                'descending' => [2, 1],
+            ]);
+            PHP,
+        linesByTest: ['it stores › ascending' => ['src/Store.php:10'], 'it stores › descending' => ['src/Store.php:10', 'src/Store.php:20']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe(['calls:store(1)>store(2)'])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('deletes a test that arranges the records of its covering test in the same order under other variable names', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('keeps only the records above the compared float', function (): void {
+                $matching = Model::factory()->create(['c_fields' => json_encode(10.5)]);
+                $withNull = Model::factory()->create(['c_fields' => null]);
+
+                expect(Model::query()->aboveFloat(10.0)->count())->toBe(1);
+            });
+            it('keeps only the records above the compared float again', function (): void {
+                $first = Model::factory()->create(['c_fields' => json_encode(10.5)]);
+                $second = Model::factory()->create(['c_fields' => null]);
+
+                expect(Model::query()->aboveFloat(10.0)->count())->toBe(1);
+            });
+            PHP,
+        linesByTest: [
+            'it keeps only the records above the compared float' => ['src/Scope.php:10'],
+            'it keeps only the records above the compared float again' => ['src/Scope.php:10', 'src/Scope.php:20'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('lists no order token for an arranging call that the covering test lacks, because the call is listed already', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores another record', function (): void {
+                store(1);
+                store(3);
+            });
+            it('stores two records', function (): void {
+                store(1);
+                store(2);
+            });
+            PHP,
+        linesByTest: ['it stores another record' => ['src/Store.php:10'], 'it stores two records' => ['src/Store.php:10', 'src/Store.php:20']],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it stores another record')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:store#0/value:3'])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
 it('lists a covering argument whose string has the prefix of an order token in it', function (string $path): void {
     $report = analyzeTokenTest(
         source: <<<PHP
@@ -3163,6 +3264,7 @@ it('lists a covering argument whose string has the prefix of an order token in i
         ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
+    'calls' => ['/v1/calls:list'],
     'items' => ['/v1/items:batchGet'],
     'keys' => ['/v1/keys:lookup'],
 ]);

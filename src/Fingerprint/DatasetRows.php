@@ -134,6 +134,7 @@ final class DatasetRows
         return TokenCollector::sum(
             TokenCollector::collect($binder->bind($body), $assignedValues, $parameterNames),
             TokenCollector::collect(array_values(array_diff_key($values, $binder->boundNames()))),
+            OrderTokens::ofArrangingCalls(self::testStatements($body)),
         );
     }
 

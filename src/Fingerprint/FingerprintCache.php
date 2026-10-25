@@ -31,7 +31,7 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $exceeding = ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering);
+            $exceeding = OrderTokens::withoutImplied($this->exceeding($tokens['own'], $covering), $covering);
             $difference = NonLiteralArguments::withoutImplied($exceeding, $exceeding);
 
             if ($smallest === null || count($difference) < count($smallest)) {
@@ -60,7 +60,7 @@ final class FingerprintCache
         $covering = TokenCollector::sum(...$tokens['covering']);
         $exceeding = array_values(array_filter(
             $this->exceeding($covering, $tokens['own']),
-            static fn (string $token): bool => !ArrayOrders::isToken($token),
+            static fn (string $token): bool => !OrderTokens::isToken($token),
         ));
         $onlyAssertionsRead = array_filter(
             $exceeding,
