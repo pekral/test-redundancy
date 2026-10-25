@@ -235,6 +235,14 @@ action is `review`. When that test passes an argument at a position where `diffe
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
 action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
+The reverse holds too. When the candidate passes a named or a positional argument that the covering test omits, such
+as `in:new:PredictedData#newCustomersForecastCount/value:24` for `new PredictedData(date: $date, newCustomersForecastCount: 24)`
+against `new PredictedData(date: $date)`, the covering test relies on the default of the argument, and a row passes
+every argument, so the case "the argument is omitted, the default applies" would be lost: the action is `review`, and
+the steps list the arguments of the candidate that the covering test omits and say to merge only when the row passes them
+as a spread array that is empty for the covering row. The same holds for a call of a variable, such as
+`($action)('john@example.com', 20, $events)` against `($action)('john@example.com', 20)`, which carries
+`function:$action` and the position `in:function:$action#2/`.
 The same holds for the expected value of an assertion. When that test expects more than the candidate does, a row
 with the values in `differsBy` would still expect it, so the case of the candidate would be lost. Such tokens are listed
 in `coveringDiffersBy`, the action is `review`, and the steps say to merge the candidate only into a row that takes its

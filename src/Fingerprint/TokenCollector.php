@@ -20,6 +20,7 @@ use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
+use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
@@ -141,7 +142,7 @@ final class TokenCollector
             $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
                 ? sprintf('call:%s::%s', $node->class->toString(), $node->name->toString())
                 : null,
-            $node instanceof FuncCall => $node->name instanceof Name ? 'function:' . $node->name->toString() : null,
+            $node instanceof FuncCall => self::functionToken($node),
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
             $node instanceof Array_ => self::arrayToken($node),
             default => null,
@@ -264,6 +265,15 @@ final class TokenCollector
         return $isAssertionRead && preg_match(self::DATA_TOKEN_PATTERN, $token) !== 1
             ? [...$counts, self::READ_PREFIX . $token => 1]
             : $counts;
+    }
+
+    private static function functionToken(FuncCall $call): ?string
+    {
+        return match (true) {
+            $call->name instanceof Name => 'function:' . $call->name->toString(),
+            $call->name instanceof Variable && is_string($call->name->name) => 'function:$' . $call->name->name,
+            default => null,
+        };
     }
 
     private static function arrayToken(Array_ $array): string

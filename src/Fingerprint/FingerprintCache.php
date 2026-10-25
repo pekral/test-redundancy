@@ -77,6 +77,23 @@ final class FingerprintCache
         );
     }
 
+    /**
+     * @param list<string> $coveringTestKeys
+     * @return list<string>
+     */
+    public function omittedArguments(string $testKey, array $coveringTestKeys): array
+    {
+        $tokens = $this->tokens($testKey, $coveringTestKeys);
+        $covering = array_keys(TokenCollector::sum(...$tokens['covering'] ?? []));
+        $isOmitted = static fn (?string $position): bool => $position !== null
+            && !array_any($covering, static fn (string $token): bool => str_starts_with($token, $position));
+
+        return array_values(array_filter(
+            array_keys($tokens['own'] ?? []),
+            static fn (string $token): bool => $isOmitted(NonLiteralArguments::argumentPositionOf($token)),
+        ));
+    }
+
     public function sharedDataset(string $testKey): ?SharedDataset
     {
         return $this->fileOf($testKey)?->sharedDatasets[TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;

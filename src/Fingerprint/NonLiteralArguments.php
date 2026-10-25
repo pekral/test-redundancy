@@ -49,6 +49,11 @@ final class NonLiteralArguments
         return preg_match(self::POSITION_PATTERN, $token, $matches) === 1 ? $matches[1] : null;
     }
 
+    public static function argumentPositionOf(string $token): ?string
+    {
+        return self::positionOf($token) ?? TokenCollector::argumentPosition($token, ofAssertion: false);
+    }
+
     public static function identityPositionOf(string $token): ?string
     {
         return preg_match(self::IDENTITY_POSITION_PATTERN, $token, $matches) === 1 ? $matches[1] : null;

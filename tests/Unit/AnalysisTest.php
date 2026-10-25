@@ -3966,3 +3966,88 @@ it('asks for a review of a test that asserts on another variable or property tha
         ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId'],
     ],
 ]);
+
+it('asks for a review of a test that passes optional arguments its covering test omits and relies on their defaults', function (
+    string $source,
+    string ...$differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the full case' => ['src/Data.php:5'], 'it covers the default case' => ['src/Data.php:5', 'src/Data.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the full case')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->steps())->toBe([
+            sprintf(Action::OMITTED_ARGUMENT_STEP, '"it covers the default case"', implode(', ', $differsBy)),
+            ...Action::Review->steps('"it covers the default case"', []),
+        ]);
+})->with([
+    'named arguments of a constructor' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                $data = new PredictedData(date: '2026-01-01', newCustomersForecastCount: 24, newCustomersAvgClv: 315.5);
+
+                expect($data->toArray())->toBe(['count' => 24]);
+            });
+            it('covers the default case', function (): void {
+                $data = new PredictedData(date: '2026-01-01');
+
+                expect($data->toArray())->toBe(['count' => 24]);
+            });
+            PHP_SOURCE,
+        'in:new:PredictedData#newCustomersForecastCount/value:24',
+        'in:new:PredictedData#newCustomersAvgClv/value:315.5',
+    ],
+    'positional argument of a function' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                expect(store('john@example.com', 20, 'opened'))->toBe(1);
+            });
+            it('covers the default case', function (): void {
+                expect(store('john@example.com', 20))->toBe(1);
+            });
+            PHP_SOURCE,
+        'in:function:store#2/value:\'opened\'',
+    ],
+    'positional argument of a variable that holds the action' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                expect(($action)('john@example.com', 20, 'opened'))->toBe(1);
+            });
+            it('covers the default case', function (): void {
+                expect(($action)('john@example.com', 20))->toBe(1);
+            });
+            PHP_SOURCE,
+        'in:function:$action#2/value:\'opened\'',
+    ],
+]);
+
+it('still merges a test into a covering test that passes the same optional arguments with other values', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                $data = new PredictedData(date: '2026-01-01', newCustomersForecastCount: 24);
+
+                expect($data->toArray())->toBe(['count' => 24]);
+            });
+            it('covers the other case', function (): void {
+                $data = new PredictedData(date: '2026-01-01', newCustomersForecastCount: 30);
+
+                expect($data->toArray())->toBe(['count' => 24]);
+            });
+            PHP_SOURCE,
+        linesByTest: ['it covers the full case' => ['src/Data.php:5'], 'it covers the other case' => ['src/Data.php:5', 'src/Data.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe(['in:new:PredictedData#newCustomersForecastCount/value:24'])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});

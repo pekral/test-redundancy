@@ -43,6 +43,12 @@ enum Action: string
         . 'To merge this test, make its whole expected value a row value of its own, so that the row expects none of them; '
         . 'otherwise keep this test.';
 
+    public const string OMITTED_ARGUMENT_STEP = 'The covering test %s omits the arguments (%s) that this test passes '
+        . 'and relies on their defaults. A dataset row passes every argument, so a merged row would pass them explicitly '
+        . 'and the case "the argument is omitted, the default applies" would be lost. '
+        . 'To merge this test, let the row pass these arguments as a spread array that is empty for the covering row; '
+        . 'otherwise keep this test.';
+
     public const string NO_ASSERTION_STEP = 'This test has no assertion, '
         . 'so it asserts only that the code under test throws no exception for its input. '
         . 'The covering test %s arranges the calls and values in coveringDiffersBy (%s), and this test does not: '

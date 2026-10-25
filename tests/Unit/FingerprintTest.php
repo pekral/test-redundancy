@@ -32,6 +32,7 @@ it('collects every node that carries a contract', function (): void {
         'function:expect',
         'expect:function:abs/call:toBe',
         'function:abs',
+        'function:$dynamic',
         'in:function:abs#0/value:-5',
         'read:function:abs',
         'in:expect:function:abs/call:toBe#0/value:true',
@@ -106,7 +107,13 @@ it('collects no property fetch that runs no Pest assertion', function (): void {
         . 'expect($user)->name->email; expect($user)->{$name};',
     );
 
-    expect(TokenCollector::collect($statements))->toBe(['in:function:expect#0/variable:user' => 2, 'function:expect' => 2]);
+    expect(TokenCollector::collect($statements))->toBe([
+        'in:function:$factory#0/non-literal' => 1,
+        'in:function:$factory#0/variable:value' => 1,
+        'in:function:expect#0/variable:user' => 2,
+        'function:$factory' => 1,
+        'function:expect' => 2,
+    ]);
 });
 
 it('collects the subject of an assertion in the assertion tokens', function (string $body, array $expected): void {
@@ -474,7 +481,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
-    'argument of a dynamic call' => ['$store(true);', ['value:true' => 1]],
+    'argument of a call of a variable' => ['$store(true);', ['function:$store' => 1, 'in:function:$store#0/value:true' => 1]],
     'argument of a method call, a static call and a new expression' => ['$cart->add(1); Cart::make(-2); new Item(Size::Large);', [
         'call:add' => 1,
         'call:Cart::make' => 1,
@@ -993,6 +1000,10 @@ it('gives a non-literal argument of a call that is no assertion the token of its
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
+    'call of a variable' => [
+        '$store($id);',
+        ['function:$store' => 1, 'in:function:$store#0/non-literal' => 1, 'in:function:$store#0/variable:id' => 1],
+    ],
     'call that an assertion reads' => [
         'expect(roleOf($user))->toBeTrue();',
         [
@@ -1016,7 +1027,6 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'in:function:store#0/non-literal' => 1,
         ],
     ],
-    'dynamic call' => ['$store($id);', []],
     'literal, constant, list, map and enum case read' => [
         'store(1, Size::Large, [$id], [\'key\' => $id], Size::Large->value);',
         [
