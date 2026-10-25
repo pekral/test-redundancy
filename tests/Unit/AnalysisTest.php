@@ -1844,6 +1844,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::Review,
     ],
+    'shorter expected list for a parameter without a type the covering closure expects' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($n, $e) => expect(g($n))->toBe($e))->with(['row' => [2, ['a', 'b']]]);
+            it('covers', fn () => expect(g(1))->toBe(['a']));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
     'shorter list than a covering expected list that hard-codes a string beside a parameter without a type' => [
         <<<'PHP'
             <?php
@@ -1907,29 +1915,112 @@ it('reviews, and does not merge, a test whose value the data provider test hard-
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
-it('asks to merge a test whose covering test sets an array key it lacks only in an assertion', function (): void {
+it('asks for a review of a test whose expected value lacks an element, a key or an argument its covering test expects', function (
+    string $source,
+    string $coveringTest,
+    string ...$coveringDiffersBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it expects less' => ['src/Subject.php:5'], $coveringTest => ['src/Subject.php:5', 'src/Subject.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it expects less')
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy)
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(Action::MISSING_EXPECTATION_STEP, sprintf('"%s"', $coveringTest), implode(', ', $coveringDiffersBy)),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
+})->with([
+    'array without a key the covering test expects' => [
+        <<<'PHP'
+            <?php
+            it('expects less', function (): void {
+                expect(new Context(isImpersonated: false, impersonatorEmail: 'a@b.cz')->toArray())
+                    ->toBe(['impersonated' => false]);
+            });
+            it('expects the impersonator', function (): void {
+                expect(new Context(isImpersonated: true, impersonatorEmail: 'a@b.cz')->toArray())
+                    ->toBe(['impersonated' => true, 'impersonator_email' => 'a@b.cz']);
+            });
+            PHP,
+        'it expects the impersonator',
+        'in:expect:new:Context/call:toArray/call:toBe#0/key:value:\'impersonator_email\'',
+    ],
+    'array without a key the covering test expects beside a key both expect with another value' => [
+        <<<'PHP'
+            <?php
+            it('expects less', fn () => expect(createAccount(Plan::FREE)->toArray())->toBe(['plan' => 0]));
+            it('expects the credit', fn () => expect(createAccount(Plan::CREDIT)->toArray())->toBe(['plan' => 1, 'credit' => 0]));
+            PHP,
+        'it expects the credit',
+        'in:expect:function:createAccount/call:toArray/call:toBe#0/key:value:\'credit\'',
+    ],
+    'array without a nested key the covering test expects' => [
+        <<<'PHP'
+            <?php
+            it('expects less', fn () => expect(build('sms'))->toEqual(['type' => 'sms']));
+            it('expects the properties', fn () => expect(build('mail'))->toEqual(['type' => 'mail', 'properties' => ['senderMail' => 'a@example.com']]));
+            PHP,
+        'it expects the properties',
+        'in:expect:function:build/call:toEqual#0/key:value:\'properties\'',
+        'in:expect:function:build/call:toEqual#0/value:\'properties\'/key:value:\'senderMail\'',
+    ],
+    'exception without the message the covering test expects' => [
+        <<<'PHP'
+            <?php
+            it('expects less', fn () => expect(fn () => import('a,b'))->toThrow(InvalidArgumentException::class));
+            it('expects the line', fn () => expect(fn () => import('a,b,c'))->toThrow(InvalidArgumentException::class, 'vocatives_cz.csv:2'));
+            PHP,
+        'it expects the line',
+        'in:call:toThrow#1/value:\'vocatives_cz.csv:2\'',
+    ],
+    'list without an element the covering test expects beside an element both expect with another value' => [
+        <<<'PHP'
+            <?php
+            it('expects less', fn () => expect(recipients(1))->toBe(['a@test.com']));
+            it('expects two recipients', fn () => expect(recipients(2))->toBe(['b@test.com', 'c@test.com']));
+            PHP,
+        'it expects two recipients',
+        'in:expect:function:recipients/call:toBe#0/value:list-item',
+    ],
+    'list without an element the covering test expects in any order' => [
+        <<<'PHP'
+            <?php
+            it('expects less', fn () => expect(resolve('segment', allowNonActive: false))->toEqualCanonicalizing(['rfm.active@test.com']));
+            it('expects the inactive recipient', fn () => expect(resolve('segment', allowNonActive: true))
+                ->toEqualCanonicalizing(['rfm.active@test.com', 'rfm.inactive@test.com']));
+            PHP,
+        'it expects the inactive recipient',
+        'in:expect:function:resolve/call:toEqualCanonicalizing#0/value:list-item',
+        'in:expect:function:resolve/call:toEqualCanonicalizing#0/value:\'rfm.inactive@test.com\'',
+    ],
+]);
+
+it('asks to merge a test whose expected value replaces the value under which its covering test expects a key', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
-            it('builds an sms action', function (): void {
-                expect(build('sms'))->toEqual(['type' => 'sms']);
-            });
-            it('builds a mail action', function (): void {
-                expect(build('mail'))->toEqual(['type' => 'mail', 'properties' => ['senderMail' => 'a@example.com']]);
-            });
+            it('builds plain options', fn () => expect(build(1))->toBe(['options' => []]));
+            it('builds colored options', fn () => expect(build(2))->toBe(['options' => ['color' => 'red']]));
             PHP,
         linesByTest: [
-            'it builds an sms action' => ['src/Builder.php:5'],
-            'it builds a mail action' => ['src/Builder.php:5', 'src/Builder.php:6'],
+            'it builds plain options' => ['src/Builder.php:5'],
+            'it builds colored options' => ['src/Builder.php:5', 'src/Builder.php:6'],
         ],
     );
     $json = decodedJson((string) json_encode($report->candidates[0]));
 
     expect($report->candidates)->toHaveCount(1)
-        ->and(valueAt($json, 'test'))->toBe('it builds an sms action')
+        ->and(valueAt($json, 'test'))->toBe('it builds plain options')
         ->and(valueAt($json, 'differsBy'))->toBe([
-            'in:function:build#0/value:\'sms\'',
-            'in:expect:function:build/call:toEqual#0/value:\'type\'/value:\'sms\'',
+            'in:function:build#0/value:1',
+            'in:expect:function:build/call:toBe#0/value:\'options\'/value:[]',
         ])
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');

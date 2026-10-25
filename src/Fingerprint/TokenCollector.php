@@ -32,12 +32,14 @@ final class TokenCollector
 
     public const string KEY_TOKEN_PATTERN = '/^(in:.*\/)?key:/';
 
+    public const string LIST_ITEM = 'value:list-item';
+
+    public const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#(\w+)/)'
+        . '(?:key:)?(?:value|const):~';
+
     private const string KEY_PREFIX = 'key:';
 
     private const string BOUND_PREFIX = 'bound:';
-
-    private const string ARGUMENT_PATTERN = '~^(in:(?:.*?/)?(?:not:)?(?:call|function|new):(?:[^/#]*::)?([^/#:]+)#\w+/)'
-        . '(?:key:)?(?:value|const):~';
 
     private const string ARGUMENT_POSITION_PATTERN = '~^in:.*(?:call|function|new):(?:[^/#]*::)?[^/#:]+#\w+/(?=(?:value|const):)~';
 
@@ -88,9 +90,9 @@ final class TokenCollector
         return $token !== null && preg_match(self::DATA_TOKEN_PATTERN, $token) === 1;
     }
 
-    public static function argumentPositionOfCodeUnderTest(string $token): ?string
+    public static function argumentPosition(string $token, bool $ofAssertion): ?string
     {
-        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && !self::isAssertion($matches[2])
+        return preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1 && self::isAssertion($matches[2]) === $ofAssertion
             && preg_match(self::ARGUMENT_POSITION_PATTERN, $token, $position) === 1 ? $position[0] : null;
     }
 
@@ -279,7 +281,7 @@ final class TokenCollector
 
     private static function arrayToken(Array_ $array): string
     {
-        return self::listLength($array) > 0 ? 'value:list-item' : 'value:[]';
+        return self::listLength($array) > 0 ? self::LIST_ITEM : 'value:[]';
     }
 
     /**

@@ -55,12 +55,19 @@ final class AssertionSubject
         $messagePosition = $assertionMethod === null ? null : self::messagePosition($assertionMethod);
 
         foreach ($call instanceof CallLike ? $call->getRawArgs() : [] as $position => $argument) {
-            $arguments .= $argument instanceof Arg && !self::fillsMessage($argument, $position, $messagePosition)
+            $arguments .= $argument instanceof Arg
+                && !self::fillsMessage($argument->name?->toString() ?? (string) $position, $messagePosition)
                 ? self::literalArgument($argument, $position)
                 : '';
         }
 
         return $arguments;
+    }
+
+    public static function isFailureMessage(string $token): bool
+    {
+        return preg_match(TokenCollector::ARGUMENT_PATTERN, $token, $matches) === 1
+            && self::fillsMessage($matches[3], self::messagePosition($matches[2]));
     }
 
     public static function isExpectationChain(Expr $node): bool
@@ -139,10 +146,9 @@ final class AssertionSubject
         );
     }
 
-    private static function fillsMessage(Arg $argument, int $position, ?int $messagePosition): bool
+    private static function fillsMessage(string $argument, ?int $messagePosition): bool
     {
-        return $messagePosition !== null
-            && ($argument->name === null ? $position === $messagePosition : $argument->name->toString() === self::MESSAGE_PARAMETER);
+        return $messagePosition !== null && in_array($argument, [self::MESSAGE_PARAMETER, (string) $messagePosition], strict: true);
     }
 
     private static function partToken(Expr $part, bool $withLiteralArguments): ?string

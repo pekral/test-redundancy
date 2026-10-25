@@ -37,6 +37,12 @@ enum Action: string
         . 'for example when it adds a missing value itself or falls back to a default; '
         . 'keep this test when it does, and delete it only when it does not.';
 
+    public const string MISSING_EXPECTATION_STEP = 'The covering test %s expects the elements, keys or arguments '
+        . 'in coveringDiffersBy (%s), and this test does not: its expected value is smaller. '
+        . 'A row with the values in differsBy would still expect them, so the case of this test would be lost. '
+        . 'To merge this test, make its whole expected value a row value of its own, so that the row expects none of them; '
+        . 'otherwise keep this test.';
+
     public const string NO_ASSERTION_STEP = 'This test has no assertion, '
         . 'so it asserts only that the code under test throws no exception for its input. '
         . 'The covering test %s arranges the calls and values in coveringDiffersBy (%s), and this test does not: '
