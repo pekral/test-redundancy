@@ -63,7 +63,10 @@ final readonly class ReportPrinter
             ['Covered lines' => (string) $report->coveredLines],
             ['Candidates' => (string) count($report->candidates)],
             ['Tests without source lines' => (string) count($report->testsWithoutSourceLines)],
+            ['Failed tests' => (string) count($report->failedTests)],
         );
+
+        $this->printFailedTests($report);
 
         if ($report->testsWithoutSourceLines !== []) {
             $this->io->writeln('<comment>Tests without source lines (check what they test, or "source")</comment>');
@@ -82,6 +85,20 @@ final readonly class ReportPrinter
             $this->io->writeln(sprintf('<comment>%s</comment>', $title));
             $this->io->listing(array_map($this->describe(...), $candidates));
         }
+    }
+
+    private function printFailedTests(FileReport $report): void
+    {
+        if ($report->failedTests === []) {
+            return;
+        }
+
+        $this->io->writeln('<comment>Failed tests (left out of the analysis; fix them and run analyse again)</comment>');
+        $this->io->listing(array_map(
+            static fn (string $test, string $message): string => $test . "\n    " . str_replace("\n", "\n    ", $message),
+            array_keys($report->failedTests),
+            $report->failedTests,
+        ));
     }
 
     private function describe(Candidate $candidate): string

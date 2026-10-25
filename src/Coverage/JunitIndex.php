@@ -16,9 +16,16 @@ final readonly class JunitIndex
      * @param array<string, string> $fileByClass
      * @param array<string, string> $descriptionByEvaluable
      * @param array<string, float> $testSeconds
+     * @param array<string, true> $passedTestKeys
+     * @param array<string, string> $failureByTestId
      */
-    private function __construct(private array $fileByClass, private array $descriptionByEvaluable, private array $testSeconds)
-    {
+    private function __construct(
+        private array $fileByClass,
+        private array $descriptionByEvaluable,
+        private array $testSeconds,
+        private array $passedTestKeys,
+        private array $failureByTestId,
+    ) {
     }
 
     /**
@@ -26,18 +33,15 @@ final readonly class JunitIndex
      */
     public static function fromFile(string $junitFile, string $projectRoot, array $searchRoots): self
     {
-        $previousErrorHandling = libxml_use_internal_errors(use_errors: true);
-        $report = is_file($junitFile) ? simplexml_load_string((string) file_get_contents($junitFile)) : false;
-        libxml_clear_errors();
-        libxml_use_internal_errors($previousErrorHandling);
         $fileByClass = [];
         $descriptionByEvaluable = [];
         $testSeconds = [];
+        $passedTestKeys = [];
+        $failureByTestId = [];
 
-        $testCases = $report === false ? null : $report->xpath('//testcase');
-
-        foreach (is_array($testCases) ? $testCases : [] as $testCase) {
+        foreach (self::testCasesOf($junitFile) as $testCase) {
             $class = (string) $testCase['class'];
+            $name = (string) $testCase['name'];
             $file = explode('::', (string) $testCase['file'], 2)[0];
             $description = (string) preg_replace('/ with data set .*$/s', '', (string) $testCase['name']);
 
@@ -48,9 +52,18 @@ final readonly class JunitIndex
             $descriptionByEvaluable[$class . '::' . PestName::evaluable($description)] = $description;
             $testKey = TestKey::make($fileByClass[$class] ?? $class, $description);
             $testSeconds[$testKey] = ($testSeconds[$testKey] ?? 0.0) + (float) $testCase['time'];
+            $failure = $testCase->failure[0] ?? $testCase->error[0] ?? null;
+
+            if ($failure === null) {
+                $passedTestKeys[$testKey] = true;
+
+                continue;
+            }
+
+            $failureByTestId[$class . '::' . $name] = self::failureMessage((string) $failure, $class, $name);
         }
 
-        return new self($fileByClass, $descriptionByEvaluable, $testSeconds);
+        return new self($fileByClass, $descriptionByEvaluable, $testSeconds, $passedTestKeys, $failureByTestId);
     }
 
     /**
@@ -65,7 +78,17 @@ final readonly class JunitIndex
             $covered[explode(TestKey::DATASET_SEPARATOR, $coveredTestKey, 2)[0]] = true;
         }
 
-        return array_keys(array_diff_key($this->testSeconds, $covered));
+        return array_keys(array_diff_key($this->passedTestKeys, $covered));
+    }
+
+    /**
+     * The failure message of every failed or errored test case, by the test id (class::name).
+     *
+     * @return array<string, string>
+     */
+    public function failureByTestId(): array
+    {
+        return $this->failureByTestId;
     }
 
     /**
@@ -91,6 +114,33 @@ final readonly class JunitIndex
     public function descriptionOf(string $class, string $method): string
     {
         return $this->descriptionByEvaluable[$class . '::' . $method] ?? $method;
+    }
+
+    /**
+     * @return list<\SimpleXMLElement>
+     */
+    private static function testCasesOf(string $junitFile): array
+    {
+        $previousErrorHandling = libxml_use_internal_errors(use_errors: true);
+        $report = is_file($junitFile) ? simplexml_load_string((string) file_get_contents($junitFile)) : false;
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousErrorHandling);
+        $testCases = $report === false ? null : $report->xpath('//testcase');
+
+        return is_array($testCases) ? array_values($testCases) : [];
+    }
+
+    private static function failureMessage(string $text, string $class, string $name): string
+    {
+        $message = trim($text);
+
+        foreach ([$class . '::' . $name, $name] as $title) {
+            if (str_starts_with($message, $title)) {
+                return trim(substr($message, strlen($title)));
+            }
+        }
+
+        return $message;
     }
 
     /**

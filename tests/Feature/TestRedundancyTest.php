@@ -231,22 +231,129 @@ it('balances the concurrent groups by the durations of the last run without chan
     removeDirectory($project);
 });
 
-it('fails when the analysed tests fail', function (): void {
+/**
+ * @param array<string, string> $source
+ */
+function phpunitProjectWith(array $source): string
+{
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('phpunit'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
-        'source' => ['src'],
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
+        'source' => ['src'],
     ]));
-    file_put_contents(
-        $project . '/tests/GreeterTest.php',
-        str_replace('\'Hello, Jane!\'', '\'Hello, nobody!\'', (string) file_get_contents($project . '/tests/GreeterTest.php')),
-    );
+    $test = $project . '/tests/GreeterTest.php';
+    file_put_contents($test, strtr((string) file_get_contents($test), $source));
 
-    expect(fn (): array => TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']))
+    return $project;
+}
+
+it('leaves a failing test case out of the analysis and lists it with the failure message', function (): void {
+    $project = phpunitProjectWith(['assertSame(\'Hello, Jane!\', (new Greeter())' => 'assertSame(\'Hello, nobody!\', (new Greeter())']);
+
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
+
+    expect(candidatesOf($reports))->toBe(['tests/GreeterTest.php :: testGreetsByName › jane' => 'review-dataset-row'])
+        ->and($reports[0]->testCases)->toBe(3)
+        ->and(array_keys($reports[0]->failedTests))->toBe(['testGreetsJane'])
+        ->and($reports[0]->failedTests['testGreetsJane'])->toContain('Failed asserting that two strings are identical')
+        ->and($reports[0]->hasFindings())->toBeTrue()
+        ->and((string) file_get_contents($project . '/.test-redundancy/baseline.json'))->not->toContain('testGreetsJane')
+        ->and(array_keys(decodedJson((string) file_get_contents($project . '/.test-redundancy/durations.json'))))
+        ->toBe(['tests/GreeterTest.php']);
+});
+
+it('keeps the coverage of every worker group and records every duration when a test case fails in one group', function (): void {
+    $project = temporaryDirectory();
+    new Filesystem()->mirror(fixturePath('pest'), $project);
+    new Filesystem()->remove($project . '/tests');
+    mkdir($project . '/tests');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+    ]));
+    $testFiles = [];
+
+    foreach (['Alpha' => 3, 'Beta' => 4] as $name => $sum) {
+        $testFiles[] = 'tests/' . $name . 'Test.php';
+        file_put_contents($project . '/tests/' . $name . 'Test.php', <<<PHP
+            <?php
+
+            declare(strict_types = 1);
+
+            require_once __DIR__ . '/../src/Calculator.php';
+
+            use Fixture\Pest\Calculator;
+
+            test('adds in {$name}', function (): void {
+                expect((new Calculator())->add(1, 2))->toBe({$sum});
+            });
+
+            test('adds again in {$name}', function (): void {
+                expect((new Calculator())->add(1, 2))->toBe(3);
+            });
+            PHP);
+    }
+
+    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+
+    expect(array_map(static fn (FileReport $report): int => $report->testCases, $reports))->toBe([2, 1])
+        ->and(array_map(static fn (FileReport $report): array => array_keys($report->failedTests), $reports))
+        ->toBe([[], ['adds in Beta']])
+        ->and(array_keys(decodedJson((string) file_get_contents($project . '/.test-redundancy/durations.json'))))
+        ->toEqualCanonicalizing($testFiles);
+});
+
+it('aborts the run when a worker ends without a JUnit log', function (): void {
+    $project = temporaryDirectory();
+    new Filesystem()->mirror(fixturePath('pest'), $project);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+    ]));
+    file_put_contents($project . '/tests/OtherCalculatorTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        test('ends the process', function (): void {
+            exit(3);
+        });
+
+        test('never runs', function (): void {
+            expect(true)->toBeTrue();
+        });
+        PHP);
+
+    expect(
+        fn (): array => TestRedundancy::forProject($project, processes: null)->analyse(
+            ['tests/OtherCalculatorTest.php'],
+            ['tests/OtherCalculatorTest.php'],
+        ),
+    )
         ->toThrow(ProcessFailedException::class);
+});
 
-    removeDirectory($project);
+it('still fails the coverage map when a test case fails', function (): void {
+    $project = gitRepository();
+    new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'map' => 'build/coverage-map.json.gz',
+    ]));
+    file_put_contents($project . '/tests/OtherCalculatorTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        test('fails', function (): void {
+            expect(1)->toBe(2);
+        });
+        PHP);
+
+    expect(fn (): mixed => TestRedundancy::forProject($project, processes: null)->buildMap(['tests'], static fn (): null => null))
+        ->toThrow(ProcessFailedException::class);
 });
 
 it('records the lines of every existing source directory when pcov is narrowed to them', function (bool $runnerParallel): void {

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Console;
 
 use Pekral\TestRedundancy\Analysis\AgentReport;
+use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Analysis\StaleMap;
 use Pekral\TestRedundancy\Configuration;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
@@ -68,7 +69,9 @@ final class AnalyseCommand extends Command
                 $input->getOption('pretty') === true,
             );
 
-        return self::SUCCESS;
+        return array_filter($reports, static fn (FileReport $report): bool => $report->failedTests !== []) === []
+            ? self::SUCCESS
+            : self::FAILURE;
     }
 
     private function processesOption(InputInterface $input): ?int

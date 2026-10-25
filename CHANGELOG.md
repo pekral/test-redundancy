@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A failing test case no longer discards the coverage of the whole `analyse` run. Before, `CoverageRun` threw
+  `ProcessFailedException` on the first worker group with a non-zero exit code, so the coverage of every other group
+  was lost and the measured durations were not recorded. Now `analyse` leaves every failed or errored test case out of
+  the analysis, so it is never a candidate and never a covering test, and it records the durations of every group that
+  finished. The report lists the left-out test cases with the failure message in the new `failedTests` field of each
+  file, counts them in `summary.failedTests`, and the text format prints a `Failed tests` list. `analyse` exits with `1`
+  while a test case fails. A process that ends without a coverage file or a JUnit log still aborts the run, and `map`
+  and `verify` still abort when a test case fails (#93).
+
 ## [0.1.5] - 2026-10-24
 
 ### Fixed

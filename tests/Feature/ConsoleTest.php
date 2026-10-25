@@ -89,6 +89,44 @@ it('prints a text report for people', function (): void {
         ->toContain('Skipped: the file declares one test case and no dataset');
 });
 
+function failingTestProject(): string
+{
+    $project = pestProject();
+    file_put_contents($project . '/tests/CalculatorTest.php', <<<'PHP'
+
+
+        it('adds one and one', function (): void {
+            expect((new Calculator())->add(1, 1))->toBe(3);
+        });
+        PHP, FILE_APPEND);
+
+    return $project;
+}
+
+it('reports a failing test case in the JSON report and exits with 1', function (): void {
+    $tester = command(failingTestProject(), 'analyse');
+
+    $tester->execute(['paths' => ['tests']]);
+    $report = decodedJson($tester->getDisplay());
+
+    expect($tester->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'summary.failedTests'))->toBe(1)
+        ->and(valueAt($report, 'files.0.failedTests.0.test'))->toBe('it adds one and one')
+        ->and(valueAt($report, 'files.0.failedTests.0.message'))->toContain('Failed asserting that 2 is identical to 3.')
+        ->and(valueAt($report, 'summary.candidates'))->toBe(3);
+});
+
+it('prints a failing test case in the text report and exits with 1', function (): void {
+    $tester = command(failingTestProject(), 'analyse');
+
+    $tester->execute(['paths' => ['tests'], '--format' => 'text']);
+
+    expect($tester->getStatusCode())->toBe(1)
+        ->and($tester->getDisplay())->toContain('Failed tests (left out of the analysis')
+        ->toContain('adds one and one')
+        ->toContain('Failed asserting that 2 is identical to 3.');
+});
+
 it('reports a file without candidates as covering a line no other test case covers', function (): void {
     $output = new BufferedOutput();
 
