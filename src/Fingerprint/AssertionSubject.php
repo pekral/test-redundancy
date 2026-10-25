@@ -25,26 +25,11 @@ final class AssertionSubject
      */
     public static function candidates(Node $assertion, string $method, array $assignedValues): array
     {
-        $subjects = match (true) {
-            ($assertion instanceof MethodCall || $assertion instanceof PropertyFetch) && self::isExpectationChain($assertion->var) => [
-                self::expectedValue($assertion->var),
-            ],
-            ($assertion instanceof MethodCall || $assertion instanceof StaticCall || $assertion instanceof FuncCall)
-                && str_starts_with($method, 'assert') => array_slice(array_values(array_filter(
-                    array_map(
-                        static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
-                        $assertion->getRawArgs(),
-                    ),
-                    static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
-                )), -1),
-            default => [],
-        };
-
         return array_values(array_filter(array_map(
             static fn (?Expr $subject): ?Expr => $subject instanceof Variable && is_string($subject->name)
                 ? $assignedValues[$subject->name] ?? $subject
                 : $subject,
-            $subjects,
+            self::subjects($assertion, $method),
         )));
     }
 
@@ -55,6 +40,35 @@ final class AssertionSubject
             $node instanceof MethodCall, $node instanceof PropertyFetch => self::isExpectationChain($node->var),
             default => false,
         };
+    }
+
+    /**
+     * @return list<\PhpParser\Node\Expr|null>
+     */
+    private static function subjects(Node $assertion, string $method): array
+    {
+        return match (true) {
+            ($assertion instanceof MethodCall || $assertion instanceof PropertyFetch) && self::isExpectationChain($assertion->var) => [
+                self::expectedValue($assertion->var),
+            ],
+            ($assertion instanceof MethodCall || $assertion instanceof StaticCall || $assertion instanceof FuncCall)
+                && str_starts_with($method, 'assert') => self::lastNonDataArgument($assertion),
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<\PhpParser\Node\Expr>
+     */
+    private static function lastNonDataArgument(CallLike $call): array
+    {
+        return array_slice(array_values(array_filter(
+            array_map(
+                static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
+                $call->getRawArgs(),
+            ),
+            static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
+        )), -1);
     }
 
     private static function expectedValue(Expr $chain): ?Expr
