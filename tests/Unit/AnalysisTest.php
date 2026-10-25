@@ -3370,6 +3370,22 @@ it('asks for a review of a test whose covering test arranges a call or an argume
             PHP_SOURCE,
         ['function:ob_start'],
     ],
+    'call read in an assertion in a loop with a non-literal argument' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                handle($event);
+            });
+            it('covers the arranged case', function (): void {
+                handle($event);
+
+                foreach ($users as $user) {
+                    expect(roleOf($user))->toBe('admin');
+                }
+            });
+            PHP_SOURCE,
+        ['loop:function:roleOf'],
+    ],
     'call read in an assertion with a non-literal argument' => [
         <<<'PHP_SOURCE'
             <?php
@@ -3517,6 +3533,9 @@ it('still deletes a test whose covering test only reads a call in an assertion i
     'function call passed to a PHPUnit assertion' => ['$this->assertNotSame(1, activeState());'],
     'function call passed to expect' => ['expect(activeState())->toBe(0);'],
     'function call with an argument passed to expect' => ['expect(roleOf($user))->toBe(\'admin\');'],
+    'function call with an argument passed to expect in a loop' => [
+        'foreach ($users as $user) { expect(roleOf($user))->toBe(\'admin\'); }',
+    ],
     'method call on a receiver passed to expect' => ['expect($user->fresh()->name)->toBe(\'x\');'],
     'method call passed to a PHPUnit assertion' => ['$this->assertSame(5, $order->total());'],
     'method chain passed to and' => ['expect($event)->and($list->items()->count())->toBe(2);'],

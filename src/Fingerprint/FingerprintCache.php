@@ -162,8 +162,10 @@ final class FingerprintCache
     {
         $call = NonLiteralArguments::callOf($token);
 
-        return ($call === null || ($covering[$call] ?? 0) > ($own[$call] ?? 0))
-            && $this->arranged($covering, $token) <= $this->arranged($own, $token);
+        return ($call === null || array_any(
+            [$call, 'loop:' . $call],
+            static fn (string $made): bool => ($covering[$made] ?? 0) > ($own[$made] ?? 0),
+        )) && $this->arranged($covering, $token) <= $this->arranged($own, $token);
     }
 
     /**
