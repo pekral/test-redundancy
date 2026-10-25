@@ -180,9 +180,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function missingKeySteps(): array
     {
-        return $this->coveringKeys() === []
-            ? []
-            : [sprintf(Action::MISSING_KEY_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringKeys()))];
+        return $this->coveringTokenSteps(Action::MISSING_KEY_STEP, $this->coveringKeys());
     }
 
     /**
@@ -200,9 +198,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function missingArgumentSteps(): array
     {
-        return $this->coveringArguments() === []
-            ? []
-            : [sprintf(Action::MISSING_ARGUMENT_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringArguments()))];
+        return $this->coveringTokenSteps(Action::MISSING_ARGUMENT_STEP, $this->coveringArguments());
     }
 
     /**
@@ -218,9 +214,16 @@ final readonly class Candidate implements JsonSerializable
      */
     private function missingExpectationSteps(): array
     {
-        return $this->coveringExpectations() === []
-            ? []
-            : [sprintf(Action::MISSING_EXPECTATION_STEP, $this->quoted($this->coveredBy), implode(', ', $this->coveringExpectations()))];
+        return $this->coveringTokenSteps(Action::MISSING_EXPECTATION_STEP, $this->coveringExpectations());
+    }
+
+    /**
+     * @param list<string> $tokens
+     * @return list<string>
+     */
+    private function coveringTokenSteps(string $step, array $tokens): array
+    {
+        return $tokens === [] ? [] : [sprintf($step, $this->quoted($this->coveredBy), implode(', ', $tokens))];
     }
 
     /**
