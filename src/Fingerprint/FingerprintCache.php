@@ -86,7 +86,8 @@ final class FingerprintCache
         $tokens = $this->tokens($testKey, $coveringTestKeys);
         $covering = array_keys(TokenCollector::sum(...$tokens['covering'] ?? []));
         $isOmitted = static fn (?string $position): bool => $position !== null
-            && !array_any($covering, static fn (string $token): bool => str_starts_with($token, $position));
+            && NonLiteralArguments::isCallOfPositionMadeBy($position, $covering)
+            && !NonLiteralArguments::isPositionFilledBy($position, $covering);
 
         return array_values(array_filter(
             array_keys($tokens['own'] ?? []),

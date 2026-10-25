@@ -295,7 +295,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function isInArgumentPositionOnlyTheCoveringTestFills(?string $position): bool
     {
-        return $position !== null && !array_any($this->differsBy ?? [], static fn (string $own): bool => str_starts_with($own, $position));
+        return $position !== null && !NonLiteralArguments::isPositionFilledBy($position, $this->differsBy ?? []);
     }
 
     private function isListOnlyTheCoveringTestExpects(string $token): bool

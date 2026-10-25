@@ -39,6 +39,8 @@ final class NonLiteralArguments
 
     private const string CALL_PATTERN = '~((?:call|function|new):[^/#]+)#\w+/(?:' . self::SUFFIX . '|' . self::IDENTITY . ')$~';
 
+    private const string POSITION_CALL_PATTERN = '~((?:call|function|new):[^/#]+)#\w+/$~';
+
     public static function isToken(string $token): bool
     {
         return self::positionOf($token) !== null;
@@ -52,6 +54,22 @@ final class NonLiteralArguments
     public static function argumentPositionOf(string $token): ?string
     {
         return self::positionOf($token) ?? TokenCollector::argumentPosition($token, ofAssertion: false);
+    }
+
+    /**
+     * @param list<string> $tokens
+     */
+    public static function isPositionFilledBy(string $position, array $tokens): bool
+    {
+        return array_any($tokens, static fn (string $token): bool => str_starts_with($token, $position));
+    }
+
+    /**
+     * @param list<string> $tokens
+     */
+    public static function isCallOfPositionMadeBy(string $position, array $tokens): bool
+    {
+        return preg_match(self::POSITION_CALL_PATTERN, $position, $matches) === 1 && in_array($matches[1], $tokens, strict: true);
     }
 
     public static function identityPositionOf(string $token): ?string

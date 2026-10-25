@@ -4029,6 +4029,46 @@ it('asks for a review of a test that passes optional arguments its covering test
     ],
 ]);
 
+it('does not name an argument of a call that the covering test never makes as omitted', function (string $source): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the full case' => ['src/Data.php:5'], 'it covers the other case' => ['src/Data.php:5', 'src/Data.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->omittedByCovering)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and(array_any(
+            $report->candidates[0]->steps(),
+            static fn (string $step): bool => str_starts_with($step, 'The covering test') && str_contains($step, 'omits the arguments'),
+        ))->toBeFalse();
+})->with([
+    'call that only the candidate makes' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                logIt('x');
+
+                expect(store('a', 1))->toBe(1);
+            });
+            it('covers the other case', function (): void {
+                expect(store('a', 2))->toBe(1);
+            });
+            PHP_SOURCE,
+    ],
+    'variable that holds another callable in the covering test' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                expect($sut(1))->toBe(1);
+            });
+            it('covers the other case', function (): void {
+                expect($action(1))->toBe(1);
+            });
+            PHP_SOURCE,
+    ],
+]);
+
 it('still merges a test into a covering test that passes the same optional arguments with other values', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP_SOURCE'
