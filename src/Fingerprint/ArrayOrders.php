@@ -16,7 +16,7 @@ final class ArrayOrders
 
     private const string ITEMS_PREFIX = 'items:';
 
-    private const string PATTERN = '/^(in:.*\/)?(?:' . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')/';
+    private const string PATTERN = "~^(?:in:(?:[^'/]|'(?:[^'\\\\]|\\\\.)*'|/)*/)?(?:" . self::KEYS_PREFIX . '|' . self::ITEMS_PREFIX . ')~';
 
     public static function isToken(string $token): bool
     {

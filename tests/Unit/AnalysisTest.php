@@ -2975,6 +2975,24 @@ it('leaves the order of the list elements of a covering test out of coveringDiff
         ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:2']);
 });
 
+it('lists a covering argument whose string has the prefix of an order token in it', function (string $path): void {
+    $report = analyzeTokenTest(
+        source: <<<PHP
+            <?php
+            it('fetches all', fn () => fetchAll('x'));
+            it('fetches all from a path', fn () => fetchAll('x', '{$path}'));
+            PHP,
+        linesByTest: ['it fetches all' => ['src/Api.php:10'], 'it fetches all from a path' => ['src/Api.php:10', 'src/Api.php:20']],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it fetches all')
+        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'items' => ['/v1/items:batchGet'],
+    'keys' => ['/v1/keys:lookup'],
+]);
+
 const SHARED_ROW_STEP = 'This row belongs to the named dataset "collidingRows", which these tests also use: "it second", "it third". '
     . 'Deleting the row deletes it from each of them. '
     . 'Delete the row only when each of them stays covered without it; otherwise keep it, or give this test its own dataset.';
