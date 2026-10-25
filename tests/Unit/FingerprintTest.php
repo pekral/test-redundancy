@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
+use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use PhpParser\ParserFactory;
@@ -35,10 +36,17 @@ it('collects every node that carries a contract', function (): void {
         'in:expect:function:abs/call:toBe#0/value:true',
         'call:Foo::create',
         'new:Bar',
+        'in:call:Foo::create#0/non-literal',
         'in:call:Foo::create#1/const:Baz::VALUE',
         'in:call:Foo::create#2/value:null',
         'in:call:Foo::create#3/value:1.5',
         'in:call:Foo::create#4/value:\'text\'',
+        'in:call:Foo::create#5/non-literal',
+        'in:call:Foo::create#6/non-literal',
+        'in:call:Foo::create#7/non-literal',
+        'in:call:Foo::create#8/non-literal',
+        'in:call:Foo::create#9/non-literal',
+        'in:call:Foo::create#10/non-literal',
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
@@ -413,6 +421,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'function:store' => 1,
         'in:function:store#0/value:list-item' => 1,
         'in:function:store#0/value:true' => 1,
+        'in:function:store#1/non-literal' => 1,
         'value:1' => 1,
         'value:2' => 1,
     ],
@@ -429,6 +438,7 @@ it('carries every enclosing call in the call path of a value', function (string 
         'function:json_encode' => 2,
         'in:function:json_encode#0/function:json_encode#0/key:value:\'test\'' => 1,
         'in:function:json_encode#0/function:json_encode#0/value:\'test\'/value:true' => 1,
+        'in:function:json_encode#0/non-literal' => 1,
     ],
     ],
     'value in a call an assertion receives' => ['expect(add(1, 2))->toBe(3);', [
@@ -476,6 +486,8 @@ it('counts how many times a test uses each token', function (): void {
         PHP);
 
     expect(TokenCollector::collect($statements))->toBe([
+        'in:function:import#0/non-literal' => 1,
+        'in:function:import#1/non-literal' => 1,
         'call:create' => 2,
         'call:Lists::factory' => 2,
         'function:import' => 1,
@@ -500,6 +512,7 @@ it('marks a call or new expression in a loop body, whose number of runs the fing
         'foreach (range(1, 3) as $i) { import(new Batch()); }',
         [
             'function:range' => 1,
+            'in:function:import#0/non-literal' => 1,
             'in:function:range#0/value:1' => 1,
             'in:function:range#1/value:3' => 1,
             'loop:function:import' => 1,
@@ -560,10 +573,13 @@ it('counts a literal a test assigns once to a local variable where the test read
 
     expect($fingerprints['it notifies'])->toEqual($expected);
 })->with([
-    'parameter the test assigns a literal' => ['$parameter = \'a\'; notify($parameter);', ['function:notify' => 1, 'value:\'a\'' => 1]],
+    'parameter the test assigns a literal' => [
+        '$parameter = \'a\'; notify($parameter);',
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1],
+    ],
     'variable a closure captures by reference' => [
         '$email = \'a\'; $notify = function () use (&$email): void { notify($email); };',
-        ['function:notify' => 1, 'value:\'a\'' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1],
     ],
     'variable a closure captures by value' => [
         '$email = \'a\'; $notify = function () use ($email): void { notify($email); };',
@@ -571,12 +587,12 @@ it('counts a literal a test assigns once to a local variable where the test read
     ],
     'variable assigned a list with an object and read twice' => [
         '$contacts = [new Contact()]; notify($contacts); notify($contacts);',
-        ['function:notify' => 2, 'new:Contact' => 1, 'value:list-item' => 1],
+        ['function:notify' => 2, 'in:function:notify#0/non-literal' => 2, 'new:Contact' => 1, 'value:list-item' => 1],
     ],
     'variable assigned a literal once' => ['$email = \'a\'; notify($email);', ['function:notify' => 1, 'in:function:notify#0/value:\'a\'' => 1]],
     'variable assigned a literal twice' => [
         '$email = \'a\'; $email = \'b\'; notify($email);',
-        ['function:notify' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1, 'value:\'b\'' => 1],
     ],
     'variable assigned a map and read once' => [
         '$options = [\'a\' => 1]; notify($options);',
@@ -586,10 +602,13 @@ it('counts a literal a test assigns once to a local variable where the test read
         '$data = [\'id\' => 5]; notify($data); notify($data);',
         ['function:notify' => 2, 'in:function:notify#0/key:value:\'id\'' => 2, 'in:function:notify#0/value:\'id\'/value:5' => 2],
     ],
-    'variable assigned an object' => ['$contact = new Contact(); notify($contact);', ['function:notify' => 1, 'new:Contact' => 1]],
+    'variable assigned an object' => [
+        '$contact = new Contact(); notify($contact);',
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'new:Contact' => 1],
+    ],
     'variable the test appends to' => [
         '$emails = []; $emails[] = \'a\'; notify($emails);',
-        ['function:notify' => 1, 'value:\'a\'' => 1, 'value:[]' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/non-literal' => 1, 'value:\'a\'' => 1, 'value:[]' => 1],
     ],
     'variable the test never reads' => ['$email = \'a\'; notify();', ['function:notify' => 1, 'value:\'a\'' => 1]],
 ]);
@@ -620,6 +639,7 @@ it('keeps the tokens of a call result without a path when the test first reads i
         'function:client' => 1,
         'in:function:client#0/value:\'a\'/value:1' => 1,
         'in:function:client#0/key:value:\'a\'' => 1,
+        'in:call:send#0/non-literal' => 1,
         'loop:call:send' => 1,
     ]);
 });
@@ -869,4 +889,58 @@ it('keeps a file in the coverage run when it may run more than one test case', f
 
 it('keeps a file that does not exist in the coverage run', function (): void {
     expect(ContractFingerprints::declaresSingleTestCase(temporaryDirectory() . '/MissingTest.php'))->toBeFalse();
+});
+
+it('gives a non-literal argument of a call that is no assertion the token of its position', function (string $code, array $expected): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
+
+    expect(TokenCollector::collect($statements))->toEqual($expected);
+})->with([
+    'call that wraps a variable' => [
+        'store(strtoupper($email));',
+        [
+            'function:store' => 1,
+            'function:strtoupper' => 1,
+            'in:function:store#0/function:strtoupper#0/non-literal' => 1,
+            'in:function:store#0/non-literal' => 1,
+        ],
+    ],
+    'dynamic call' => ['$store($id);', []],
+    'literal, constant, list, map and enum case read' => [
+        'store(1, Size::Large, [$id], [\'key\' => $id], Size::Large->value);',
+        [
+            'function:store' => 1,
+            'in:function:store#0/value:1' => 1,
+            'in:function:store#1/const:Size::Large' => 1,
+            'in:function:store#2/value:list-item' => 1,
+            'in:function:store#3/key:value:\'key\'' => 1,
+            'in:function:store#4/const:Size::Large->value' => 1,
+        ],
+    ],
+    'named argument' => ['store(enabled: $flag);', ['function:store' => 1, 'in:function:store#enabled/non-literal' => 1]],
+    'new expression' => ['store(new Money());', ['function:store' => 1, 'new:Money' => 1, 'in:function:store#0/non-literal' => 1]],
+    'Pest assertion' => ['expect($actual)->toBe($expected);', ['function:expect' => 1, 'call:toBe' => 1]],
+    'PHPUnit assertion' => ['$this->assertSame($expected, $actual);', ['call:assertSame' => 1]],
+    'property' => ['$campaign->add($campaign->id);', ['call:add' => 1, 'in:call:add#0/non-literal' => 1]],
+    'variable' => ['store($id);', ['function:store' => 1, 'in:function:store#0/non-literal' => 1]],
+]);
+
+it('lists no non-literal argument token of a call that the token list names already', function (): void {
+    $difference = [
+        'function:store',
+        'in:function:store#0/non-literal',
+        'loop:call:Batch::import',
+        'in:call:Batch::import#1/non-literal',
+        'in:function:store#1/function:wrap#0/non-literal',
+        'in:function:load#0/non-literal',
+        'value:1',
+    ];
+
+    expect(NonLiteralArguments::withoutImplied($difference))->toBe([
+        'function:store',
+        'loop:call:Batch::import',
+        'in:function:store#1/function:wrap#0/non-literal',
+        'in:function:load#0/non-literal',
+        'value:1',
+    ]);
 });

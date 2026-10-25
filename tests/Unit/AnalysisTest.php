@@ -122,7 +122,7 @@ it('reports the covering-side tokens that made the action review', function (Can
     'call in a sibling row' => [candidate('it works › a', ['it works › b'], ['value:1'], ['new:Money']), []],
     'call in both tests' => [candidate('it works', ['it also works'], ['call:toThrow'], ['call:forget']), []],
     'call in one of two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1'], ['call:forget']), []],
-    'call in the covering test of a test that adds nothing' => [candidate('it works', ['it also works'], [], ['call:forget']), []],
+    'call in the covering test of a test that adds nothing' => [candidate('it works', ['it also works'], [], ['call:forget']), ['call:forget']],
     'data in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2']), []],
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null, coveringDiffersBy: null), []],
 ]);
@@ -3316,4 +3316,247 @@ it('reports a test that passes the values of a kept row as delete, covered by th
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->coveredBy)->toBe(['it matches the expected number of records for a static date › June 15th'])
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('asks for a review of a test whose covering test arranges a call or an argument position that the test lacks', function (
+    string $source,
+    array $coveringDiffersBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Handler.php:5'], 'it covers the arranged case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
+        ->and(valueAt($json, 'differsBy'))->toBe([])
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy);
+})->with([
+    'call made more times' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                streamOutput();
+
+                expect(level())->toBe(0);
+            });
+            it('covers the arranged case', function (): void {
+                ob_start();
+                ob_start();
+                echo 'streamed';
+                streamOutput();
+
+                expect(level())->toBe(0);
+            });
+            PHP_SOURCE,
+        ['function:ob_start'],
+    ],
+    'extra argument held in a variable that holds a call' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $logged = logEvent($account, $campaign, $contact);
+
+                expect($logged)->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                $url = fake()->url();
+                $logged = logEvent($account, $campaign, $contact, $url);
+
+                expect($logged)->toBeTrue();
+            });
+            PHP_SOURCE,
+        ['in:function:logEvent#3/non-literal', 'call:url', 'function:fake'],
+    ],
+    'extra argument that reads a property' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $counted = recalculate($job, 5);
+
+                expect($counted)->toBe(1);
+            });
+            it('covers the arranged case', function (): void {
+                $counted = recalculate($job, 5, $campaign->id);
+
+                expect($counted)->toBe(1);
+            });
+            PHP_SOURCE,
+        ['in:function:recalculate#2/non-literal'],
+    ],
+    'extra arrangement call' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $domain = createDomain();
+
+                expect(deleteDomain($domain))->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                $domain = createDomain();
+                createVerifiedDomain();
+
+                expect(deleteDomain($domain))->toBeTrue();
+            });
+            PHP_SOURCE,
+        ['function:createVerifiedDomain'],
+    ],
+    'mock that throws' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $mail = Mockery::mock(MailService::class);
+                $mail->shouldReceive('send')->once();
+                app()->instance(MailService::class, $mail);
+
+                handle($event);
+
+                expect(activeState())->toBe(0);
+            });
+            it('covers the arranged case', function (): void {
+                $mail = Mockery::mock(MailService::class);
+                $mail->shouldReceive('send')->once()->andThrow(new InvalidDomain());
+                app()->instance(MailService::class, $mail);
+
+                handle($event);
+
+                expect(activeState())->toBe(0);
+            });
+            PHP_SOURCE,
+        ['call:andThrow', 'new:InvalidDomain'],
+    ],
+    'wrapping call' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $kept = keepSubscribed(collect([$subscriber->email]));
+
+                expect($kept)->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                $kept = keepSubscribed(collect([strtoupper($subscriber->email)]));
+
+                expect($kept)->toBeTrue();
+            });
+            PHP_SOURCE,
+        ['function:strtoupper'],
+    ],
+]);
+
+it('still deletes a test whose covering test arranges the same calls and passes a non-literal value at the same positions', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $domain = createDomain();
+                $counted = recalculate($job, $campaign->id);
+
+                expect($counted)->toBe(1);
+            });
+            it('covers the arranged case', function (): void {
+                $domain = createDomain();
+                $counted = recalculate($other, $other->campaign->id);
+
+                expect($counted)->toBe(1);
+                expect($counted)->not->toBeNull();
+            });
+            PHP_SOURCE,
+        linesByTest: ['it covers the plain case' => ['src/Handler.php:5'], 'it covers the arranged case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Delete);
+});
+
+it('asks for a review of a test that passes a non-literal argument its covering test lacks', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('covers the arranged case', function (): void {
+                $counted = recalculate($job, 5, $campaign->id);
+
+                expect($counted)->toBe(1);
+            });
+            it('covers the plain case', function (): void {
+                $counted = recalculate($job, 5);
+
+                expect($counted)->toBe(1);
+                expect($job->refresh())->not->toBeNull();
+            });
+            PHP_SOURCE,
+        linesByTest: ['it covers the arranged case' => ['src/Handler.php:5'], 'it covers the plain case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the arranged case')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:recalculate#2/non-literal'])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('names the arrangement the covering test adds to a test that asserts something', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                $domain = createDomain();
+
+                expect(deleteDomain($domain))->toBeTrue();
+            });
+            it('covers the arranged case', function (): void {
+                $domain = createDomain();
+                createVerifiedDomain();
+
+                expect(deleteDomain($domain))->toBeTrue();
+            });
+            PHP_SOURCE,
+        linesByTest: ['it covers the plain case' => ['src/Handler.php:5'], 'it covers the arranged case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+
+    expect($report->candidates[0]->steps())->toBe([
+        sprintf(Action::MISSING_CALL_STEP, '"it covers the arranged case"', 'function:createVerifiedDomain'),
+        Action::VERIFY_STEP,
+    ]);
+});
+
+it('still merges into a test that takes its argument as a parameter a test with a literal at that position', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('stores five', function (): void {
+                expect(store(5))->toBeTrue();
+            });
+            it('stores a number', function (int $number): void {
+                expect(store($number))->toBeTrue();
+            })->with('numbers');
+            PHP_SOURCE,
+        linesByTest: ['it stores five' => ['src/Store.php:5'], 'it stores a number' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it stores five')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:store#0/value:5'])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('asks for a review of a test that differs only in data from a covering test that passes a parameter at a position it lacks', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('stores five', function (): void {
+                expect(store(5))->toBeTrue();
+            });
+            it('stores a number with a limit', function (int $number, int $limit): void {
+                expect(store($number, $limit))->toBeTrue();
+            })->with('numbers');
+            PHP_SOURCE,
+        linesByTest: ['it stores five' => ['src/Store.php:5'], 'it stores a number with a limit' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['in:function:store#1/non-literal'])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
 });

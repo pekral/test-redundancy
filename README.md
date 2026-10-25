@@ -192,14 +192,22 @@ aborts the run. `map` and `verify` still abort when a test case fails.
   not an assertion, such as an argument of the code under test (`in:call:getByListIdAndLastId#4/value:'email'`). A
   missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `review`. A
   value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, does
-  not count.
+  not count. A value that is not a literal counts too: a variable, a property or a call result in an argument position
+  that the candidate does not fill carries the token `in:<call>#<position>/non-literal`, such as
+  `in:function:logEvent#3/non-literal` for the fourth argument `$url` of `logEvent($account, $campaign, $contact, $url)`.
+- **No missing call or object.** The covering test has a call, function or `new` expression that the candidate lacks,
+  or has it more times than the candidate does, for example `function:createVerifiedDomain` for an extra record it
+  creates, `call:andThrow` and `new:InvalidDomain` for a mock that throws, `function:strtoupper` for a wrapping call, or
+  `function:ob_start` called twice. Such a call arranges another state of the code under test, so the tokens are listed
+  in `coveringDiffersBy` and the action is `review`. An assertion, and a literal that is not an argument, do not count.
 - **No missing arrangement for a test without an assertion.** A candidate without an assertion asserts only that the
   code under test throws no exception for its input. When the covering test has a call, function, `new` expression or
   value that the candidate lacks, such as `function:createDomain` for a record it creates before the call under test,
   the candidate can be the only test of an empty or missing input. The tokens are listed in `coveringDiffersBy`, the
-  action is `review`, and the steps ask whether the empty or missing input is a case of its own. An assertion and a
-  value or key passed only to an assertion do not count, so a covering test that only asserts more about the same input
-  still leaves the candidate `delete`.
+  action is `review`, and the steps ask whether the empty or missing input is a case of its own. This holds for a value
+  that is not an argument too, such as a literal the covering test echoes. An assertion and a value or key passed only
+  to an assertion do not count, so a covering test that only asserts more about the same input still leaves the
+  candidate `delete`.
 - **No other test uses the dataset.** A row of a named Pest dataset, `dataset('name', …)`, that another test of the
   same file also uses with `->with('name')` cannot be deleted for one test: deleting the row removes it from every
   test that uses the dataset. Such a row is `review`, not `delete`, and the first step names the dataset and the other
@@ -357,6 +365,14 @@ test lacks.
   an array passed straight to a call carries the call and the position before the key, e.g.
   `in:function:store#0/value:'enabled'/value:false` for `store(['enabled' => false])`, so the same array at swapped
   positions is a different token.
+- **Non-literal arguments.** An argument of a call that is not an assertion, whose value is not a literal, a constant,
+  an enum case, a list or a map, carries the call and the position followed by `non-literal`, such as
+  `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, not the
+  variable, so `recalculate($job, 5, $campaign->id)` and `recalculate($job, 5, $other)` have the same token, and a test
+  that lacks the position differs from the one that fills it. The token is left out of a difference that names the
+  call itself already, as `function:recalculate` does for a call the other test does not make. A variable that the
+  test assigns once and passes on is read as the value it holds, so `$url = fake()->url(); store($url)` has the call
+  tokens of `fake()->url()` and the token of the position.
 - **Enclosing calls.** A value that an argument passes on through an array or a nested call carries every enclosing
   call and array key, outermost first. `json_encode(json_encode(['test' => true]))` has the token
   `in:function:json_encode#0/function:json_encode#0/value:'test'/value:true`, and `json_encode(['test' => true])` has
