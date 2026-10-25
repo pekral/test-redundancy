@@ -7,6 +7,8 @@ namespace Pekral\TestRedundancy\Fingerprint;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\ArrayItem;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\ClassConstFetch;
@@ -132,11 +134,56 @@ final class NodeContext
         return $reads;
     }
 
+    /**
+     * @return list<int>
+     */
+    public static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
+    {
+        $passedItems = match (true) {
+            $value instanceof Array_ => array_filter(
+                $value->items,
+                static fn (ArrayItem $item): bool => $item->key !== null || $isArgument,
+            ),
+            $value instanceof CallLike && !$isAssertion => array_filter(
+                $value->getRawArgs(),
+                static fn (Node $argument): bool => $argument instanceof Arg,
+            ),
+            default => [],
+        };
+
+        return array_merge(self::valueIds($value), ...array_map(
+            static fn (ArrayItem|Arg $item): array => match (true) {
+                $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
+                $item->key === null => self::valueIds($item->value),
+                default => [...self::valueIds($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
+            },
+            array_values($passedItems),
+        ));
+    }
+
+    /**
+     * @return array<int>
+     */
+    public static function nodeIds(NodeFinder $nodeFinder, Node $node): array
+    {
+        return array_map(spl_object_id(...), $nodeFinder->find($node, static fn (): bool => true));
+    }
+
     private static function isAssertionCall(CallLike $call): bool
     {
         $token = TokenCollector::token($call);
 
         return $token !== null && TokenCollector::isAssertionToken($token);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function valueIds(Expr $value): array
+    {
+        $enumCase = self::enumCaseReadBy($value);
+
+        return $enumCase === null ? [spl_object_id($value)] : [spl_object_id($value), spl_object_id($enumCase)];
     }
 
     /**

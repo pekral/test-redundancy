@@ -55,7 +55,7 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->deleteOrReviewSharedRow(),
             $this->differsBy === [] => Action::Review,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
-            $this->isDatasetRow() && $this->isCoveredBySiblingRow() => Action::ReviewDatasetRow,
+            $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
             $this->differsOnlyInDataFromOneTestOfTheSameFile()
                 && $this->coveringTokensForReview() === []
                 && $this->coveringDatasetTakesDiffersBy() => Action::MergeIntoDataset,
@@ -329,11 +329,6 @@ final readonly class Candidate implements JsonSerializable
     private function isCoveredByOneTestOfTheSameFile(): bool
     {
         return count($this->coveredBy) === 1 && !str_contains($this->coveredBy[0], ' :: ');
-    }
-
-    private function isCoveredBySiblingRow(): bool
-    {
-        return $this->siblingRow() !== null;
     }
 
     private function siblingRow(): ?string

@@ -40,7 +40,10 @@ final class FingerprintCache
             }
         }
 
-        return $smallest ?? array_values(array_filter(array_keys($tokens['own']), static fn (string $token): bool => !TokenCollector::isReadToken($token)));
+        return $smallest ?? array_values(array_filter(
+            array_keys($tokens['own']),
+            static fn (string $token): bool => !TokenCollector::isReadToken($token),
+        ));
     }
 
     /**
@@ -66,7 +69,9 @@ final class FingerprintCache
         );
 
         return array_map(
-            static fn (string $token): string => in_array($token, $onlyAssertionsRead, strict: true) ? TokenCollector::readToken($token) : $token,
+            static fn (string $token): string => in_array($token, $onlyAssertionsRead, strict: true)
+                ? TokenCollector::readToken($token)
+                : $token,
             NonLiteralArguments::withoutImplied($exceeding),
         );
     }
