@@ -1512,6 +1512,22 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             PHP,
         Action::MergeIntoDataset,
     ],
+    'another list length for a parameter without a type the covering closure puts in a list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
+            it('covers', fn () => expect(f([1, 2]))->toBeTrue());
+            PHP,
+        Action::Review,
+    ],
+    'another list length for a parameter without a type the covering closure puts in an expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['a', 'b']));
+            PHP,
+        Action::Review,
+    ],
     'argument the covering closure does not pass' => [
         <<<'PHP'
             <?php
@@ -1519,6 +1535,14 @@ it('merges a test into a covering dataset only when each value in differsBy reac
                 expect(validate($subject))->toBeFalse();
             })->with(['row' => ['*|X|*']]);
             it('covers', fn () => expect(validate('*|Y|*', 'subject'))->toBeFalse());
+            PHP,
+        Action::Review,
+    ],
+    'empty list for a mixed parameter the covering closure puts in an expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn (mixed $e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe([]));
             PHP,
         Action::Review,
     ],
@@ -1577,6 +1601,22 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             <?php
             it('runs', fn (string $e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
             it('covers', fn () => expect(g())->toBe(['b']));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'list item string for a parameter without a type the covering closure puts in an expected list' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($e) => expect(g())->toBe([$e]))->with(['row' => ['a']]);
+            it('covers', fn () => expect(g())->toBe(['b']));
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'longer list for a parameter without a type' => [
+        <<<'PHP'
+            <?php
+            it('runs', fn ($x) => expect(f($x))->toBeTrue())->with(['row' => [[1]]]);
+            it('covers', fn () => expect(f([1, 2]))->toBeTrue());
             PHP,
         Action::MergeIntoDataset,
     ],
