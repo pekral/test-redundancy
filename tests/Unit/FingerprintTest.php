@@ -908,6 +908,17 @@ it('gives a non-literal argument of a call that is no assertion the token of its
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
+    'call that an assertion reads' => [
+        'expect(roleOf($user))->toBeTrue();',
+        [
+            'expect:function:roleOf/call:toBeTrue' => 1,
+            'function:expect' => 1,
+            'function:roleOf' => 1,
+            'in:function:roleOf#0/non-literal' => 1,
+            'read:function:roleOf' => 1,
+            'read:in:function:roleOf#0/non-literal' => 1,
+        ],
+    ],
     'call that wraps a variable' => [
         'store(strtoupper($email));',
         [
@@ -948,7 +959,7 @@ it('lists no non-literal argument token of a call that the token list names alre
         'value:1',
     ];
 
-    expect(NonLiteralArguments::withoutImplied($difference))->toBe([
+    expect(NonLiteralArguments::withoutImplied($difference, $difference))->toBe([
         'function:store',
         'loop:call:Batch::import',
         'in:function:store#1/function:wrap#0/non-literal',

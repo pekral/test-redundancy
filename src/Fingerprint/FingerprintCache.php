@@ -31,9 +31,8 @@ final class FingerprintCache
         $smallest = null;
 
         foreach ($tokens['covering'] as $covering) {
-            $difference = NonLiteralArguments::withoutImplied(
-                ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering),
-            );
+            $exceeding = ArrayOrders::withoutImplied($this->exceeding($tokens['own'], $covering), $covering);
+            $difference = NonLiteralArguments::withoutImplied($exceeding, $exceeding);
 
             if ($smallest === null || count($difference) < count($smallest)) {
                 $smallest = $difference;
@@ -65,14 +64,16 @@ final class FingerprintCache
         ));
         $onlyAssertionsRead = array_filter(
             $exceeding,
-            fn (string $token): bool => $this->arranged($covering, $token) <= $this->arranged($tokens['own'], $token),
+            fn (string $token): bool => $this->isOnlyRead($covering, $tokens['own'], $token),
         );
+
+        $arranged = array_values(array_diff($exceeding, $onlyAssertionsRead));
 
         return array_map(
             static fn (string $token): string => in_array($token, $onlyAssertionsRead, strict: true)
                 ? TokenCollector::readToken($token)
                 : $token,
-            NonLiteralArguments::withoutImplied($exceeding),
+            NonLiteralArguments::withoutImplied($exceeding, $arranged),
         );
     }
 
@@ -137,6 +138,18 @@ final class FingerprintCache
             static fn (int $count, string $token): bool => !TokenCollector::isReadToken($token) && $count > ($other[$token] ?? 0),
             ARRAY_FILTER_USE_BOTH,
         ));
+    }
+
+    /**
+     * @param array<string, int> $covering
+     * @param array<string, int> $own
+     */
+    private function isOnlyRead(array $covering, array $own, string $token): bool
+    {
+        $call = NonLiteralArguments::callOf($token);
+
+        return ($call === null || ($covering[$call] ?? 0) > ($own[$call] ?? 0))
+            && $this->arranged($covering, $token) <= $this->arranged($own, $token);
     }
 
     /**

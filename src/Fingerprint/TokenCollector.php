@@ -63,7 +63,7 @@ final class TokenCollector
         $paths = self::paths($nodeFinder, $nodes, $assignedValues, $readProperties);
         $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
         $assertionReads = NodeContext::assertionReads($nodeFinder, $nodes);
-        $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths);
+        $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths, $assertionReads);
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
         foreach ($nodeFinder->find($nodes, $carriesToken) as $node) {
