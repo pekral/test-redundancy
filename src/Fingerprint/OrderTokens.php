@@ -10,6 +10,7 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\Cast;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Expression;
@@ -195,7 +196,8 @@ final class OrderTokens
     private static function isComposite(Expr $element): bool
     {
         return ($element instanceof Array_ && $element->items !== [])
-            || ($element instanceof CallLike && $element->getRawArgs() !== []);
+            || ($element instanceof CallLike && $element->getRawArgs() !== [])
+            || $element instanceof Cast;
     }
 
 }

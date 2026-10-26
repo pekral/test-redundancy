@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that differs from its covering test only in a cast is no longer `delete` or `merge-into-dataset`. Before, a
+  cast carried no token, so `store([(object) ['code' => null]])` and `store([['code' => null]])` had the same tokens,
+  and a `merge-into-dataset` row built from `differsBy` dropped the cast and passed an array instead of a `stdClass`.
+  Now a cast carries a token for its type next to the tokens of its expression, e.g. `cast:object` or `cast:int`. An
+  alias carries the token of its type, so `(integer)` carries `cast:int` and `(double)` carries `cast:float`. The token
+  is listed in `differsBy` or `coveringDiffersBy`, and the candidate is `review`. The variable or property inside a
+  cast keeps its name token, so `connect((int) $this->enShop)` still carries `in:function:connect#0/property:enShop`.
+  A cast that an assertion receives as its subject names the assertion, like a `new` expression, e.g.
+  `expect:cast:string/call:toBe` for `expect((string) $response->body())->toBe('x')`. A cast in a list is ordered by
+  its source, like an array or a call with arguments (#117).
 - A test is no longer `merge-into-dataset` when the covering test fills the differing slot of an assertion with an array
   that holds a variable or a property. Before, the key `$subscriber->email` in `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])`
   carried no token, so a candidate with `toBe([])` was `merge-into-dataset`, although a dataset row cannot hold the key.

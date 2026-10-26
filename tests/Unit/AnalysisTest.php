@@ -4398,3 +4398,46 @@ it('decides on a test by what the covering test passes in the slot that differs'
         Action::Review,
     ],
 ]);
+
+it('does not delete or merge a test that differs from its covering test only in a cast', function (
+    string $candidateBody,
+    string $coveringBody,
+    array $differsBy,
+    array $coveringDiffersBy,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe($coveringDiffersBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'a cast of a property to an integer where the covering test passes the property' => [
+        'connect((int) $this->enShop);',
+        'connect($this->enShop);',
+        ['cast:int'],
+        [],
+    ],
+    'a cast to an object in a list where the covering test passes an empty list' => [
+        'expect(enrich(new LengthAwarePaginator([(object) [\'code\' => null]], 1, 50)))->toBeEmpty();',
+        'expect(enrich(new LengthAwarePaginator([], 0, 50)))->toBeEmpty();',
+        [
+            'in:function:enrich#0/new:LengthAwarePaginator#0/value:list-item',
+            'cast:object',
+            'key:value:\'code\'',
+            'in:value:\'code\'/value:null',
+            'in:function:enrich#0/new:LengthAwarePaginator#1/value:1',
+        ],
+        [],
+    ],
+    'an array in a list where the covering test casts it to an object' => [
+        'store([[\'code\' => null]]);',
+        'store([(object) [\'code\' => null]]);',
+        [],
+        ['cast:object'],
+    ],
+]);

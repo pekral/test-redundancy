@@ -12,6 +12,7 @@ use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\Cast;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
@@ -147,6 +148,7 @@ final class TokenCollector
                 : null,
             $node instanceof FuncCall => FunctionToken::of($node),
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
+            $node instanceof Cast => 'cast:' . self::castType($node),
             $node instanceof Array_ => self::arrayToken($node),
             default => null,
         };
@@ -183,6 +185,7 @@ final class TokenCollector
             || $node instanceof StaticCall
             || $node instanceof FuncCall
             || $node instanceof New_
+            || $node instanceof Cast
             || ($node instanceof Array_ && $node->items === []);
     }
 
@@ -376,6 +379,11 @@ final class TokenCollector
         return ($node instanceof PropertyFetch || $node instanceof MethodCall)
             && $node->name instanceof Identifier
             && $node->name->toString() === 'not';
+    }
+
+    private static function castType(Cast $cast): string
+    {
+        return str_replace('double', 'float', strtolower(substr($cast->getType(), strlen('Expr_Cast_'))));
     }
 
     private static function scalar(Scalar|InterpolatedStringPart $scalar, string $sign): ?string
