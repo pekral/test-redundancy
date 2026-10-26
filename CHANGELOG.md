@@ -14,8 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Now each variable or property that is a key or a value of an array that an assertion receives, at any depth, carries
   `variable:` or `property:` at the position of that argument, such as
   `in:expect:variable:response/call:updatedEmails/call:toBe#0/property:email`. The token is listed in
-  `coveringDiffersBy`, and the candidate is `review`. An enum case read, such as `Status::Active->value`, stays a
-  value and carries no name (#116).
+  `coveringDiffersBy`, and the candidate is `review`. The same holds for an array that a call other than an assertion
+  receives, such as `store(['key' => $id])`, and for the variable or property that an array element read holds, such as
+  `$row` in `toBe($row['email'])`. An enum case read, such as `Status::Active->value`, stays a value and carries no
+  name, also inside an operator or a ternary, so a covering test with `connect(Status::Active->value . 'x')` is
+  `merge-into-dataset` against `connect('a' . 'x')`, because a dataset row holds the enum value (#116).
 - A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
   callable held in an array element. Before, a call such as `($this->actions['cleanUp'])('acme')` carried no token, so
   two identical calls gave the same tokens as one call, and the test with one call was `delete`. Now such a call
