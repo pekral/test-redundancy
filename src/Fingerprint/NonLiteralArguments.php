@@ -9,6 +9,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ArrayDimFetch;
 use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Expr\BitwiseNot;
 use PhpParser\Node\Expr\BooleanNot;
@@ -168,9 +169,9 @@ final class NonLiteralArguments
         return array_merge([], ...array_map(
             static fn (Expr $value): array => array_map(
                 static fn (string $suffix): string => NodeContext::pathPrefix($paths, $value) . $suffix,
-                [...($isAssertion ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
+                [...($isAssertion || $value instanceof Array_ ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
             ),
-            $callToken === null ? [] : self::nonLiteralValues($call, $isAssertion),
+            $callToken === null ? [] : self::nonLiteralValues($call),
         ));
     }
 
@@ -187,6 +188,7 @@ final class NonLiteralArguments
                 array_merge([], ...array_map(static fn (ArrayItem $item): array => [$item->key, $item->value], $value->items)),
                 $parameters,
             ),
+            $value instanceof ArrayDimFetch => self::namesOfEach([$value->var, $value->dim], $parameters),
             $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
             $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
                 || $value instanceof BitwiseNot => self::namesOf($value->expr, $parameters),
@@ -212,7 +214,7 @@ final class NonLiteralArguments
     /**
      * @return list<\PhpParser\Node\Expr>
      */
-    private static function nonLiteralValues(CallLike $call, bool $isAssertion): array
+    private static function nonLiteralValues(CallLike $call): array
     {
         $values = array_map(
             static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
@@ -221,7 +223,7 @@ final class NonLiteralArguments
 
         return array_values(array_filter(
             $values,
-            static fn (?Expr $value): bool => $value !== null && (self::isNonLiteral($value) || ($isAssertion && $value instanceof Array_)),
+            static fn (?Expr $value): bool => $value !== null && (self::isNonLiteral($value) || $value instanceof Array_),
         ));
     }
 

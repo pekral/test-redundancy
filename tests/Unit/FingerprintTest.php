@@ -134,6 +134,7 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     'actual argument without a token' => ['self::assertSame(foo(), $rows[\'id\']);', [
         'call:self::assertSame' => 1,
         'function:foo' => 1,
+        'in:call:self::assertSame#1/variable:rows' => 1,
         'read:function:foo' => 1,
         'value:\'id\'' => 1,
     ],
@@ -614,10 +615,17 @@ it('gives a list the number of its items, so a repeated item counts', function (
     'list of one variable read three times' => ['notify([$click, $click, $click]);', [
         'function:notify' => 1,
         'in:function:notify#0/value:list-item' => 3,
+        'in:function:notify#0/variable:click' => 3,
     ],
     ],
-    'list that unpacks another array' => ['notify([...$clicks, $click]);', ['function:notify' => 1]],
-    'map' => ['notify([\'a\' => $click]);', ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1]],
+    'list that unpacks another array' => [
+        'notify([...$clicks, $click]);',
+        ['function:notify' => 1, 'in:function:notify#0/variable:clicks' => 1, 'in:function:notify#0/variable:click' => 1],
+    ],
+    'map' => [
+        'notify([\'a\' => $click]);',
+        ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1, 'in:function:notify#0/variable:click' => 1],
+    ],
 ]);
 
 it('counts how many times a test uses each token', function (): void {
@@ -1095,7 +1103,9 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'in:function:store#0/value:1' => 1,
             'in:function:store#1/const:Size::Large' => 1,
             'in:function:store#2/value:list-item' => 1,
+            'in:function:store#2/variable:id' => 1,
             'in:function:store#3/key:value:\'key\'' => 1,
+            'in:function:store#3/variable:id' => 1,
             'in:function:store#4/const:Size::Large->value' => 1,
         ],
     ],
@@ -1151,6 +1161,10 @@ it('names the variable or the property that an argument of a call or of an asser
             'in:call:assertSame#0/const:Status::Active->value/value:1',
             'in:call:assertSame#1/variable:result',
         ],
+    ],
+    'enum case value in an operator passed to the code under test' => [
+        'connect(Status::Active->value . $suffix);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:suffix', 'const:Status::Active->value'],
     ],
     'nullsafe property passed to the code under test' => [
         'connect($shop?->url);',

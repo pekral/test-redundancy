@@ -2845,7 +2845,7 @@ it('keeps a test that passes the same item several times in one list against a t
                 expect($this->cacheManager->claimUnregistered($clicks))->toHaveCount(1);
             });
             PHP,
-        ['in:call:claimUnregistered#0/function:collect#0/value:list-item'],
+        ['in:call:claimUnregistered#0/function:collect#0/variable:click', 'in:call:claimUnregistered#0/function:collect#0/value:list-item'],
         Action::Review,
     ],
 ]);
@@ -3690,6 +3690,20 @@ it('asks for a review of a test whose covering test arranges a call or an argume
             PHP_SOURCE,
         ['call:andThrow', 'new:InvalidDomain'],
     ],
+]);
+
+it('asks for a review of a test whose argument holds a property that the covering test wraps in a call', function (string $source): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Handler.php:5'], 'it covers the arranged case' => ['src/Handler.php:5', 'src/Handler.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
+        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/property:email'])
+        ->and(valueAt($json, 'action'))->toBe('review');
+})->with([
     'wrapping call' => [
         <<<'PHP_SOURCE'
             <?php
@@ -3704,7 +3718,6 @@ it('asks for a review of a test whose covering test arranges a call or an argume
                 expect($kept)->toBeTrue();
             });
             PHP_SOURCE,
-        ['function:strtoupper'],
     ],
     'wrapping call inside an expectation' => [
         <<<'PHP_SOURCE'
@@ -3716,7 +3729,6 @@ it('asks for a review of a test whose covering test arranges a call or an argume
                 expect(keepSubscribed(collect([strtoupper($subscriber->email)])))->toBeTrue();
             });
             PHP_SOURCE,
-        ['function:strtoupper'],
     ],
 ]);
 
@@ -4292,5 +4304,62 @@ it('decides on a test whose covering test fills the differing slot of an asserti
         '[$email => [\'field1\' => \'value1\']]',
         Action::Review,
         ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/variable:email'],
+    ],
+]);
+
+it('decides on a test by what the covering test passes in the slot that differs', function (
+    string $coveringStatement,
+    string $candidateStatement,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('covers the arranged case', function (): void {
+                %s
+            });
+            it('covers the plain case', function (): void {
+                %s
+            });
+            PHP_SOURCE, $coveringStatement, $candidateStatement),
+        linesByTest: [
+            'it covers the arranged case' => ['src/Handler.php:5', 'src/Handler.php:6'],
+            'it covers the plain case' => ['src/Handler.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'array element in an array of an assertion against an empty array' => [
+        'expect(f())->toBe([$row[\'email\'] => 1]);',
+        'expect(f())->toBe([]);',
+        Action::Review,
+    ],
+    'array element in an assertion against a literal' => [
+        'expect(f())->toBe($row[\'email\']);',
+        'expect(f())->toBe(\'a\');',
+        Action::Review,
+    ],
+    'array of a call that holds a property key against an empty array' => [
+        'foo([$subscriber->email => 1]);',
+        'foo([]);',
+        Action::Review,
+    ],
+    'array of a call that holds a variable against a literal' => [
+        'foo([\'k\' => $x, \'n\' => 1]);',
+        'foo([\'k\' => \'lit\', \'n\' => 1]);',
+        Action::Review,
+    ],
+    'enum case value in an operator against a literal' => [
+        'foo(Status::Active->value . \'x\');',
+        'foo(\'a\' . \'x\');',
+        Action::MergeIntoDataset,
+    ],
+    'enum case value in an operator against a runtime property' => [
+        'foo($order->value . \'x\');',
+        'foo(Status::Active->value . \'x\');',
+        Action::Review,
     ],
 ]);
