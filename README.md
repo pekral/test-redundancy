@@ -293,6 +293,11 @@ test lacks.
   covering test makes the call more times (see *No missing call or object*). A
   callable that the test names only at run time, such as `($this->{$name})()` or `($this->actions[$name])()`, carries
   no token.
+- **Casts.** A cast carries a token for its type, e.g. `cast:object` for `(object) ['code' => null]` or `cast:int` for
+  `(int) $id`, next to the tokens of the expression it casts. An alias carries the token of its type, so `(integer)`
+  carries `cast:int` and `(double)` carries `cast:float`. A test that differs from its covering test only in a cast is
+  therefore `review`, never `delete` or `merge-into-dataset`, because a row built from `differsBy` would drop the cast
+  and pass another type. A cast in a list is ordered by its source, like an array or a call with arguments.
 - **Loops.** A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop carries a
   `loop:` prefix, e.g. `loop:call:Batch::import`. A call made in a loop and the same call made outside a loop are
   different tokens, so the action is `review`. Two loops differ only in the tokens they carry, never in the number of
