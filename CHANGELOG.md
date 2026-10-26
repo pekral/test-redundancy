@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.7] - 2026-10-26
 
+### Changed
+
+- The public PHP property `Candidate::$coveringDiffersBy` and the constructor parameter of the same name are now
+  `coveringDifference`. A PHP caller that reads `$candidate->coveringDiffersBy` or passes `coveringDiffersBy:` as a
+  named argument must use `coveringDifference`, or `Candidate::coveringTokensForReview()` for the list that the
+  report field `coveringDiffersBy` shows. The JSON report and the text report do not change (#136).
+
 ### Fixed
 
 - The PHP property `Candidate::$coveringDiffersBy` no longer carries the name of the report field `coveringDiffersBy`
