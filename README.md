@@ -281,12 +281,15 @@ test lacks.
   of them.
 - **Counts.** The fingerprint counts each token, so a token the candidate uses more times than the covering test is
   listed too. The count is the number of places the token appears in the test source, not the number of runs.
-  A call of a callable that a variable or a property holds counts too: `($action)($account)` carries
-  `function:$action`, `($this->action)($account)` carries `function:$this->action`, and `(self::$action)($account)`
-  carries `function:self::$action`. A nullsafe method call `$action?->handle($account)` carries `call:handle`, like the
+  A call of a callable that a variable, a property or an array element holds counts too: `($action)($account)` carries
+  `function:$action`, `($this->action)($account)` carries `function:$this->action`, `(self::$action)($account)`
+  carries `function:self::$action`, and `($this->actions['cleanUp'])($account)` carries
+  `function:$this->actions['cleanUp']`. An array element carries the token only when its key is a literal integer or a
+  literal string without `/`, `#` or `:`. A nullsafe method call `$action?->handle($account)` carries `call:handle`, like the
   method call `$action->handle($account)`. A test that makes such a call once is therefore `review` against a covering
   test that makes it twice, because the covering test makes the call more times (see *No missing call or object*). A
-  callable that the test names only at run time, such as `($this->{$name})()`, carries no token.
+  callable that the test names only at run time, such as `($this->{$name})()` or `($this->actions[$name])()`, carries
+  no token.
 - **Loops.** A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop carries a
   `loop:` prefix, e.g. `loop:call:Batch::import`. A call made in a loop and the same call made outside a loop are
   different tokens, so the action is `review`. Two loops differ only in the tokens they carry, never in the number of
