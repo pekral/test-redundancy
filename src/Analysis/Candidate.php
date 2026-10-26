@@ -8,6 +8,7 @@ use JsonSerializable;
 use Pekral\TestRedundancy\Fingerprint\AssertionSubject;
 use Pekral\TestRedundancy\Fingerprint\DatasetParameters;
 use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
+use Pekral\TestRedundancy\Fingerprint\PestFingerprints;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Support\TestKey;
@@ -81,6 +82,7 @@ final readonly class Candidate implements JsonSerializable
                     || $this->isInArgumentPositionOnlyTheCoveringTestFills(NonLiteralArguments::argumentPositionOf($token))
                     || $this->isExpectationOnlyTheCoveringTestHas($token),
             )),
+            $this->differsBy !== [] => $this->coveringExpectedExceptions(),
             default => [],
         };
     }
@@ -134,7 +136,8 @@ final readonly class Candidate implements JsonSerializable
         $steps = [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
-            ...$this->missingExpectationSteps(),
+            ...$this->coveringTokenSteps(Action::MISSING_EXPECTATION_STEP, $this->coveringExpectations()),
+            ...$this->coveringTokenSteps(Action::EXPECTED_EXCEPTION_STEP, $this->coveringExpectedExceptions()),
             ...$this->coveringTokenSteps(Action::OMITTED_ARGUMENT_STEP, $this->omittedByCovering),
             ...$sharedSteps,
             ...$this->action()->steps(
@@ -209,9 +212,9 @@ final readonly class Candidate implements JsonSerializable
     /**
      * @return list<string>
      */
-    private function missingExpectationSteps(): array
+    private function coveringExpectedExceptions(): array
     {
-        return $this->coveringTokenSteps(Action::MISSING_EXPECTATION_STEP, $this->coveringExpectations());
+        return array_values(array_filter($this->coveringTokens(), PestFingerprints::isExpectedExceptionToken(...)));
     }
 
     /**
@@ -231,6 +234,7 @@ final readonly class Candidate implements JsonSerializable
         return [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
+            ...$this->coveringTokenSteps(Action::EXPECTED_EXCEPTION_STEP, $this->coveringExpectedExceptions()),
             ...$this->coveringTokenSteps(
                 $this->assertsNothing ? Action::NO_ASSERTION_STEP : Action::MISSING_CALL_STEP,
                 $this->otherCoveringTokens(),
@@ -248,6 +252,7 @@ final readonly class Candidate implements JsonSerializable
             $this->coveringKeys(),
             $this->coveringArguments(),
             $this->coveringExpectations(),
+            $this->coveringExpectedExceptions(),
         ));
     }
 

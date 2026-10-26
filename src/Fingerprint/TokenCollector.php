@@ -123,7 +123,7 @@ final class TokenCollector
     public static function isAssertionToken(string $token): bool
     {
         return match (true) {
-            OrderTokens::isToken($token) => false,
+            OrderTokens::isToken($token), PestFingerprints::isExpectedExceptionToken($token) => false,
             str_starts_with($token, self::BOUND_PREFIX), self::isReadToken($token) => true,
             preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 => preg_match(self::ARGUMENT_PATTERN, $token, $matches) === 1
                 && self::isAssertion($matches[2]),

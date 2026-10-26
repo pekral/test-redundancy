@@ -973,7 +973,9 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
                 'in:expect:function:add/call:toBe#0/value:3',
             ],
         )
-        ->and($fingerprints['rejects'])->toHaveKeys(['call:throws', 'const:InvalidArgumentException::class', 'value:\'Broken\'']);
+        ->and(array_keys($fingerprints['rejects']))->toEqualCanonicalizing(
+            ['function:fail', 'call:throws', 'call:throws#0/const:InvalidArgumentException::class', 'call:throws#1/value:\'Broken\''],
+        );
 });
 
 it('fingerprints PHPUnit tests and their data providers', function (): void {
