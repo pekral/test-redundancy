@@ -92,6 +92,7 @@ final readonly class RedundancyAnalyzer
             $this->fingerprints->sharedDataset($testKey),
             $this->fingerprints->datasetParameters($testKey, $coveredBy),
             $this->fingerprints->omittedArguments($testKey, $coveredBy),
+            count($coveredBy) === 1 ? $this->fingerprints->sharedDataset($coveredBy[0]) : null,
         );
     }
 

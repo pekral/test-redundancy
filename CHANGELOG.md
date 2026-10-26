@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The first step of a `merge-into-dataset` candidate whose covering test is a row of a named Pest dataset
+  (`dataset('name', …)`) that other tests of the same file also use with `->with('name')` no longer tells the reader to
+  add a row to the dataset of the covering test, as if only that test used it. A row added to the dataset is added to
+  every test that uses it. Now the step names the dataset and the other tests and asks to add the row only when each of
+  them stays correct with it, otherwise to give the covering test its own dataset (#135). The action is still
+  `merge-into-dataset`, as for a row of a dataset that no other test uses. A named dataset defined in another file is
+  not parsed, so a candidate covered by one of its rows is `review`, as before.
 - A test that passes a literal where its covering test passes a closure that returns another value is no longer
   `merge-into-dataset`. Before, a closure argument carried only the `non-literal` token of its position and the value
   it returns, so `foo('a')` against `foo(fn () => 1)`, `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])` and

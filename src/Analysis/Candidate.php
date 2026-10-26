@@ -32,6 +32,7 @@ final readonly class Candidate implements JsonSerializable
         public ?SharedDataset $sharedDataset = null,
         public ?DatasetParameters $coveringDatasetParameters = null,
         public array $omittedByCovering = [],
+        public ?SharedDataset $coveringSharedDataset = null,
     ) {
     }
 
@@ -113,7 +114,9 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
-        $sharedSteps = $this->sharedDataset === null ? [] : [$this->sharedDatasetStep($this->sharedDataset)];
+        $sharedSteps = $this->sharedDataset === null ? [] : [
+            sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, $this->sharedDataset->quotedOtherTests()),
+        ];
 
         if ($this->unionOnlyLines !== []) {
             return [...$sharedSteps, sprintf(Action::UNION_ONLY_LINES_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
@@ -138,6 +141,7 @@ final readonly class Candidate implements JsonSerializable
                 $this->quoted($coveringTests),
                 $this->otherCoveringTokens(),
                 TestKey::datasetOf($this->coveredBy[0] ?? ''),
+                $this->coveringSharedDataset,
             ),
         ];
 
@@ -149,11 +153,6 @@ final readonly class Candidate implements JsonSerializable
     private function deleteOrReviewSharedRow(): Action
     {
         return $this->sharedDataset === null ? Action::Delete : Action::Review;
-    }
-
-    private function sharedDatasetStep(SharedDataset $sharedDataset): string
-    {
-        return sprintf(Action::SHARED_DATASET_STEP, $sharedDataset->name, $this->quoted($sharedDataset->otherTests));
     }
 
     /**
