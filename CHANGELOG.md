@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-26
+
 ### Fixed
 
 - A test is no longer `delete` or `merge-into-dataset` when one of the two tests holds a variable or a property
@@ -48,7 +50,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   covering dataset is now `delete`, covered by that row, and the row is no longer a candidate covered by that test.
   Before, a row that runs fewer lines than such a test was `delete` covered by the test, and the test was
   `merge-into-dataset` into another row, so following both proposals deleted the row and added it back (#118).
-- A test that differs from its covering test only in a cast is no longer `delete` or `merge-into-dataset`. Before, a
+- A test that has a cast its covering test lacks is no longer `delete` or `merge-into-dataset`. Before, a
   cast carried no token, so `store([(object) ['code' => null]])` and `store([['code' => null]])` had the same tokens,
   and a `merge-into-dataset` row built from `differsBy` dropped the cast and passed an array instead of a `stdClass`.
   Now a cast carries a token for its type at its place, e.g. `in:function:store#0/cast:object`, so a cast that moves to
@@ -56,8 +58,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   an argument also the place of the argument, e.g. `in:function:store#0/cast:object/key:value:'code'` for
   `store((object) ['code' => null])`, so `store((int) '5', (int) '6')` and `store((int) '6', (int) '5')` are
   `merge-into-dataset`, never `delete`. An alias carries the token of its type, so `(integer)` carries `cast:int`, and
-  `(double)` carries `cast:float` and is ordered as `(float)`. The token is listed in `differsBy` or
-  `coveringDiffersBy`, and the candidate is `review`. The variable or property inside a cast keeps its name token, so
+  `(double)` carries `cast:float` and is ordered as `(float)`. The token is listed in `differsBy`, and the candidate is
+  `review`. The variable or property inside a cast keeps its name token, so
   `connect((int) $this->enShop)` still carries `in:function:connect#0/property:enShop`. A cast that an assertion
   receives as its subject, or that is an array key, carries the cast together with what it casts, e.g.
   `expect:cast:string/variable:response/call:body/call:toBe` for `expect((string) $response->body())->toBe('x')` and
@@ -483,7 +485,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.5...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.6...HEAD
+[0.1.6]: https://github.com/pekral/test-redundancy/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/pekral/test-redundancy/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/pekral/test-redundancy/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/pekral/test-redundancy/compare/0.1.2...0.1.3

@@ -306,9 +306,11 @@ test lacks.
   `in:function:store#0/cast:object/key:value:'code'`, so two tests with swapped literals in cast arguments, such as
   `store((int) '5', (int) '6')` and `store((int) '6', (int) '5')`, are `merge-into-dataset`. A token inside a cast in a
   list carries no place, e.g. `in:cast:object/key:value:'code'`. An alias carries the token of its type, so
-  `(integer)` carries `cast:int` and `(double)` carries `cast:float`. A test that differs from its covering test only in
-  a cast, or in the place of a cast, is therefore `review`, never `delete` or `merge-into-dataset`, because a row built
-  from `differsBy` would drop the cast and pass another type. A cast that is the subject of an assertion or an array key
+  `(integer)` carries `cast:int` and `(double)` carries `cast:float`. A test that has a cast its covering test lacks,
+  or a cast in another place, is therefore `review`, not `delete` or `merge-into-dataset`, because a row built from
+  `differsBy` would drop the cast and pass another type. A cast that only the covering test has is not in `differsBy`,
+  so `expect(render())->toBe($x)` covered by `expect(render())->toBe((string) $x)` is still `delete`. A cast that is
+  the subject of an assertion or an array key
   carries what it casts, e.g. `expect:cast:string/variable:response/call:body/call:toBe` or
   `in:function:store#0/cast:string/const:Foo::A/value:1`. A cast in a list is ordered by its source, like an array or
   a call with arguments.
