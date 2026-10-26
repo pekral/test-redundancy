@@ -18,7 +18,7 @@ final readonly class Candidate implements JsonSerializable
     /**
      * @param list<string> $coveredBy
      * @param list<string>|null $differsBy
-     * @param list<string>|null $coveringDiffersBy
+     * @param list<string>|null $coveringDifference
      * @param list<string> $unionOnlyLines
      * @param list<string> $omittedByCovering
      */
@@ -26,7 +26,7 @@ final readonly class Candidate implements JsonSerializable
         public string $testKey,
         public array $coveredBy,
         public ?array $differsBy,
-        public ?array $coveringDiffersBy,
+        public ?array $coveringDifference,
         public array $unionOnlyLines,
         public bool $assertsNothing,
         public ?SharedDataset $sharedDataset = null,
@@ -258,7 +258,7 @@ final readonly class Candidate implements JsonSerializable
     {
         return array_values(
             array_filter(
-                $this->assertsNothing ? $this->coveringTokens() : $this->coveringDiffersBy ?? [],
+                $this->assertsNothing ? $this->coveringTokens() : $this->coveringDifference ?? [],
                 fn (string $token): bool => !TokenCollector::isAssertionToken($token)
                     && (NonLiteralArguments::identityPositionOf($token) === null || NonLiteralArguments::isCallArgument($token))
                     && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
@@ -271,7 +271,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringTokens(): array
     {
-        return array_map(TokenCollector::withoutRead(...), $this->coveringDiffersBy ?? []);
+        return array_map(TokenCollector::withoutRead(...), $this->coveringDifference ?? []);
     }
 
     private function isInValueDiffersByLists(string $key): bool
@@ -318,7 +318,7 @@ final readonly class Candidate implements JsonSerializable
     {
         return $this->coveringDatasetParameters === null
             || (array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...))
-                && !array_any($this->coveringDiffersBy ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
+                && !array_any($this->coveringDifference ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
     }
 
     private function isCoveredByOneTestOfTheSameFile(): bool
