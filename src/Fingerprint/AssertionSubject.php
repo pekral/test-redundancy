@@ -19,6 +19,7 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
+use PhpParser\NodeFinder;
 use PHPUnit\Framework\Assert;
 use ReflectionMethod;
 use ReflectionParameter;
@@ -29,39 +30,67 @@ final class AssertionSubject
     private const string MESSAGE_PARAMETER = 'message';
 
     /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @return array<int, \PhpParser\Node\Expr>
      */
-    public static function of(Node $assertion, string $method, array $assignedValues): ?Expr
+    public static function byAssertion(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues): array
     {
-        return array_find(
-            self::candidates($assertion, $method, $assignedValues),
-            static fn (Expr $subject): bool => self::token($subject) !== null,
-        );
+        $subjects = [];
+
+        foreach ($nodeFinder->find($nodes, TokenCollector::carriesContract(...)) as $node) {
+            $token = TokenCollector::token($node);
+            $subject = $token === null ? null : self::of($node, TokenCollector::calledMethod($token), $assignedValues);
+
+            if ($subject !== null) {
+                $subjects[spl_object_id($node)] = $subject;
+            }
+        }
+
+        return $subjects;
     }
 
-    public static function token(Expr $subject, bool $withLiteralArguments = false): ?string
+    /**
+     * @param array<int, \PhpParser\Node\Expr> $subjects
+     * @return array<int, \PhpParser\Node\Expr>
+     */
+    public static function named(array $subjects): array
     {
-        $token = self::partToken($subject, $withLiteralArguments);
+        return array_filter($subjects, static fn (Expr $subject): bool => self::token($subject) !== null);
+    }
+
+    /**
+     * @param array<int, \PhpParser\Node\Expr> $subjects
+     * @return array<int, \PhpParser\Node\Expr>
+     */
+    public static function paired(array $subjects): array
+    {
+        $named = self::named($subjects);
+        $unnamed = array_map(self::tokenOrSource(...), array_diff_key($subjects, $named));
+
+        return count(array_unique($unnamed)) > 1 ? $subjects : $named;
+    }
+
+    public static function tokenOrSource(Expr $subject): string
+    {
+        return self::token($subject) ?? TokenCollector::token($subject) ?? OrderTokens::sourceOf($subject);
+    }
+
+    public static function token(Expr $subject, bool $withArguments = false): ?string
+    {
+        $token = self::partToken($subject, $withArguments);
         $receiver = $subject instanceof MethodCall || $subject instanceof NullsafeMethodCall
-            ? NonLiteralArguments::identity($subject->var) ?? self::partToken($subject->var, $withLiteralArguments)
+            ? NonLiteralArguments::identity($subject->var) ?? self::partToken($subject->var, $withArguments)
             : null;
 
         return $token === null || $receiver === null ? $token : $receiver . '/' . $token;
     }
 
-    public static function literalArguments(Node $call, ?string $assertionMethod = null): string
+    public static function arguments(Node $call, ?string $assertionMethod = null): string
     {
-        $arguments = '';
-        $messagePosition = $assertionMethod === null ? null : self::messagePosition($assertionMethod);
+        $arguments = self::argumentsBesideMessage($call, $assertionMethod);
 
-        foreach ($call instanceof CallLike ? $call->getRawArgs() : [] as $position => $argument) {
-            $arguments .= $argument instanceof Arg
-                && !self::fillsMessage($argument->name?->toString() ?? (string) $position, $messagePosition)
-                ? self::literalArgument($argument, $position)
-                : '';
-        }
-
-        return $arguments;
+        return implode('', array_map(self::argument(...), $arguments, array_keys($arguments)));
     }
 
     public static function isFailureMessage(string $token): bool
@@ -81,16 +110,26 @@ final class AssertionSubject
 
     /**
      * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     */
+    private static function of(Node $assertion, string $method, array $assignedValues): ?Expr
+    {
+        return self::candidates($assertion, $method, $assignedValues)[0] ?? null;
+    }
+
+    /**
+     * @param array<string, \PhpParser\Node\Expr> $assignedValues
      * @return list<\PhpParser\Node\Expr>
      */
     private static function candidates(Node $assertion, string $method, array $assignedValues): array
     {
-        return array_values(array_filter(array_map(
-            static fn (?Expr $subject): ?Expr => $subject instanceof Variable && is_string($subject->name)
-                ? $assignedValues[$subject->name] ?? $subject
-                : $subject,
-            self::subjects($assertion, $method),
-        )));
+        return array_merge([], ...array_map(
+            static function (Expr $subject) use ($assignedValues): array {
+                $value = $subject instanceof Variable && is_string($subject->name) ? $assignedValues[$subject->name] ?? $subject : $subject;
+
+                return NodeContext::returnedValues($value) ?? [$value];
+            },
+            array_values(array_filter(self::subjects($assertion, $method))),
+        ));
     }
 
     /**
@@ -103,7 +142,7 @@ final class AssertionSubject
                 self::expectedValue($assertion->var),
             ],
             ($assertion instanceof MethodCall || $assertion instanceof StaticCall || $assertion instanceof FuncCall)
-                && str_starts_with($method, 'assert') => self::lastNonDataArgument($assertion),
+                && str_starts_with($method, 'assert') => self::actualArgument($assertion, $method),
             default => [],
         };
     }
@@ -111,15 +150,27 @@ final class AssertionSubject
     /**
      * @return list<\PhpParser\Node\Expr>
      */
-    private static function lastNonDataArgument(CallLike $call): array
+    private static function actualArgument(CallLike $call, string $method): array
     {
-        return array_slice(array_values(array_filter(
-            array_map(
-                static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
-                $call->getRawArgs(),
-            ),
-            static fn (?Expr $value): bool => $value !== null && !TokenCollector::isData($value),
-        )), -1);
+        $values = array_map(static fn (Arg $argument): Expr => $argument->value, self::argumentsBesideMessage($call, $method));
+        $nonDataValues = array_filter($values, static fn (Expr $value): bool => !TokenCollector::isData($value));
+
+        return array_slice(array_values($nonDataValues === [] ? $values : $nonDataValues), -1);
+    }
+
+    /**
+     * @return array<\PhpParser\Node\Arg>
+     */
+    private static function argumentsBesideMessage(Node $call, ?string $assertionMethod): array
+    {
+        $messagePosition = $assertionMethod === null ? null : self::messagePosition($assertionMethod);
+
+        return array_filter(
+            $call instanceof CallLike ? $call->getRawArgs() : [],
+            static fn (Node $argument, int $position): bool => $argument instanceof Arg
+                && !self::fillsMessage($argument->name?->toString() ?? (string) $position, $messagePosition),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     private static function messagePosition(string $assertionMethod): ?int
@@ -135,15 +186,16 @@ final class AssertionSubject
         )?->getPosition();
     }
 
-    private static function literalArgument(Arg $argument, int $position): string
+    private static function argument(Arg $argument, int $position): string
     {
         $literal = TokenCollector::isData($argument->value) ? (string) TokenCollector::token($argument->value) : null;
+        $names = $literal === null ? NonLiteralArguments::namesOf($argument->value, parameters: []) : [];
 
-        return $literal === null ? '' : sprintf(
-            '#%s:%s',
-            $argument->name?->toString() ?? $position,
-            substr($literal, (int) strpos($literal, ':') + 1),
-        );
+        return sprintf('#%s:%s', $argument->name?->toString() ?? $position, match (true) {
+            $literal !== null => substr($literal, (int) strpos($literal, ':') + 1),
+            $names !== [] => implode(',', $names),
+            default => OrderTokens::sourceOf($argument->value),
+        });
     }
 
     private static function fillsMessage(string $argument, ?int $messagePosition): bool
@@ -151,19 +203,17 @@ final class AssertionSubject
         return $messagePosition !== null && in_array($argument, [self::MESSAGE_PARAMETER, (string) $messagePosition], strict: true);
     }
 
-    private static function partToken(Expr $part, bool $withLiteralArguments): ?string
+    private static function partToken(Expr $part, bool $withArguments): ?string
     {
         $token = match (true) {
-            $part instanceof Cast => CastToken::of(
-                $part,
-                NonLiteralArguments::identity($part->expr) ?? self::token($part->expr, $withLiteralArguments),
-            ),
+            $part instanceof Cast => CastToken::of($part, self::token($part->expr, $withArguments)),
             default => NonLiteralArguments::nameOrToken($part),
         };
 
         return match (true) {
-            $token === null || preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,
-            $withLiteralArguments => $token . self::literalArguments($part),
+            $token === null => null,
+            $withArguments => $token . self::arguments($part),
+            preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,
             default => $token,
         };
     }

@@ -16,11 +16,13 @@ use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\UnaryMinus;
+use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt\Do_;
 use PhpParser\Node\Stmt\For_;
 use PhpParser\Node\Stmt\Foreach_;
+use PhpParser\Node\Stmt\Return_;
 use PhpParser\Node\Stmt\While_;
 use PhpParser\NodeFinder;
 
@@ -145,8 +147,13 @@ final class NodeContext
      */
     public static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
     {
-        if ($value instanceof Cast) {
-            return [...self::valueIds($value), ...self::argumentValueIds($value->expr, $isAssertion, $isArgument)];
+        $innerValues = $value instanceof Cast ? [$value->expr] : self::returnedValues($value);
+
+        if ($innerValues !== null) {
+            return array_merge(self::valueIds($value), ...array_map(
+                static fn (Expr $innerValue): array => self::argumentValueIds($innerValue, $isAssertion, $isArgument),
+                $innerValues,
+            ));
         }
 
         $passedItems = match (true) {
@@ -184,6 +191,38 @@ final class NodeContext
         $token = TokenCollector::token($call);
 
         return $token !== null && TokenCollector::isAssertionToken($token);
+    }
+
+    /**
+     * @return list<\PhpParser\Node\Expr>|null
+     */
+    public static function returnedValues(Expr $value): ?array
+    {
+        return match (true) {
+            $value instanceof ArrowFunction => [$value->expr],
+            $value instanceof Closure => array_values(array_filter(array_map(
+                static fn (Return_ $return): ?Expr => $return->expr,
+                self::ownReturns(new NodeFinder(), $value->stmts),
+            ))),
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<\PhpParser\Node> $statements
+     * @return list<\PhpParser\Node\Stmt\Return_>
+     */
+    private static function ownReturns(NodeFinder $nodeFinder, array $statements): array
+    {
+        $nestedReturns = $nodeFinder->find(
+            $nodeFinder->findInstanceOf($statements, FunctionLike::class),
+            static fn (Node $node): bool => $node instanceof Return_,
+        );
+
+        return array_values(array_filter(
+            $nodeFinder->findInstanceOf($statements, Return_::class),
+            static fn (Return_ $return): bool => !in_array($return, $nestedReturns, strict: true),
+        ));
     }
 
     /**
