@@ -4116,6 +4116,7 @@ it('asks for a review of a test that asserts on another variable or property tha
             });
             PHP_SOURCE,
         [
+            'in:expect:function:resolveUtm/call:toBe#0/operator:interpolatedstring#0/value:\'no_segment_tag_\'',
             'in:expect:function:resolveUtm/call:toBe#0/operator:interpolatedstring#1/operand:variable:campaign/property:title',
             'value:\'no_segment_tag_\'',
         ],
@@ -4130,7 +4131,11 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe('tag_' . $campaign->name);
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/operator:concat#1/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
+        [
+            'in:expect:function:resolveUtm/call:toBe#0/operator:concat#0/value:\'no_segment_tag_\'',
+            'in:expect:function:resolveUtm/call:toBe#0/operator:concat#1/operand:variable:campaign/property:title',
+            'value:\'no_segment_tag_\'',
+        ],
     ],
     'variable the covering test expects only negated' => [
         <<<'PHP_SOURCE'
@@ -4167,7 +4172,10 @@ it('asks for a review of a test whose interpolated string has another literal te
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it greets the user')
-        ->and($report->candidates[0]->differsBy)->toBe(['value:\'Hello \''])
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:expect:function:greet/call:toBe#0/operator:interpolatedstring#0/value:\'Hello \'',
+            'value:\'Hello \'',
+        ])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -4199,6 +4207,7 @@ it('asks for a review of a test whose argument has another operator or other pla
             PHP_SOURCE,
         'in:function:foo#0/operator:plus',
         'in:function:foo#0/operator:plus#0/operand:variable:x',
+        'in:function:foo#0/operator:plus#1/value:1',
     ],
     'another operator between literals' => [
         <<<'PHP_SOURCE'
@@ -4213,6 +4222,8 @@ it('asks for a review of a test whose argument has another operator or other pla
             });
             PHP_SOURCE,
         'in:function:foo#0/operator:plus',
+        'in:function:foo#0/operator:plus#0/value:1',
+        'in:function:foo#0/operator:plus#1/value:2',
     ],
     'another unary operator' => [
         <<<'PHP_SOURCE'
@@ -4228,6 +4239,35 @@ it('asks for a review of a test whose argument has another operator or other pla
             PHP_SOURCE,
         'in:function:foo#0/operator:booleannot',
         'in:function:foo#0/operator:booleannot#0/operand:variable:x',
+    ],
+    'one literal operand fewer next to a call than the covering test' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo(f() . 'a');
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo(f() . 'a' . 'b');
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:concat#1/value:\'a\'',
+    ],
+    'one literal operand fewer than the covering test' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo(1 + 2);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo(1 + 2 + 3);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:plus#0/value:1',
+        'in:function:foo#0/operator:plus#1/value:2',
     ],
     'one operand fewer than the covering test' => [
         <<<'PHP_SOURCE'
@@ -4288,6 +4328,26 @@ it('asks for a review of a test whose argument has another operator or other pla
         'in:expect:function:f/call:toBe#0/operator:ternary#2/operand:variable:y',
     ],
 ]);
+
+it('asks to merge a test whose literal operands its covering test passes at swapped places', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('subtracts the larger amount', function (): void {
+                foo(1 - 2);
+            });
+            it('subtracts the smaller amount', function (): void {
+                foo(2 - 1);
+            });
+            PHP_SOURCE,
+        linesByTest: ['it subtracts the larger amount' => ['src/Store.php:5'], 'it subtracts the smaller amount' => ['src/Store.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it subtracts the larger amount')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/operator:minus#0/value:1', 'in:function:foo#0/operator:minus#1/value:2'])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
 
 it('asks for a review of a test that passes optional arguments its covering test omits and relies on their defaults', function (
     string $source,

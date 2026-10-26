@@ -281,13 +281,21 @@ final class NonLiteralArguments
         $token = self::OPERATOR_PREFIX . NodeContext::kindOf($operator);
 
         return array_merge([$token], ...array_map(
-            static fn (int $place, ?Node $operand): array => self::placed(
-                $token . '#' . $place,
-                self::kindedNames(self::OPERAND_PREFIX, [$operand], $parameters),
-            ),
+            static fn (int $place, ?Node $operand): array => self::placed($token . '#' . $place, self::operandNames($operand, $parameters)),
             array_keys($operands),
             $operands,
         ));
+    }
+
+    /**
+     * @param list<string> $parameters
+     * @return list<string>
+     */
+    private static function operandNames(?Node $operand, array $parameters): array
+    {
+        return $operand !== null && TokenCollector::isData($operand)
+            ? array_filter([TokenCollector::token($operand)], is_string(...))
+            : self::kindedNames(self::OPERAND_PREFIX, [$operand], $parameters);
     }
 
     private static function propertyOf(Expr|Name $object, Expr|Identifier $property): ?string
