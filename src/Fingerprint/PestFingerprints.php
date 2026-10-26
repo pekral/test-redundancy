@@ -162,7 +162,7 @@ final readonly class PestFingerprints
                 $datasetArgument = self::argument($expression, 0);
                 $datasetRows = $this->datasetRows($datasetArgument);
                 $dataset = $this->datasetName($datasetArgument);
-                $datasets[] = $dataset;
+                $datasets = [...$datasets, ...$this->datasetNames($expression)];
             } elseif ($method !== null) {
                 $modifierTokens = TokenCollector::sum(
                     $modifierTokens,
@@ -198,6 +198,17 @@ final readonly class PestFingerprints
     private function datasetName(?Node $dataset): ?string
     {
         return $dataset instanceof String_ ? $dataset->value : null;
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function datasetNames(MethodCall $call): array
+    {
+        return array_map(
+            fn (Node $argument): ?string => $argument instanceof Arg ? $this->datasetName($argument->value) : null,
+            array_values($call->args),
+        );
     }
 
     /**
