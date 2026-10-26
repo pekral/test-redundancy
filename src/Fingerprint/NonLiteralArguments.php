@@ -23,6 +23,7 @@ use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Expr\UnaryPlus;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\InterpolatedString;
 use PhpParser\NodeFinder;
 
@@ -37,7 +38,11 @@ final class NonLiteralArguments
 
     private const string KIND = '(?:' . self::ELEMENT_PREFIX . '|' . self::OPERAND_PREFIX . ')';
 
-    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::KIND . '+)?(?:variable|property):[^/]+';
+    private const string NAME = '(?:variable|property):[^/]+(?:/property:[^/]+)*';
+
+    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::KIND . '+)?' . self::NAME;
+
+    private const string KINDED_NAME_PATTERN = '~(?:^|/)\\K' . self::KIND . '*' . self::NAME . '$~';
 
     private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
 
@@ -110,9 +115,20 @@ final class NonLiteralArguments
     {
         return match (true) {
             $value instanceof Variable && is_string($value->name) => 'variable:' . $value->name,
-            ($value instanceof PropertyFetch || $value instanceof NullsafePropertyFetch || $value instanceof StaticPropertyFetch)
-                && $value->name instanceof Identifier => 'property:' . $value->name->toString(),
+            $value instanceof PropertyFetch, $value instanceof NullsafePropertyFetch => self::propertyOf($value->var, $value->name),
+            $value instanceof StaticPropertyFetch => self::propertyOf($value->class, $value->name),
             default => null,
+        };
+    }
+
+    public static function nameOrToken(?Expr $node): ?string
+    {
+        return match (true) {
+            $node === null => null,
+            $node instanceof PropertyFetch,
+            $node instanceof NullsafePropertyFetch,
+            $node instanceof StaticPropertyFetch => self::identity($node),
+            default => TokenCollector::token($node),
         };
     }
 
@@ -221,14 +237,22 @@ final class NonLiteralArguments
     private static function kindedNames(string $kind, array $values, array $parameters): array
     {
         return array_map(
-            static function (string $name) use ($kind): string {
-                $steps = explode('/', $name);
-                $identity = array_pop($steps);
-
-                return str_contains($identity, $kind) ? $name : implode('/', [...$steps, $kind . $identity]);
-            },
+            static fn (string $name): string => preg_replace_callback(
+                self::KINDED_NAME_PATTERN,
+                static fn (array $identity): string => str_contains($identity[0], $kind) ? $identity[0] : $kind . $identity[0],
+                $name,
+            ) ?? $name,
             self::namesOfEach($values, $parameters),
         );
+    }
+
+    private static function propertyOf(Expr|Name $object, Expr|Identifier $property): ?string
+    {
+        return match (true) {
+            !$property instanceof Identifier => null,
+            $object instanceof Name => sprintf('property:%s::%s', $object->toString(), $property->toString()),
+            default => implode('/', array_filter([self::identity($object), 'property:' . $property->toString()], is_string(...))),
+        };
     }
 
     /**

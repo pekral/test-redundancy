@@ -231,7 +231,7 @@ already lists does not count, because a row replaces the whole value. For exampl
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
 `merge-into-dataset`. When that test passes a variable or a property that the candidate does not pass, such as
-`in:function:dispatchBulkStep#0/property:name` for `dispatchBulkStep($account->name)` against
+`in:function:dispatchBulkStep#0/variable:account/property:name` for `dispatchBulkStep($account->name)` against
 `dispatchBulkStep('happypet')`, a row with the values in `differsBy` would still pass that variable or property, so the
 case of the candidate would be lost: the name tokens (see *Argument names*) are listed in `coveringDiffersBy` and the
 action is `review`. A name token or a `non-literal` token is never data, also when its path crosses the key of an
@@ -328,17 +328,18 @@ test lacks.
   `expect($templates->create())->toBeGreaterThan(0)` has the tokens
   `expect:variable:templates/call:create/call:toBeGreaterThan` and
   `in:expect:variable:templates/call:create/call:toBeGreaterThan#0/value:0`, and
-  `expect($template->order)->toBeGreaterThan(0)` has `expect:property:order/call:toBeGreaterThan` and
-  `in:expect:property:order/call:toBeGreaterThan#0/value:0`.
+  `expect($template->order)->toBeGreaterThan(0)` has `expect:variable:template/property:order/call:toBeGreaterThan` and
+  `in:expect:variable:template/property:order/call:toBeGreaterThan#0/value:0`.
   - The subject of a Pest expectation is the value passed to the nearest `->and()` before the call, or else to
     `expect()`. Every call of the expectation chain carries it, `->and()` and `->each` included.
   - The subject of a PHPUnit `assert*` call is its last argument that is not a literal or a constant:
     `self::assertSame(3, add(1, 2))` has the token `expect:function:add/call:self::assertSame`.
-  - A property carries the token `property:<name>`. A call, a function call and a `new` expression carry their own
-    token.
+  - A property carries its name token (see *Argument names*), e.g. `variable:template/property:order`. A call, a
+    function call and a `new` expression carry their own token.
   - A method call also carries its receiver before its own token: a variable by its name as `variable:<name>`, also
-    when the test assigns it once, a property as `property:<name>`, also a static or a nullsafe one such as
-    `self::$repository`, and a call, a function call or a `new` expression as its own token.
+    when the test assigns it once, a property by its name token, such as `variable:this/property:repository` for
+    `$this->repository` and `property:self::repository` for `self::$repository`, and a call, a function call or a
+    `new` expression as its own token.
     `expect($moment->format('Y-m-d'))` has the subject `variable:moment/call:format`, and
     `expect($interval->applyTo($moment)->format('Y-m-d'))` has `call:applyTo/call:format`. Only the nearest receiver
     is kept. A literal or a constant as the receiver adds nothing, so `expect(Status::Active->label())` has the subject
@@ -373,8 +374,11 @@ test lacks.
   `in:function:store#0/keys:value:'a'>value:'b'` for `store(['a' => 1, 'b' => 2])`. An array with three keys has three
   such tokens. The same keys in another order give other tokens, so two dataset rows whose arrays differ only in the
   order of their keys differ in `differsBy`, and the candidate is `review`, not `delete`. The order is input when the
-  test reads the array in order, for example in a `foreach` that inserts records. A key that no token names, such as a
-  variable, and an item without a key add nothing. A test whose keys are a part of the keys of its covering test, in the
+  test reads the array in order, for example in a `foreach` that inserts records. A property as a key takes part by
+  its name (see *Argument names*), e.g. `in:function:transfer#0/keys:variable:a/property:id>variable:b/property:id`
+  for `transfer([$a->id => 1, $b->id => 1])`, and the name is also the path of the value under it, e.g.
+  `in:function:transfer#0/variable:a/property:id/value:1`. A key that no token names, such as a variable, and an item
+  without a key add nothing. A test whose keys are a part of the keys of its covering test, in the
   same order, has no order token the covering test lacks. An order token of a key that the covering test lacks is not
   listed either, because that key is listed already. The order tokens of the covering test are never listed in
   `coveringDiffersBy`, because the keys that cause them are listed already.
@@ -396,8 +400,9 @@ test lacks.
   an enum case, a call or a `new` expression without arguments, or an empty array. A variable or a property takes part
   by its name (see *Argument names*), e.g. `in:function:transfer#0/items:variable:a>variable:b` for
   `transfer([$a, $b])`, so `[$a, $b]` and `[$b, $a]`, or `[$a, 1]` and `[1, $a]`, differ and neither is `delete`
-  against the other. A property is named without its object, so `[$a->id, $b->id]` and `[$b->id, $a->id]` give the
-  same tokens. A non-empty array, and a call or a
+  against the other. A property takes part by its name, which names its object too, so `[$a->id, $b->id]` has
+  `in:function:transfer#0/items:variable:a/property:id>variable:b/property:id` and is `review`, not `delete`, against
+  `[$b->id, $a->id]`. A non-empty array, and a call or a
   `new` expression with arguments, take part by their source code, e.g.
   `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
   `items:['id' => 1]>['id' => 2]` for two rows of a dataset. That source code is normalized: the quotes of a string,
@@ -442,18 +447,19 @@ test lacks.
   tokens of `fake()->url()` and the token of the position.
 - **Argument names.** A variable or a property passed straight to a call, a function call, a `new` expression or an
   assertion carries the call and the position followed by its name: `variable:<name>` for a variable and
-  `property:<name>` for a property. `connect($this->enShop)` has the token `in:function:connect#0/property:enShop`,
-  `recalculate($job, 5, $campaign->id)` has `in:function:recalculate#0/variable:job` and
-  `in:function:recalculate#2/property:id`, and `expect(linksOf($account))->toContain($canvaUserId)` has
-  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. A static or a nullsafe property is a property
-  too: `connect(self::$enShop)` has `in:function:connect#0/property:enShop` and `connect($shop?->url)` has
-  `in:function:connect#0/property:url`. A variable or property inside a cast that is the argument carries the position
-  of that argument, so `toBe((string) $campaign->title)` has
-  `in:expect:function:resolveUtm/call:toBe#0/property:title` for `expect(resolveUtm($campaign))`. The cast has a token
-  of its own (see *Casts*). Each variable or property inside an operator, a ternary or an interpolated string that is
+  `property:<name>` for a property, after the name of its object. `connect($this->enShop)` has the token
+  `in:function:connect#0/variable:this/property:enShop`, `recalculate($job, 5, $campaign->id)` has
+  `in:function:recalculate#0/variable:job` and `in:function:recalculate#2/variable:campaign/property:id`, and
+  `expect(linksOf($account))->toContain($canvaUserId)` has
+  `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. A nullsafe property is a property too:
+  `connect($shop?->url)` has `in:function:connect#0/variable:shop/property:url`. A static property is named with its
+  class as written, so `connect(self::$enShop)` has `in:function:connect#0/property:self::enShop`. A variable or
+  property inside a cast that is the argument carries the position of that argument, so `toBe((string) $campaign->title)`
+  has `in:expect:function:resolveUtm/call:toBe#0/variable:campaign/property:title` for
+  `expect(resolveUtm($campaign))`. The cast has a token of its own (see *Casts*). Each variable or property inside an operator, a ternary or an interpolated string that is
   the argument carries the position of that argument and the prefix `operand:`, because the argument holds the name and
   is not the name. So `toBe('no_segment_tag_' . $campaign->title)` and `toBe("no_segment_tag_{$campaign->title}")` both
-  have `in:expect:function:resolveUtm/call:toBe#0/operand:property:title`, and
+  have `in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title`, and
   `connect($primary ? $enShop : -$debit)` has `in:function:connect#0/operand:variable:primary`,
   `in:function:connect#0/operand:variable:enShop` and `in:function:connect#0/operand:variable:debit`. A test that
   passes `$x` and a test that passes `$x . $y`, `$c ? $x : 1`, `-$x` or `"{$x}"` differ, and neither is `delete`
@@ -475,11 +481,17 @@ test lacks.
   Names that swap places inside a list, such as `[$a, $b]` and `[$b, $a]`, differ by their order tokens (see *Order of
   list elements*).
   `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
-  `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:property:email`. A candidate with `toBe([])` is
-  then `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. So two tests that pass or expect different
-  variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
-  receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
-  carries no name, because each dataset row fills it with another value. A variable that the test assigns once and
+  `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:variable:subscriber/property:email`. A candidate
+  with `toBe([])` is then `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the
+  key. So two tests that pass or expect different variables or properties differ in `differsBy`, and the candidate is
+  `review`. The name of a property names its object too when the object is a variable, a property or a class, so
+  `$account->name` and `$user->name` differ, `$this->shop->url` has `variable:this/property:shop/property:url`, and
+  `$class::$shop` has `variable:class/property:shop`. A property of an object that has no name, such as the result of
+  a call or an element read in `$a->get()->id` or `$a['x']->id`, has `property:<name>` alone. So
+  `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is still `delete`, as
+  `transfer([$a->get(), $b->get()])` against `transfer([$b->get(), $a->get()])` is. A parameter of the test closure or
+  test method carries no name, because each dataset row fills it with another value. A property of a parameter is still
+  named with the parameter, e.g. `variable:row/property:id` for `$row->id`. A variable that the test assigns once and
   passes on where it first reads it carries no name there, because that read is counted as the value the variable
   holds. A later read of the variable carries the name. A name that only the covering test has does not turn a
   `delete` candidate into `review`: the candidate passes another value at the same position, or the position token

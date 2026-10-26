@@ -536,7 +536,7 @@ it('asks for a review of a test whose covering test makes a call it does not', f
         ->and($reports[0]->candidates[0]->coveredBy)->toBe(['it forgets the template HTML content'])
         ->and($reports[0]->candidates[0]->differsBy)->toBe([
             'in:call:put#1/value:\'<html><body><h1>Test</h1></body></html>\'',
-            'in:expect:property:manager/call:get/call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
+            'in:expect:variable:this/property:manager/call:get/call:toBe#0/value:\'<html><body><h1>Test</h1></body></html>\'',
         ])
         ->and($reports[0]->candidates[0]->action())->toBe(Action::Review)
         ->and($reports[0]->candidates[0]->coveringTokensForReview())->toBe(['call:forget']);
@@ -2378,7 +2378,12 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             PHP,
         'it deactivates a contact unsubscribed from its only subscribed list',
         'it activates an inactive contact still subscribed in another list',
-        ['in:call:create#0/value:\'active\'/value:1', 'call:Connection::factory', 'in:function:expectCounterDelta#0/value:-1'],
+        [
+            'in:call:create#0/value:\'list_id\'/element:variable:list/property:id',
+            'in:call:create#0/value:\'active\'/value:1',
+            'call:Connection::factory',
+            'in:function:expectCounterDelta#0/value:-1',
+        ],
         Action::Review,
     ],
     'an address stored twice against once' => [
@@ -2451,7 +2456,7 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         'it resolves the same string to the same value twice',
         [
             'in:call:handle#0/value:\'campaign_{name}_{date}\'',
-            'in:expect:property:action/call:handle/call:toBe#0/value:\'campaign_Summer Sale_2026-03-10\'',
+            'in:expect:variable:this/property:action/call:handle/call:toBe#0/value:\'campaign_Summer Sale_2026-03-10\'',
         ],
         Action::Review,
     ],
@@ -3740,7 +3745,9 @@ it('asks for a review of a test whose argument holds a property that the coverin
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
-        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/value:list-item/element:property:email'])
+        ->and(valueAt($json, 'differsBy'))->toBe(
+            ['in:function:keepSubscribed#0/function:collect#0/value:list-item/element:variable:subscriber/property:email'],
+        )
         ->and(valueAt($json, 'action'))->toBe('review');
 })->with([
     'wrapping call' => [
@@ -3820,7 +3827,7 @@ it('still deletes a test whose covering test makes the same calls with the same 
             });
             it('covers the arranged case', function (): void {
                 $domain = createDomain();
-                $counted = recalculate($job, $other->campaign->id);
+                $counted = recalculate($job, $campaign->id);
 
                 expect($counted)->toBe(1);
                 expect($counted)->not->toBeNull();
@@ -3855,7 +3862,9 @@ it('asks for a review of a test that passes a non-literal argument its covering 
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it covers the arranged case')
-        ->and($report->candidates[0]->differsBy)->toBe(['in:function:recalculate#2/non-literal', 'in:function:recalculate#2/property:id'])
+        ->and($report->candidates[0]->differsBy)->toBe(
+            ['in:function:recalculate#2/non-literal', 'in:function:recalculate#2/variable:campaign/property:id'],
+        )
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -3948,7 +3957,7 @@ it('asks for a review of a test that passes another variable or property to the 
                 expect(connect($this->mainShop))->toBe(1);
             });
             PHP_SOURCE,
-        ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+        ['in:function:connect#0/variable:this/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
     ],
     'another property cast' => [
         <<<'PHP_SOURCE'
@@ -3960,7 +3969,7 @@ it('asks for a review of a test that passes another variable or property to the 
                 expect(connect((int) $this->mainShop))->toBe(2);
             });
             PHP_SOURCE,
-        ['in:function:connect#0/property:enShop'],
+        ['in:function:connect#0/variable:this/property:enShop'],
     ],
     'another static property' => [
         <<<'PHP_SOURCE'
@@ -3972,7 +3981,7 @@ it('asks for a review of a test that passes another variable or property to the 
                 expect(connect(self::$mainShop))->toBe(1);
             });
             PHP_SOURCE,
-        ['in:function:connect#0/property:enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
+        ['in:function:connect#0/property:self::enShop', 'in:expect:function:connect/call:toBe#0/value:2'],
     ],
     'another variable' => [
         <<<'PHP_SOURCE'
@@ -4023,7 +4032,7 @@ it('asks for a review of a test that passes a literal where its covering test pa
                 expect(dispatchBulkStep($account->name))->toBe(2);
             });
             PHP_SOURCE,
-        ['in:function:dispatchBulkStep#0/property:name'],
+        ['in:function:dispatchBulkStep#0/variable:account/property:name'],
     ],
     'property passed by name' => [
         <<<'PHP_SOURCE'
@@ -4035,7 +4044,7 @@ it('asks for a review of a test that passes a literal where its covering test pa
                 expect(articlesFor(articleId: $article->post_id))->toHaveCount(2);
             });
             PHP_SOURCE,
-        ['in:function:articlesFor#articleId/property:post_id'],
+        ['in:function:articlesFor#articleId/variable:article/property:post_id'],
     ],
 ]);
 
@@ -4060,7 +4069,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(balanceOf($account))->toBe(-$account->credit);
             });
             PHP_SOURCE,
-        ['in:expect:function:balanceOf/call:toBe#0/operand:property:debit'],
+        ['in:expect:function:balanceOf/call:toBe#0/operand:variable:account/property:debit'],
     ],
     'another property as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4072,7 +4081,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect($manager->connection())->toBe($second);
             });
             PHP_SOURCE,
-        ['in:expect:variable:manager/call:connection/call:toBe#0/property:redisConnection'],
+        ['in:expect:variable:manager/call:connection/call:toBe#0/variable:this/property:redisConnection'],
     ],
     'another property cast as the expected string' => [
         <<<'PHP_SOURCE'
@@ -4084,7 +4093,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe((string) $campaign->name);
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/property:title'],
+        ['in:expect:function:resolveUtm/call:toBe#0/variable:campaign/property:title'],
     ],
     'another property interpolated in the expected string' => [
         <<<'PHP_SOURCE'
@@ -4096,7 +4105,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe("tag_{$campaign->name}");
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/operand:property:title', 'value:\'no_segment_tag_\''],
+        ['in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
     ],
     'another property joined to a string as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4108,7 +4117,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe('tag_' . $campaign->name);
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/operand:property:title', 'value:\'no_segment_tag_\''],
+        ['in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
     ],
     'variable the covering test expects only negated' => [
         <<<'PHP_SOURCE'
@@ -4332,12 +4341,12 @@ it('decides on a test whose covering test fills the differing slot of an asserti
     'property as an array key' => [
         '[$subscriber->email => [\'field1\' => \'value1\']]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:property:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:variable:subscriber/property:email'],
     ],
     'property as an array value' => [
         '[\'email\' => $subscriber->email]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/value:\'email\'/element:property:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/value:\'email\'/element:variable:subscriber/property:email'],
     ],
     'variable as an array key' => [
         '[$email => [\'field1\' => \'value1\']]',
@@ -4723,6 +4732,92 @@ it('merges, never deletes, a test whose cast arguments, cast subjects or cast ke
             'in:expect:variable:r/call:a/call:toBe#0/cast:int/value:\'1\'',
             'in:expect:variable:r/call:b/call:toBe#0/cast:int/value:\'2\'',
         ],
+    ],
+]);
+
+it('does not delete a test that passes the same properties of other or swapped objects as its covering test', function (
+    string $candidateStatement,
+    string $coveringStatement,
+    array $differsBy,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('a', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            it('b', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE, $candidateStatement, $coveringStatement),
+        linesByTest: ['it a' => ['src/Transfer.php:5'], 'it b' => ['src/Transfer.php:5']],
+    );
+
+    expect(array_map(
+        static fn (Candidate $candidate): array => [$candidate->testCase(), $candidate->differsBy, $candidate->action()],
+        $report->candidates,
+    ))->toBe([['it a', $differsBy, $action]]);
+})->with([
+    'an assertion on a property of another object' => [
+        'expect($a->id)->toBe(1);',
+        'expect($b->id)->toBe(1);',
+        [
+            'in:function:expect#0/variable:a/property:id',
+            'expect:variable:a/property:id/call:toBe',
+            'in:expect:variable:a/property:id/call:toBe#0/value:1',
+        ],
+        Action::Review,
+    ],
+    'a property of another object passed to the code under test' => [
+        'transfer($a->id);',
+        'transfer($b->id);',
+        ['in:function:transfer#0/variable:a/property:id'],
+        Action::Review,
+    ],
+    'nullsafe properties of two objects that swap places in a list' => [
+        'transfer([$a?->id, $b?->id]);',
+        'transfer([$b?->id, $a?->id]);',
+        ['in:function:transfer#0/items:variable:a/property:id>variable:b/property:id'],
+        Action::Review,
+    ],
+    'properties of two objects that swap places in a list' => [
+        'transfer([$a->id, $b->id]);',
+        'transfer([$b->id, $a->id]);',
+        ['in:function:transfer#0/items:variable:a/property:id>variable:b/property:id'],
+        Action::Review,
+    ],
+    'properties of two objects that swap places in a list the other way round' => [
+        'transfer([$b->id, $a->id]);',
+        'transfer([$a->id, $b->id]);',
+        ['in:function:transfer#0/items:variable:b/property:id>variable:a/property:id'],
+        Action::Review,
+    ],
+    'properties of two objects that swap their values as array keys' => [
+        'transfer([$a->id => 1, $b->id => 2]);',
+        'transfer([$a->id => 2, $b->id => 1]);',
+        ['in:function:transfer#0/variable:a/property:id/value:1', 'in:function:transfer#0/variable:b/property:id/value:2'],
+        Action::MergeIntoDataset,
+    ],
+    'properties of two objects that swap the keys of a map' => [
+        'transfer([$a->id => 1, $b->id => 1]);',
+        'transfer([$b->id => 1, $a->id => 1]);',
+        ['in:function:transfer#0/keys:variable:a/property:id>variable:b/property:id'],
+        Action::Review,
+    ],
+    'properties of two properties that swap places in a list' => [
+        'transfer([$this->a->id, $this->b->id]);',
+        'transfer([$this->b->id, $this->a->id]);',
+        ['in:function:transfer#0/items:variable:this/property:a/property:id>variable:this/property:b/property:id'],
+        Action::Review,
+    ],
+    'static properties of two classes that swap places in a list' => [
+        'transfer([A::$id, B::$id]);',
+        'transfer([B::$id, A::$id]);',
+        ['in:function:transfer#0/items:property:A::id>property:B::id'],
+        Action::Review,
     ],
 ]);
 

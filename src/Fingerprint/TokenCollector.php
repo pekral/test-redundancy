@@ -161,7 +161,7 @@ final class TokenCollector
     public static function nameOf(?Expr $node, array $readProperties): ?array
     {
         $node = $node === null ? null : NodeContext::enumCaseReadBy($node) ?? $node;
-        $token = $node instanceof Cast ? CastToken::withOperandName($node, $readProperties) : ($node === null ? null : self::token($node));
+        $token = $node instanceof Cast ? CastToken::withOperandName($node, $readProperties) : NonLiteralArguments::nameOrToken($node);
 
         return $node === null || $token === null ? null : [$node, $token . ($readProperties[spl_object_id($node)] ?? '')];
     }

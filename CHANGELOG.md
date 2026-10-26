@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A test that passes the same properties of other or swapped objects as its covering test is no longer `delete`.
+  Before, the name token of a property carried no token for its object. So `transfer([$a->id, $b->id])` and
+  `transfer([$b->id, $a->id])` had the same tokens, and one of them was `delete`. The same held for `transfer($a->id)`
+  against `transfer($b->id)` and for `expect($a->id)->toBe(1)` against `expect($b->id)->toBe(1)`. Now the name of a
+  property also names its object when the object is a variable, a property or a class, e.g. `variable:a/property:id`,
+  `variable:this/property:shop/property:url` and `property:self::enShop`. The order tokens of a list and of the keys
+  of a map use this name, e.g. `in:function:transfer#0/items:variable:a/property:id>variable:b/property:id`, so these
+  candidates are `review`. A property as an array key now also names the values under it with this name instead of
+  `call:<name>`, e.g. `in:function:transfer#0/variable:a/property:id/value:1`. So
+  `transfer([$a->id => 1, $b->id => 2])` against `transfer([$a->id => 2, $b->id => 1])` is `merge-into-dataset`, not
+  `delete`. A property of an object that has no name, such as the result of a call in `$a->get()->id` or an element
+  read in `$a['x']->id`, keeps `property:<name>` alone (#130).
+
 ## [0.1.6] - 2026-10-26
 
 ### Fixed
