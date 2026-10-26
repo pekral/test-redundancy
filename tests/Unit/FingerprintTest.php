@@ -180,10 +180,10 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     ],
     ],
     'property passed to expect' => ['expect($template->order)->toBeGreaterThan(0);', [
-        'expect:property:order/call:toBeGreaterThan' => 1,
+        'expect:variable:template/property:order/call:toBeGreaterThan' => 1,
         'function:expect' => 1,
-        'in:expect:property:order/call:toBeGreaterThan#0/value:0' => 1,
-        'in:function:expect#0/property:order' => 1,
+        'in:expect:variable:template/property:order/call:toBeGreaterThan#0/value:0' => 1,
+        'in:function:expect#0/variable:template/property:order' => 1,
     ],
     ],
     'value passed to and' => ['expect($user)->toBeTrue()->and(load())->not->toBeEmpty();', [
@@ -1173,7 +1173,10 @@ it('gives a non-literal argument of a call that is no assertion the token of its
         '$this->assertSame($expected, $actual);',
         ['call:assertSame' => 1, 'in:call:assertSame#0/variable:expected' => 1, 'in:call:assertSame#1/variable:actual' => 1],
     ],
-    'property' => ['$campaign->add($campaign->id);', ['call:add' => 1, 'in:call:add#0/non-literal' => 1, 'in:call:add#0/property:id' => 1]],
+    'property' => [
+        '$campaign->add($campaign->id);',
+        ['call:add' => 1, 'in:call:add#0/non-literal' => 1, 'in:call:add#0/variable:campaign/property:id' => 1],
+    ],
     'variable' => ['store($id);', ['function:store' => 1, 'in:function:store#0/non-literal' => 1, 'in:function:store#0/variable:id' => 1]],
 ]);
 
@@ -1219,7 +1222,7 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'nullsafe property passed to the code under test' => [
         'connect($shop?->url);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:url'],
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:shop/property:url'],
     ],
     'property as an array key passed to a Pest assertion' => [
         'expect(linksOf())->toBe([$subscriber->email => [\'a\' => 1]]);',
@@ -1227,35 +1230,64 @@ it('names the variable or the property that an argument of a call or of an asser
             'expect:function:linksOf/call:toBe',
             'function:expect',
             'function:linksOf',
-            'in:expect:function:linksOf/call:toBe#0/element:property:email',
-            'in:expect:function:linksOf/call:toBe#0/call:email/key:value:\'a\'',
-            'in:expect:function:linksOf/call:toBe#0/call:email/value:\'a\'/value:1',
+            'in:expect:function:linksOf/call:toBe#0/element:variable:subscriber/property:email',
+            'in:expect:function:linksOf/call:toBe#0/variable:subscriber/property:email/key:value:\'a\'',
+            'in:expect:function:linksOf/call:toBe#0/variable:subscriber/property:email/value:\'a\'/value:1',
             'read:function:linksOf',
+        ],
+    ],
+    'property as an array key with a property of another object as its value' => [
+        'store([$a->id => $b->id]);',
+        [
+            'function:store',
+            'in:function:store#0/element:variable:a/property:id',
+            'in:function:store#0/variable:a/property:id/element:variable:b/property:id',
         ],
     ],
     'property cast passed to the code under test' => [
         'connect((int) $this->enShop);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop', 'in:function:connect#0/cast:int'],
+        [
+            'function:connect',
+            'in:function:connect#0/non-literal',
+            'in:function:connect#0/variable:this/property:enShop',
+            'in:function:connect#0/cast:int',
+        ],
     ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:property:name', 'value:\'tag_\''],
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:variable:campaign/property:name', 'value:\'tag_\''],
     ],
     'property joined to a string passed to a PHPUnit assertion' => [
         '$this->assertSame(\'a\' . $x->title, $y);',
-        ['call:assertSame', 'in:call:assertSame#0/operand:property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
+        ['call:assertSame', 'in:call:assertSame#0/operand:variable:x/property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
+    ],
+    'property of a call result passed to the code under test' => [
+        'connect($shop->current()->url);',
+        ['call:current', 'function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:url'],
+    ],
+    'property of a property passed to the code under test' => [
+        'connect($this->shop->url);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:this/property:shop/property:url'],
     ],
     'property of a variable passed by name' => [
         'articlesFor(articleId: $article->post_id);',
-        ['function:articlesFor', 'in:function:articlesFor#articleId/non-literal', 'in:function:articlesFor#articleId/property:post_id'],
+        [
+            'function:articlesFor',
+            'in:function:articlesFor#articleId/non-literal',
+            'in:function:articlesFor#articleId/variable:article/property:post_id',
+        ],
     ],
     'property passed to the code under test' => [
         'connect($this->enShop);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:this/property:enShop'],
+    ],
+    'static property of a class held in a variable passed to the code under test' => [
+        'connect($class::$enShop);',
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:class/property:enShop'],
     ],
     'static property passed to the code under test' => [
         'connect(self::$enShop);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:self::enShop'],
     ],
     'variable and an element read joined by operators inside an array passed to the code under test' => [
         'store([\'k\' => $a . $b], $rows[0] . \'x\');',
@@ -1275,14 +1307,14 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/operand:property:title',
+            'in:function:store#0/operand:variable:campaign/property:title',
             'in:function:store#0/operand:variable:prefix',
             'value:\'_\'',
         ],
     ],
     'variable and property passed to a PHPUnit assertion' => [
         '$this->assertSame($this->redisConnection, $connection);',
-        ['call:assertSame', 'in:call:assertSame#0/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
+        ['call:assertSame', 'in:call:assertSame#0/variable:this/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
     ],
     'variable in a nested array passed to a PHPUnit assertion' => [
         '$this->assertSame([\'a\' => [\'b\' => $id]], $result);',
@@ -1317,7 +1349,7 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/operand:property:enShop',
+            'in:function:store#0/operand:variable:this/property:enShop',
             'in:function:store#0/operand:variable:fallback',
             'in:function:store#0/operand:variable:primary',
         ],
@@ -1341,6 +1373,7 @@ it('names the variable or the property that an argument of a call or of an asser
 it('tells an assertion from the code under test by the call a name token belongs to', function (string $token, bool $isAssertion): void {
     expect(TokenCollector::isAssertionToken($token))->toBe($isAssertion);
 })->with([
+    'property of an object passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:a/property:id', true],
     'variable passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId', true],
     'variable passed to the code under test whose name starts like an assertion' => ['in:function:store#0/variable:expected', false],
 ]);
