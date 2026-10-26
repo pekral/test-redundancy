@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test is no longer `merge-into-dataset` when the covering test fills the differing slot of an assertion with an array
+  that holds a variable or a property. Before, the key `$subscriber->email` in `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])`
+  carried no token, so a candidate with `toBe([])` was `merge-into-dataset`, although a dataset row cannot hold the key.
+  Now each variable or property that is a key or a value of an array that an assertion receives, at any depth, carries
+  `variable:` or `property:` at the position of that argument, such as
+  `in:expect:variable:response/call:updatedEmails/call:toBe#0/property:email`. The token is listed in
+  `coveringDiffersBy`, and the candidate is `review`. An enum case read, such as `Status::Active->value`, stays a
+  value and carries no name (#116).
 - A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
   callable held in an array element. Before, a call such as `($this->actions['cleanUp'])('acme')` carried no token, so
   two identical calls gave the same tokens as one call, and the test with one call was `delete`. Now such a call

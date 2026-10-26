@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\BinaryOp;
@@ -169,7 +170,7 @@ final class NonLiteralArguments
                 static fn (string $suffix): string => NodeContext::pathPrefix($paths, $value) . $suffix,
                 [...($isAssertion ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
             ),
-            $callToken === null ? [] : self::nonLiteralValues($call),
+            $callToken === null ? [] : self::nonLiteralValues($call, $isAssertion),
         ));
     }
 
@@ -182,10 +183,15 @@ final class NonLiteralArguments
         return match (true) {
             $value instanceof BinaryOp => self::namesOfEach([$value->left, $value->right], $parameters),
             $value instanceof InterpolatedString => self::namesOfEach($value->parts, $parameters),
+            $value instanceof Array_ => self::namesOfEach(
+                array_merge([], ...array_map(static fn (ArrayItem $item): array => [$item->key, $item->value], $value->items)),
+                $parameters,
+            ),
             $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
             $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
                 || $value instanceof BitwiseNot => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
+            NodeContext::enumCaseReadBy($value) !== null => [],
             default => array_filter([self::identity($value)], is_string(...)),
         };
     }
@@ -206,14 +212,17 @@ final class NonLiteralArguments
     /**
      * @return list<\PhpParser\Node\Expr>
      */
-    private static function nonLiteralValues(CallLike $call): array
+    private static function nonLiteralValues(CallLike $call, bool $isAssertion): array
     {
         $values = array_map(
             static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
             $call->getRawArgs(),
         );
 
-        return array_values(array_filter($values, static fn (?Expr $value): bool => $value !== null && self::isNonLiteral($value)));
+        return array_values(array_filter(
+            $values,
+            static fn (?Expr $value): bool => $value !== null && (self::isNonLiteral($value) || ($isAssertion && $value instanceof Array_)),
+        ));
     }
 
     private static function isNonLiteral(Expr $value): bool

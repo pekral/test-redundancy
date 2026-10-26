@@ -1143,9 +1143,30 @@ it('names the variable or the property that an argument of a call or of an asser
 
     expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing($expected);
 })->with([
+    'enum case value in an array passed to a PHPUnit assertion' => [
+        '$this->assertSame([Status::Active->value => 1], $result);',
+        [
+            'call:assertSame',
+            'in:call:assertSame#0/key:const:Status::Active->value',
+            'in:call:assertSame#0/const:Status::Active->value/value:1',
+            'in:call:assertSame#1/variable:result',
+        ],
+    ],
     'nullsafe property passed to the code under test' => [
         'connect($shop?->url);',
         ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:url'],
+    ],
+    'property as an array key passed to a Pest assertion' => [
+        'expect(linksOf())->toBe([$subscriber->email => [\'a\' => 1]]);',
+        [
+            'expect:function:linksOf/call:toBe',
+            'function:expect',
+            'function:linksOf',
+            'in:expect:function:linksOf/call:toBe#0/property:email',
+            'in:expect:function:linksOf/call:toBe#0/call:email/key:value:\'a\'',
+            'in:expect:function:linksOf/call:toBe#0/call:email/value:\'a\'/value:1',
+            'read:function:linksOf',
+        ],
     ],
     'property cast passed to the code under test' => [
         'connect((int) $this->enShop);',
@@ -1184,6 +1205,16 @@ it('names the variable or the property that an argument of a call or of an asser
     'variable and property passed to a PHPUnit assertion' => [
         '$this->assertSame($this->redisConnection, $connection);',
         ['call:assertSame', 'in:call:assertSame#0/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
+    ],
+    'variable in a nested array passed to a PHPUnit assertion' => [
+        '$this->assertSame([\'a\' => [\'b\' => $id]], $result);',
+        [
+            'call:assertSame',
+            'in:call:assertSame#0/variable:id',
+            'in:call:assertSame#0/key:value:\'a\'',
+            'in:call:assertSame#0/value:\'a\'/key:value:\'b\'',
+            'in:call:assertSame#1/variable:result',
+        ],
     ],
     'variable inside a short ternary passed to the code under test' => [
         'store($name ?: \'none\');',
