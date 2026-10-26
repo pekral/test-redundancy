@@ -2267,6 +2267,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
         ->and($reports[0]->candidates[0]->action())->toBe($action);
 })->with([
+    'a cleanup run once against twice through an action held in a property' => [
+        <<<'PHP'
+            <?php
+            it('clears every mirrored row', function (): void {
+                ($this->cleanUp)($this->account);
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            it('stays idempotent when the cleanup runs twice', function (): void {
+                ($this->cleanUp)($this->account);
+                ($this->cleanUp)($this->account);
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            PHP,
+        'it clears every mirrored row',
+        'it stays idempotent when the cleanup runs twice',
+        [],
+        Action::Review,
+    ],
     'a contact on one list against a contact on two lists' => [
         <<<'PHP'
             <?php
@@ -2307,6 +2325,25 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         'it stores the same address twice',
         'it stores an address once',
         ['function:store', 'in:function:store#0/value:\'a@example.com\'', 'in:expect:function:stored/call:toBe#0/value:1'],
+        Action::Review,
+    ],
+    'a string resolved once against twice through an action held in a property' => [
+        <<<'PHP'
+            <?php
+            it('resolves multiple tags in one string', function (): void {
+                expect((self::$resolve)('campaign_{name}_{date}', $this->campaign))->toBe('campaign_Summer Sale_2026-03-10');
+            });
+            it('resolves the same string to the same value twice', function (): void {
+                $first = (self::$resolve)('campaign_{name}', $this->campaign);
+                expect((self::$resolve)('campaign_{name}', $this->campaign))->toBe($first);
+            });
+            PHP,
+        'it resolves multiple tags in one string',
+        'it resolves the same string to the same value twice',
+        [
+            'in:function:self::$resolve#0/value:\'campaign_{name}_{date}\'',
+            'in:expect:function:self::$resolve/call:toBe#0/value:\'campaign_Summer Sale_2026-03-10\'',
+        ],
         Action::Review,
     ],
     'one import against the three imports in a loop of the issue' => [

@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that calls the code under test once is no longer `delete` or `merge-into-dataset` against a test that calls
+  it twice through a callable held in a property. Before, a call such as `($this->cleanUp)($this->account)` or
+  `(self::$resolve)('campaign_{name}', $campaign)` carried no token, so two identical calls gave the same tokens as
+  one call. A test that runs the cleanup once and asserts the state was `delete`, covered by a test that runs it twice,
+  and no test asserted the state after a single call. Now such a call carries `function:` and the callable as written,
+  e.g. `function:$this->cleanUp`, `function:$this?->actions->cleanUp` or `function:self::$resolve`, like the call of a
+  variable `function:$action` of #102. The fingerprint counts the call, so the covering test that makes it twice lists
+  it in `coveringDiffersBy`, and the candidate is `review`. Its arguments carry a position too. A callable that the test
+  names only at run time, such as `($this->{$name})()`, still carries no token (#103).
 - A `merge-into-dataset` candidate is now `review` when it passes an optional argument that its covering test omits.
   Before, a candidate such as `new PredictedData(date: $date, newCustomersForecastCount: 24)` was merged into the
   covering test `new PredictedData(date: $date)`, which relies on the default `= null`. A dataset row passes every
