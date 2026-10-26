@@ -9,14 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The PHP property `Candidate::$coveringDiffersBy` no longer carries the name of the report field `coveringDiffersBy`
-  while it holds another list. The property held every token of the covering test that the candidate lacks, so a
-  candidate from `RedundancyAnalyzer::analyze()` could be `delete` and still read a non-empty `coveringDiffersBy`, e.g.
-  `expect(render())->toBe($x)` covered by `expect(render())->toBe((string) $x)`, `foo(f())` covered by
-  `foo(f() . 'a')`, a `merge-into-dataset` candidate, or a `review-dataset-row` candidate (#136). The property is now
-  `Candidate::$coveringDifference`. The report field `coveringDiffersBy` in the JSON report, and `covering differs by`
-  in the text report, do not change: they list only the tokens of the covering test that made the action `review`, as
-  the README states, and they are empty for every other candidate. `Candidate::coveringTokensForReview()` returns the
-  same list in PHP.
+  while it holds another list. The property held the tokens of the covering test that the candidate lacks, so a
+  candidate from `RedundancyAnalyzer::analyze()` could read a non-empty `coveringDiffersBy` while its action was not
+  `review`: a `delete` candidate, e.g. `expect(render())->toBe($x)` covered by `expect(render())->toBe((string) $x)` or
+  `foo(f())` covered by `foo(f() . 'a')`, a `merge-into-dataset` candidate, or a `review-dataset-row` candidate (#136).
+  The property is now `Candidate::$coveringDifference`. The report field `coveringDiffersBy` in the JSON report, and
+  `covering differs by` in the text report, do not change: they list only the tokens of the covering test that made the
+  action `review`, as the README states, and they are empty for every other candidate.
+  `Candidate::coveringTokensForReview()` returns the same list in PHP.
 - The first step of a `merge-into-dataset` candidate whose covering test is a row of a named Pest dataset
   (`dataset('name', …)`) that other tests of the same file also use with `->with('name')` no longer tells the reader to
   add a row to the dataset of the covering test, as if only that test used it. A row added to the dataset is added to
