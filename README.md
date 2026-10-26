@@ -428,10 +428,13 @@ test lacks.
   `in:function:connect#0/variable:primary`, `in:function:connect#0/variable:enShop` and
   `in:function:connect#0/variable:debit`. Each variable or property that is a key or a value of an array that a
   call or an assertion receives, at any depth, carries the position of that argument too, and so does the variable
-  that an array element read holds, such as `$row` in `$row['email']`, so
-  `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
-  `in:expect:variable:response/call:updatedEmails/call:toBe#0/property:email`. A candidate with `toBe([])` is then
-  `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. So two tests that pass or expect different
+  that an array element read holds, such as `$row` in `$row['email']`. Such a name has the prefix `element:`, because
+  the argument holds the variable and is not the variable: `toBe([$x])` and `toBe($rows[0])` have
+  `in:expect:function:f/call:toBe#0/element:variable:x` and `.../element:variable:rows`, while `toBe($x)` has
+  `.../variable:x`. So a test that passes `$x` and a test that passes `[$x]` differ, and neither is `delete` against
+  the other. `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
+  `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:property:email`. A candidate with `toBe([])` is
+  then `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. So two tests that pass or expect different
   variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
   receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
   carries no name, because each dataset row fills it with another value. A variable that the test assigns once and
