@@ -2304,6 +2304,33 @@ it('still merges a test whose covering test expects the same exception through i
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 });
 
+it('still merges a test whose throws() argument differs from the one of its covering test only in a comment', function (
+    string $candidate,
+    string $covering,
+): void {
+    $report = analyzeTokenTest(
+        source: <<<PHP
+            <?php
+            it('rejects one input', fn () => validate(''))->throwsIf({$candidate}, EmailNotFound::class);
+            it('rejects another input', fn () => validate('a'))->throwsIf({$covering}, EmailNotFound::class);
+            PHP,
+        linesByTest: ['it rejects one input' => ['src/Validator.php:5'], 'it rejects another input' => ['src/Validator.php:5', 'src/Validator.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:validate#0/value:\'\''])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
+})->with([
+    'a comment after the last statement of a closure' => [
+        'function () { return $this->x; /* why */ }',
+        'function () { return $this->x; }',
+    ],
+    'a comment before a statement of a closure' => ['function () { /* why */ return $this->x; }', 'function () { return $this->x; }'],
+    'a comment in an otherwise empty closure' => ['function () { /* never */ }', 'function () { }'],
+]);
+
 it('asks to merge a test whose expected value replaces the value under which its covering test expects a key', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

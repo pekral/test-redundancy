@@ -15,8 +15,10 @@ use PhpParser\Node\Expr\Cast\Double;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\Stmt\Nop;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor;
 use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\PrettyPrinter\Standard;
@@ -114,11 +116,15 @@ final class OrderTokens
     {
         return new Standard()->prettyPrint(new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
 
-            public function leaveNode(Node $node): ?Node
+            public function leaveNode(Node $node): null|int|Node
             {
                 $node->setAttributes($node instanceof Double ? ['kind' => Double::KIND_FLOAT] : []);
 
-                return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
+                return match (true) {
+                    $node instanceof Nop => NodeVisitor::REMOVE_NODE,
+                    $node instanceof ConstFetch => new ConstFetch(new Name($node->name->toLowerString())),
+                    default => null,
+                };
             }
 
         })->traverse([$element]));
