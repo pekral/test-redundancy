@@ -3550,6 +3550,28 @@ it('reports a row of a named dataset that another test uses as review, not delet
         ->and($report->candidates[1]->steps()[0])->toContain('"it first"');
 });
 
+it('reports a row of a named dataset that another test combines with a dataset of its own as review, not delete', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            dataset('collidingRows', ['one' => [1], 'two' => [1]]);
+            dataset('sizes', ['small' => [1]]);
+
+            it('first', fn (int $row) => expect(store($row))->toBeTrue())->with('collidingRows');
+            it('second', fn (int $size, int $row) => expect(drop($size, $row))->toBeTrue())->with('sizes')->with('collidingRows');
+            PHP,
+        linesByTest: [
+            'it first › one' => ['src/Store.php:5'],
+            'it first › two' => ['src/Store.php:5'],
+            'it second › small' => ['src/Drop.php:5'],
+        ],
+    );
+
+    expect($report->candidates[0]->testCase())->toBe('it first › one')
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->steps()[0])->toContain('"collidingRows"', '"it second"');
+});
+
 it('reports a test that passes the values of a row as delete, covered by that row', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP_SOURCE'
@@ -5576,6 +5598,37 @@ it('names the named dataset of the covering row and the other tests that use it 
             'Delete this test.',
             Action::VERIFY_STEP,
         ]);
+});
+
+it('names a test that combines the named dataset of the covering row with another dataset in the merge step', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            dataset('shapes', ['basic domain' => ['example.com']]);
+            dataset('sizes', ['small' => [1]]);
+
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with('shapes');
+            it('also reads', function (int $size, string $name): void {
+                expect(read($size, $name))->toBeTrue();
+            })->with('sizes')->with('shapes');
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it notifies nobody when empty' => ['src/D.php:5'],
+            'it runs for any shape › basic domain' => ['src/D.php:5'],
+            'it also reads › small / basic domain' => ['src/R.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset)
+        ->and($report->candidates[0]->steps()[0])->toBe(
+            sprintf(Action::ADD_SHARED_ROW_STEP, 'shapes', '"it also reads"', 'it runs for any shape'),
+        );
 });
 
 it('keeps the plain merge step for a named dataset that only the covering test uses', function (): void {

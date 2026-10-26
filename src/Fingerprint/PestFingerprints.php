@@ -24,6 +24,7 @@ use PhpParser\NodeFinder;
  * @phpstan-type Test array{
  *     tokens: array<string, int>,
  *     dataset: string|null,
+ *     datasets: list<string>,
  *     parameters: \Pekral\TestRedundancy\Fingerprint\DatasetParameters|null,
  * }
  */
@@ -114,7 +115,7 @@ final readonly class PestFingerprints
      */
     private function test(Node $expression, string $prefix): array
     {
-        [$call, $datasetRows, $modifierTokens, $dataset] = $this->unwrapChain($expression);
+        [$call, $datasetRows, $modifierTokens, $dataset, $datasets] = $this->unwrapChain($expression);
         $description = $call === null ? null : self::functionCall($call, self::TEST_FUNCTIONS);
 
         if ($call === null || $description === null) {
@@ -130,6 +131,7 @@ final readonly class PestFingerprints
         return array_map(
             static fn (array $tokens): array => [
                 'dataset' => $dataset,
+                'datasets' => $datasets,
                 'parameters' => $datasetParameters,
                 'tokens' => TokenCollector::sum($tokens, $modifierTokens),
             ],
@@ -138,13 +140,20 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array{0: \PhpParser\Node\Expr\FuncCall|null, 1: array<\PhpParser\Node\ArrayItem|null>, 2: array<string, int>, 3: string|null}
+     * @return array{
+     *     0: \PhpParser\Node\Expr\FuncCall|null,
+     *     1: array<\PhpParser\Node\ArrayItem|null>,
+     *     2: array<string, int>,
+     *     3: string|null,
+     *     4: list<string>,
+     * }
      */
     private function unwrapChain(Node $expression): array
     {
         $datasetRows = [];
         $modifierTokens = [];
         $dataset = null;
+        $datasets = [];
 
         while ($expression instanceof MethodCall) {
             $method = $expression->name instanceof Identifier ? $expression->name->toString() : null;
@@ -153,6 +162,7 @@ final readonly class PestFingerprints
                 $datasetArgument = self::argument($expression, 0);
                 $datasetRows = $this->datasetRows($datasetArgument);
                 $dataset = $this->datasetName($datasetArgument);
+                $datasets[] = $dataset;
             } elseif ($method !== null) {
                 $modifierTokens = TokenCollector::sum(
                     $modifierTokens,
@@ -164,7 +174,13 @@ final readonly class PestFingerprints
             $expression = $expression->var;
         }
 
-        return [$expression instanceof FuncCall ? $expression : null, $datasetRows, $modifierTokens, $dataset];
+        return [
+            $expression instanceof FuncCall ? $expression : null,
+            $datasetRows,
+            $modifierTokens,
+            $dataset,
+            array_values(array_unique(array_filter($datasets, static fn (?string $name): bool => $name !== null))),
+        ];
     }
 
     /**
@@ -208,15 +224,16 @@ final readonly class PestFingerprints
      */
     private static function sharedDatasets(array $tests): array
     {
+        $users = self::testsByDataset($tests);
         $shared = [];
 
-        foreach (self::testsByDataset($tests) as $dataset) {
-            foreach (array_keys($dataset['tests']) as $test) {
-                $otherTests = array_values(array_diff(array_keys($dataset['tests']), [$test]));
+        foreach ($tests as $testKey => $test) {
+            $dataset = $test['dataset'];
+            $name = TestKey::withoutDatasetRow($testKey);
+            $otherTests = $dataset === null ? [] : array_values(array_diff($users[$dataset], [$name]));
 
-                if ($otherTests !== []) {
-                    $shared[$test] = new SharedDataset($dataset['name'], $otherTests);
-                }
+            if ($dataset !== null && $otherTests !== []) {
+                $shared[$name] = new SharedDataset($dataset, $otherTests);
             }
         }
 
@@ -236,16 +253,15 @@ final readonly class PestFingerprints
 
     /**
      * @param array<string, Test> $tests
-     * @return array<string, array{name: string, tests: array<string, true>}>
+     * @return array<string, list<string>>
      */
     private static function testsByDataset(array $tests): array
     {
         $datasets = [];
 
         foreach ($tests as $testKey => $test) {
-            if ($test['dataset'] !== null) {
-                $datasets[$test['dataset']] ??= ['name' => $test['dataset'], 'tests' => []];
-                $datasets[$test['dataset']]['tests'][TestKey::withoutDatasetRow($testKey)] = true;
+            foreach ($test['datasets'] as $dataset) {
+                $datasets[$dataset] = array_values(array_unique([...$datasets[$dataset] ?? [], TestKey::withoutDatasetRow($testKey)]));
             }
         }
 
