@@ -4238,3 +4238,59 @@ it('still merges a test into a covering test that passes the same optional argum
         ->and($report->candidates[0]->differsBy)->toBe(['in:new:PredictedData#newCustomersForecastCount/value:24'])
         ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
+
+it('decides on a test whose covering test fills the differing slot of an assertion with an array that holds a runtime expression', function (
+    string $expectedKey,
+    Action $action,
+    array $coveringDiffersBy,
+): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('records the custom fields of an updated contact', function (): void {
+                $subscriber = Subscriber::factory()->create();
+
+                $response = updateBulk([['email' => $subscriber->email, 'custom_fields' => ['field1' => 'value1']]]);
+
+                expect($response->getUpdatedEmailsWithCustomFields())->toBe(%s);
+            });
+            it('records nothing when custom_fields is an empty array', function (): void {
+                $subscriber = Subscriber::factory()->create();
+
+                $response = updateBulk([['email' => $subscriber->email, 'custom_fields' => []]]);
+
+                expect($response->getUpdatedEmailsWithCustomFields())->toBe([]);
+            });
+            PHP_SOURCE, $expectedKey),
+        linesByTest: [
+            'it records the custom fields of an updated contact' => ['src/Handler.php:5', 'src/Handler.php:6'],
+            'it records nothing when custom_fields is an empty array' => ['src/Handler.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it records nothing when custom_fields is an empty array')
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe($coveringDiffersBy)
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'literal array key' => [
+        '[\'a@b.cz\' => [\'field1\' => \'value1\']]',
+        Action::MergeIntoDataset,
+        [],
+    ],
+    'property as an array key' => [
+        '[$subscriber->email => [\'field1\' => \'value1\']]',
+        Action::Review,
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/property:email'],
+    ],
+    'property as an array value' => [
+        '[\'email\' => $subscriber->email]',
+        Action::Review,
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/property:email'],
+    ],
+    'variable as an array key' => [
+        '[$email => [\'field1\' => \'value1\']]',
+        Action::Review,
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/variable:email'],
+    ],
+]);

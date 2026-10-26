@@ -426,7 +426,12 @@ test lacks.
   `toBe((string) $campaign->title)` all have `in:expect:function:resolveUtm/call:toBe#0/property:title` for
   `expect(resolveUtm($campaign))`, and `connect($primary ? $enShop : -$debit)` has
   `in:function:connect#0/variable:primary`, `in:function:connect#0/variable:enShop` and
-  `in:function:connect#0/variable:debit`. So two tests that pass or expect different
+  `in:function:connect#0/variable:debit`. Each variable or property that is a key or a value of an array that an
+  assertion receives, at any depth, carries the position of that argument too, so
+  `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
+  `in:expect:variable:response/call:updatedEmails/call:toBe#0/property:email`. A candidate with `toBe([])` is then
+  `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. An array that the
+  code under test receives carries no name. So two tests that pass or expect different
   variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its
   receiver, so `$account->name` and `$user->name` have the same token. A parameter of the test closure or test method
   carries no name, because each dataset row fills it with another value. A variable that the test assigns once and
