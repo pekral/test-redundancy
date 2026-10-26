@@ -33,15 +33,15 @@ final class NonLiteralArguments
 
     private const string ELEMENT_PREFIX = 'element:';
 
-    private const string IDENTITY = '(?:(?:[^/#]+/)*' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
+    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
 
     private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
 
     private const string POSITION = '(in:(?:.*/)?(?:call|function|new):[^/#]+#\w+/)';
 
-    private const string POSITION_PATTERN = '~^' . self::POSITION . self::SUFFIX . '$~';
+    private const string POSITION_PATTERN = '~^' . self::POSITION . self::SUFFIX . '$~s';
 
-    private const string IDENTITY_POSITION_PATTERN = '~^' . self::POSITION . self::IDENTITY . '$~';
+    private const string IDENTITY_POSITION_PATTERN = '~^' . self::POSITION . self::IDENTITY . '$~s';
 
     private const string CALL_PATTERN = '~' . self::CALL . '(?:' . self::SUFFIX . '|' . self::IDENTITY . ')$~';
 

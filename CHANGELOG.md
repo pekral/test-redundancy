@@ -18,7 +18,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `[$k => $x]`. These candidates are `review`. A name token or a `non-literal` token whose path crosses the key of an
   array, such as `in:function:foo#0/value:'k'/function:bar#0/variable:x` for `foo(['k' => bar($x)])`, is no longer
   read as data, so it is listed in `coveringDiffersBy` and the candidate against `foo(['k' => bar('a')])` is
-  `review`, not `merge-into-dataset` (#122).
+  `review`, not `merge-into-dataset`. This also holds when the key contains `#` or a newline, such as
+  `foo(['a#b' => $x])`. A variable or a property in a list now takes part in the order of the list elements by its
+  name, e.g. `in:function:transfer#0/items:variable:a>variable:b`, so `transfer([$a, $b])` against
+  `transfer([$b, $a])`, and `transfer([$a, 1])` against `transfer([1, $a])`, are `review`, not `delete` (#122).
 - A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
   callable held in a class constant. Before, a call such as `(self::HANDLER)('acme')` or
   `(Actions::ALL['cleanUp'])('acme')` carried no token, so two identical calls gave the same tokens as one call, and the
