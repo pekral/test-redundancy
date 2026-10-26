@@ -580,6 +580,20 @@ test lacks.
   as the value the variable holds. A later read of the variable carries the name. A name that only the covering test has
   does not turn a `delete` candidate into `review`: the candidate passes another value at the same position, or the
   position token already lists the argument.
+- **Closure arguments.** A closure or an arrow function that is an argument of a call, a `new` expression or an
+  assertion carries the call and the position followed by `closure`, next to the value it returns (see *Call
+  arguments*): `store(fn () => 1)` has `in:function:store#0/closure`. A closure inside an array carries the place of
+  its key or `value:list-item` and the prefix `element:`, as a variable does, so `store(['k' => fn () => 1])` has
+  `in:function:store#0/value:'k'/element:closure` and `store([fn () => 1])` has
+  `in:function:store#0/value:list-item/element:closure`. A closure that another closure returns carries no token of
+  its own. A closure is not data, because a dataset row cannot fill its slot with a literal. A candidate is
+  therefore `review`, and not `merge-into-dataset`, when its covering test passes a closure where the candidate
+  passes a literal, such as `foo('a')` against `foo(fn () => 1)` or `foo(function () { return 1; })`,
+  `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])`, `foo(['a'])` against `foo([fn () => 1])`, or `toBe('a')`
+  against `toBe(fn () => 1)`. The token of the closure is listed in `coveringDiffersBy`. Two tests that pass a closure at the same place carry the
+  same token, so closures that return other values, such as `foo(fn () => 'a')` against `foo(fn () => 1)`, stay
+  `merge-into-dataset`. A closure that a dataset row passes to a parameter of the test is no closure argument of the
+  body: the type of the parameter decides whether a row takes the literal (see *Dataset rows*).
 - **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
   `expect(activeState())` or `assertSame(5, $order->total())`, adds the token `read:` followed by its own token, such
   as `read:function:activeState`, beside the token itself. The token counts how many of the calls are such reads, so

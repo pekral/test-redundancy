@@ -17,6 +17,7 @@ use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
@@ -192,7 +193,10 @@ final class AssertionSubject
     private static function argument(Arg $argument, int $position): string
     {
         $literal = TokenCollector::isData($argument->value) ? (string) TokenCollector::token($argument->value) : null;
-        $names = new NodeFinder()->findFirst($argument->value, TokenCollector::isData(...)) === null
+        $names = new NodeFinder()->findFirst(
+            $argument->value,
+            static fn (Node $node): bool => TokenCollector::isData($node) || $node instanceof FunctionLike,
+        ) === null
             ? NonLiteralArguments::namesOf($argument->value, parameters: [])
             : [];
 
