@@ -1150,6 +1150,24 @@ it('names a test that uses a named dataset after another dataset as a user of th
         ->and($cache->sharedDataset('tests/RowsTest.php :: it combines › s'))->toBeNull();
 });
 
+it('names a test that passes a named dataset as any argument of one with call as a user of that dataset', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/RowsTest.php', <<<'PHP'
+        <?php
+        dataset('rows', ['a' => [1]]);
+        dataset('sizes', ['s' => [2]]);
+
+        it('reads', fn (int $row) => expect($row)->toBeInt())->with('rows');
+        it('combines', fn (int $size, int $row) => expect($size + $row)->toBeInt())->with('sizes', 'rows');
+        PHP);
+    $cache = new FingerprintCache($project);
+
+    expect($cache->sharedDataset('tests/RowsTest.php :: it reads › a'))
+        ->toEqual(new SharedDataset('rows', ['it combines']))
+        ->and($cache->sharedDataset('tests/RowsTest.php :: it combines › s'))->toBeNull();
+});
+
 function declaresSingleTestCase(string $code): bool
 {
     $project = temporaryDirectory();

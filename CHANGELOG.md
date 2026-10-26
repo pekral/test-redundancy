@@ -13,11 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   add a row to the dataset of the covering test, as if only that test used it. A row added to the dataset is added to
   every test that uses it. Now the step names the dataset and the other tests and asks to add the row only when each of
   them stays correct with it, otherwise to give the covering test its own dataset (#135). The action is still
-  `merge-into-dataset`, as for a row of a dataset that no other test uses. A test is a user of the dataset when its
-  chain holds `->with('name')` at any position, so `->with('sizes')->with('name')` counts too; before, only the first
-  `->with()` of a chain was read. The same detection now names those tests in the step of a row of a named dataset that
-  `delete` would remove (#87), which is `review`. A test the analysis does not parse, for example one whose inline
-  dataset has rows without a string key, and a test inside a `describe()` block that is bound to the dataset with
+  `merge-into-dataset`, as for a row of a dataset that no other test uses. A test is a user of the dataset when it
+  holds `->with('name')` at any position of its chain or as any argument of a `->with()`, so
+  `->with('sizes')->with('name')` and `->with('sizes', 'name')` count too; before, only the first argument of the first
+  `->with()` was read. The same detection now names those tests in the step of a row of a named dataset that
+  `delete` would remove (#87), which is `review`. A name inside an array or a spread argument, such as
+  `->with(['name'])` or `->with(...$names)`, is not read. A test the analysis does not parse, for example one whose
+  inline dataset has rows without a string key, and a test inside a `describe()` block that is bound to the dataset with
   `describe(…)->with('name')`, are not detected as users, so the step then stays the plain add-row step. A named
   dataset defined in another file is not parsed, so a candidate covered by one of its rows is `review`, as before.
 - A test that passes a literal where its covering test passes a closure that returns another value is no longer
