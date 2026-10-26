@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
+  callable held in a class constant. Before, a call such as `(self::HANDLER)('acme')` or
+  `(Actions::ALL['cleanUp'])('acme')` carried no token, so two identical calls gave the same tokens as one call, and the
+  test with one call was `delete`. Now such a call carries `function:` and the constant as written, with `:` escaped
+  like the key of an array element: `function:self%3A%3AHANDLER` or `function:Actions%3A%3AALL['cleanUp']`. The
+  fingerprint counts the call, so the candidate is `review`, and its arguments carry a position. Because `:` is
+  escaped, a constant named like an assertion, such as `self::assertReady`, is not read as an assertion. A constant
+  named only at run time, such as `($class::HANDLER)()`, still carries no token (#120).
 - A `merge-into-dataset` candidate whose covering test is a row of a dataset test no longer asks to turn that test into
   a dataset test again. The first step is now `Add a row with the values in differsBy to the dataset of "<test>".`, with
   the name of the dataset test without the row. A covering test that is not a dataset row keeps the step `Turn "<test>"

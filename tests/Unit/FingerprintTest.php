@@ -477,11 +477,51 @@ it('reads no order token of arranging calls as an assertion', function (): void 
     expect(new FingerprintCache($project)->assertsNothing('tests/ArrangeTest.php :: it arranges'))->toBeTrue();
 });
 
+it('reads no call of a callable held in a class constant named like an assertion as an assertion', function (): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/ArrangeTest.php', <<<'PHP'
+        <?php
+        it('arranges', function (): void {
+            (self::assertReady)('acme');
+            (Checks::expectations['ready'])('acme');
+        });
+        PHP);
+
+    expect(new FingerprintCache($project)->assertsNothing('tests/ArrangeTest.php :: it arranges'))->toBeTrue();
+});
+
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
+    'argument of a call of a class constant' => [
+        '(self::HANDLER)(\'acme\'); (self::HANDLER)(\'acme\'); (static::HANDLER)(1); (parent::HANDLER)(2);'
+            . ' (Actions::ALL[\'cleanUp\'])(3);',
+        [
+            'const:Actions::ALL' => 1,
+            'const:parent::HANDLER' => 1,
+            'const:self::HANDLER' => 2,
+            'const:static::HANDLER' => 1,
+            'function:Actions%3A%3AALL[\'cleanUp\']' => 1,
+            'function:parent%3A%3AHANDLER' => 1,
+            'function:self%3A%3AHANDLER' => 2,
+            'function:static%3A%3AHANDLER' => 1,
+            'in:function:Actions%3A%3AALL[\'cleanUp\']#0/value:3' => 1,
+            'in:function:parent%3A%3AHANDLER#0/value:2' => 1,
+            'in:function:self%3A%3AHANDLER#0/value:\'acme\'' => 2,
+            'in:function:static%3A%3AHANDLER#0/value:1' => 1,
+            'value:\'cleanUp\'' => 1,
+        ],
+    ],
+    'argument of a call of a class constant named only at run time' => [
+        '($class::HANDLER)(true); (self::{$name})(true); ($class::ALL[\'a\'])(true);',
+        [
+            'value:true' => 3,
+            'value:\'a\'' => 1,
+        ],
+    ],
     'argument of a call of an array element' => [
         '($this->actions[\'store\'])(true); ($this->actions[\'store\'])(true); ($actions[0])(1); (self::$actions[\'a\'][\'b\'])(2);',
         [

@@ -284,18 +284,21 @@ test lacks.
   of them.
 - **Counts.** The fingerprint counts each token, so a token the candidate uses more times than the covering test is
   listed too. The count is the number of places the token appears in the test source, not the number of runs.
-  A call of a callable that a variable, a property or an array element holds counts too: `($action)($account)` carries
-  `function:$action`, `($this->action)($account)` carries `function:$this->action`, `(self::$action)($account)`
-  carries `function:self::$action`, and `($this->actions['cleanUp'])($account)` carries
-  `function:$this->actions['cleanUp']`. The key of an array element is written like a `value:` or `const:` token without
-  its prefix, e.g. `$actions[0]`, `$actions[-1]` or `$actions[self%3A%3AK]`. In the key, `%`, `/`, `#` and `:` are
-  written as `%25`, `%2F`, `%23` and `%3A`, because `/`, `#` and `:` separate the parts of a token, so
-  `($this->commands['import:products'])($account)` carries `function:$this->commands['import%3Aproducts']`. A nullsafe
+  A call of a callable that a variable, a property, a class constant or an array element holds counts too:
+  `($action)($account)` carries `function:$action`, `($this->action)($account)` carries `function:$this->action`,
+  `(self::$action)($account)` carries `function:self::$action`, `(self::HANDLER)($account)` carries
+  `function:self%3A%3AHANDLER`, and `($this->actions['cleanUp'])($account)` carries
+  `function:$this->actions['cleanUp']`. A class constant and the key of an array element are written like a `const:` or
+  `value:` token without its prefix, e.g. `$actions[0]`, `$actions[-1]`, `$actions[self%3A%3AK]` or
+  `Actions%3A%3AALL['cleanUp']`. In them, `%`, `/`, `#` and `:` are written as `%25`, `%2F`, `%23` and `%3A`, because
+  `/`, `#` and `:` separate the parts of a token, so `($this->commands['import:products'])($account)` carries
+  `function:$this->commands['import%3Aproducts']`, and a constant named like an assertion, such as `self::assertReady`,
+  is not read as an assertion. A nullsafe
   method call `$action?->handle($account)` carries `call:handle`, like the method call `$action->handle($account)`. A
   test that makes such a call once is therefore `review` against a covering test that makes it twice, because the
   covering test makes the call more times (see *No missing call or object*). A
-  callable that the test names only at run time, such as `($this->{$name})()` or `($this->actions[$name])()`, carries
-  no token.
+  callable that the test names only at run time, such as `($this->{$name})()`, `($this->actions[$name])()` or
+  `($class::HANDLER)()`, carries no token.
 - **Casts.** A cast carries a token for its type at its place, e.g. `in:function:store#0/cast:object` for
   `store((object) ['code' => null])` or `in:function:connect#0/cast:int` for `connect((int) $id)`. Each token inside the
   cast carries the cast in its path, and in an argument also the place of the argument, e.g.

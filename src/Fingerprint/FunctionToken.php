@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ArrayDimFetch;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\NullsafePropertyFetch;
 use PhpParser\Node\Expr\PropertyFetch;
@@ -34,6 +35,7 @@ final class FunctionToken
             $callable instanceof StaticPropertyFetch => $callable->class instanceof Name && $callable->name instanceof Identifier
                 ? $callable->class->toString() . '::$' . $callable->name->toString()
                 : null,
+            $callable instanceof ClassConstFetch => self::dataName($callable),
             $callable instanceof ArrayDimFetch => self::elementName($callable),
             default => null,
         };
@@ -42,11 +44,16 @@ final class FunctionToken
     private static function elementName(ArrayDimFetch $element): ?string
     {
         $receiver = self::callableName($element->var);
-        $key = $element->dim !== null && TokenCollector::isData($element->dim) ? TokenCollector::token($element->dim) : null;
+        $key = $element->dim === null ? null : self::dataName($element->dim);
 
-        return $receiver === null || $key === null
-            ? null
-            : $receiver . '[' . strtr((string) preg_replace(TokenCollector::DATA_TOKEN_PATTERN, '', $key), self::KEY_ESCAPES) . ']';
+        return $receiver === null || $key === null ? null : $receiver . '[' . $key . ']';
+    }
+
+    private static function dataName(Expr $data): ?string
+    {
+        $token = TokenCollector::isData($data) ? TokenCollector::token($data) : null;
+
+        return $token === null ? null : strtr((string) preg_replace(TokenCollector::DATA_TOKEN_PATTERN, '', $token), self::KEY_ESCAPES);
     }
 
     private static function propertyName(PropertyFetch|NullsafePropertyFetch $property): ?string
