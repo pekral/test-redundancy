@@ -166,14 +166,13 @@ final readonly class RedundancyAnalyzer
         $equalRows = [];
 
         foreach (array_filter(array_keys($removed), TestKey::isDatasetRow(...)) as $rowKey) {
-            $coveredBy = $this->coveredBy(
+            $coveredBy = $this->singleCoverWithoutDifference(
                 $rowKey,
                 $analyzedTests[$rowKey],
                 $this->coverPool($rowKey, $analyzedTests, $removed, $pool),
-                $pool,
             );
 
-            if (count($coveredBy) === 1
+            if ($coveredBy !== null
                 && isset($removed[$coveredBy[0]])
                 && !TestKey::isDatasetRow($coveredBy[0])
                 && $this->fingerprints->difference($coveredBy[0], [$rowKey]) === []
