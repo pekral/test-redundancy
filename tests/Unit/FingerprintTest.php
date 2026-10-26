@@ -505,6 +505,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'new:Item' => 1,
     ],
     ],
+    'argument of a nullsafe method call' => ['$a?->handle(1); $a?->handle(1);', ['call:handle' => 2, 'in:call:handle#0/value:1' => 2]],
     'argument under a key' => ['store([\'limit\' => min(5)]);', [
         'function:min' => 1,
         'function:store' => 1,

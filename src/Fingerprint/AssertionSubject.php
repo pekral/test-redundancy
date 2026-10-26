@@ -12,6 +12,7 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
@@ -40,7 +41,7 @@ final class AssertionSubject
     public static function token(Expr $subject, bool $withLiteralArguments = false): ?string
     {
         $token = self::partToken($subject, $withLiteralArguments);
-        $receiver = $subject instanceof MethodCall
+        $receiver = $subject instanceof MethodCall || $subject instanceof NullsafeMethodCall
             ? NonLiteralArguments::identity($subject->var) ?? self::partToken($subject->var, $withLiteralArguments)
             : null;
 

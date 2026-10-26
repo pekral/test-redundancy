@@ -2285,6 +2285,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         [],
         Action::Review,
     ],
+    'a cleanup run once against twice through a nullsafe method call' => [
+        <<<'PHP'
+            <?php
+            it('clears every mirrored row', function (): void {
+                $this->action?->handle('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            it('stays idempotent when the cleanup runs twice', function (): void {
+                $this->action?->handle('acme');
+                $this->action?->handle('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            PHP,
+        'it clears every mirrored row',
+        'it stays idempotent when the cleanup runs twice',
+        [],
+        Action::Review,
+    ],
     'a contact on one list against a contact on two lists' => [
         <<<'PHP'
             <?php
@@ -2343,6 +2361,25 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         [
             'in:function:self::$resolve#0/value:\'campaign_{name}_{date}\'',
             'in:expect:function:self::$resolve/call:toBe#0/value:\'campaign_Summer Sale_2026-03-10\'',
+        ],
+        Action::Review,
+    ],
+    'a string resolved once against twice through a nullsafe method call' => [
+        <<<'PHP'
+            <?php
+            it('resolves multiple tags in one string', function (): void {
+                expect($this->action?->handle('campaign_{name}_{date}', $this->campaign))->toBe('campaign_Summer Sale_2026-03-10');
+            });
+            it('resolves the same string to the same value twice', function (): void {
+                $first = $this->action?->handle('campaign_{name}', $this->campaign);
+                expect($this->action?->handle('campaign_{name}', $this->campaign))->toBe($first);
+            });
+            PHP,
+        'it resolves multiple tags in one string',
+        'it resolves the same string to the same value twice',
+        [
+            'in:call:handle#0/value:\'campaign_{name}_{date}\'',
+            'in:expect:property:action/call:handle/call:toBe#0/value:\'campaign_Summer Sale_2026-03-10\'',
         ],
         Action::Review,
     ],

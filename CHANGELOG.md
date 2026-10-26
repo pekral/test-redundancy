@@ -15,7 +15,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and no test asserted the state after a single call. Now such a call carries `function:` and the callable as written,
   e.g. `function:$this->cleanUp`, `function:$this?->actions->cleanUp` or `function:self::$resolve`, like the call of a
   variable `function:$action` of #102. The fingerprint counts the call, so the covering test that makes it twice lists
-  it in `coveringDiffersBy`, and the candidate is `review`. Its arguments carry a position too. A callable that the test
+  it in `coveringDiffersBy`, and the candidate is `review`. Its arguments carry a position too. A nullsafe method call
+  such as `$this->action?->handle('acme')` carried no token either. It now carries `call:handle`, like the method call
+  `$this->action->handle('acme')`, and an assertion on its result names the same receiver. A callable that the test
   names only at run time, such as `($this->{$name})()`, still carries no token (#103).
 - A `merge-into-dataset` candidate is now `review` when it passes an optional argument that its covering test omits.
   Before, a candidate such as `new PredictedData(date: $date, newCustomersForecastCount: 24)` was merged into the
