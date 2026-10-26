@@ -18,10 +18,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     e.g. `expect:variable:a/call:toBe` and `in:expect:variable:a/call:toBe#0/value:1`, and as an array key, e.g.
     `in:function:store#0/variable:a/value:1` and `in:function:store#0/keys:variable:a>variable:b`. These swapped pairs
     are `merge-into-dataset`, and variable keys that swap places are `review`.
-  - When a test has two or more assertions with different subjects that carry no token, such as literals, constants
-    or element reads, each argument of these assertions carries its subject in its path: a literal or a constant by
-    its token, any other expression by its source code, e.g. `in:expect:value:'5'/call:toBe#0/value:5` and
-    `in:expect:$r['a']/call:toBe#0/value:1`. The swapped pair is `merge-into-dataset`. A test with one such subject
+  - When a test has two or more assertions with different subjects that carry no token, such as literals, constants,
+    element reads, lists, maps or enum case reads such as `Status::A->value`, each argument of these assertions
+    carries its subject in its path: a literal, a constant or an empty array by its token, any other expression by
+    its source code, e.g. `in:expect:value:'5'/call:toBe#0/value:5`, `in:expect:$r['a']/call:toBe#0/value:1`,
+    `in:expect:[1]/call:toBe#0/value:3` and `in:expect:Status::A->value/call:toBe#0/value:1`. The swapped pair is
+    `merge-into-dataset`. A test with one such subject
     keeps `in:call:toBe#0/value:5`. A test with two or more such subjects is now `review`, not
     `merge-into-dataset`, against a covering test that asserts other such subjects. The last argument of a PHPUnit
     `assert*` call is the subject when every argument other than the failure message is a literal or a constant, so
@@ -36,12 +38,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     value it returns, so `expect(fn () => import(1))->toThrow(A::class)` has the subject `function:import`. The value
     a closure returns is the expression of each of its own `return` statements.
 
-  Three shapes stay `delete`. A closure that the test assigns to a variable and then passes on, such as
+  These shapes stay `delete`. A closure that the test assigns to a variable and then passes on, such as
   `$f = fn () => 1; $g = fn () => 2; store($f, $g);` against the same test with the values swapped, carries no place.
   An operator that a closure returns carries no token, as #131 states, so `store(fn () => $x + 1, fn () => $x + 2)`
   against the closures swapped is `delete`. A call that is not an assertion and pairs a name with a literal in its
   arguments, such as `store($a, 1); store($b, 2);` against `store($a, 2); store($b, 1);`, has no pairing token
-  (#133).
+  (#133). This release does not change three more shapes, which stay `delete` against the same test with the values
+  swapped. Properties of different elements of one array, such as `expect($u[0]->name)->toBe('a');
+  expect($u[1]->name)->toBe('b');`, give both subjects the same token `property:name`. The same call asserted twice,
+  such as `expect($s->next())->toBe(1); expect($s->next())->toBe(2);` or `$a = foo(); $b = foo();
+  expect($a)->toBe(1); expect($b)->toBe(2);`, gives both subjects the same token. The closures of a Pest
+  `sequence()`, such as `expect([1, 2])->sequence(fn ($e) => $e->toBe(1), fn ($e) => $e->toBe(2))`, carry no place.
 - A test that spreads an argument of a call that is not an assertion where its covering test passes it plain, or the
   other way round, is no longer `delete`. Before, a spread argument carried the same tokens as the plain argument, so
   `foo(...$x)` and `foo($x)` had the same tokens, and one of them was `delete`. Now the spread of an argument of a call

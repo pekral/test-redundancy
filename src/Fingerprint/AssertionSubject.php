@@ -73,7 +73,10 @@ final class AssertionSubject
 
     public static function tokenOrSource(Expr $subject): string
     {
-        return self::token($subject) ?? TokenCollector::token($subject) ?? OrderTokens::sourceOf($subject);
+        return self::token($subject) ?? match (true) {
+            TokenCollector::isData($subject) => (string) TokenCollector::token($subject),
+            default => OrderTokens::sourceOf($subject),
+        };
     }
 
     public static function token(Expr $subject, bool $withArguments = false): ?string
@@ -207,6 +210,7 @@ final class AssertionSubject
     {
         $token = match (true) {
             $part instanceof Cast => CastToken::of($part, self::token($part->expr, $withArguments)),
+            NodeContext::enumCaseReadBy($part) !== null => null,
             default => NonLiteralArguments::nameOrToken($part),
         };
 

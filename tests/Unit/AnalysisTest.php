@@ -67,6 +67,14 @@ function analyzeTokenTest(string $source, array $linesByTest): FileReport
     return new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/TokenTest.php' => $coverage], map: null)[0];
 }
 
+function analyzeTestPair(string $candidateBody, string $coveringBody): FileReport
+{
+    return analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+}
+
 it('picks the action that fits a candidate', function (Candidate $candidate, Action $action): void {
     expect($candidate->action())->toBe($action);
 })->with([
@@ -4942,10 +4950,7 @@ it('does not delete or merge a test that differs from its covering test only in 
     array $differsBy,
     array $coveringDiffersBy,
 ): void {
-    $report = analyzeTokenTest(
-        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
-        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
-    );
+    $report = analyzeTestPair($candidateBody, $coveringBody);
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it a')
@@ -5013,10 +5018,7 @@ it('merges, never deletes, a test whose cast arguments, cast subjects or cast ke
     string $coveringBody,
     array $differsBy,
 ): void {
-    $report = analyzeTokenTest(
-        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
-        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
-    );
+    $report = analyzeTestPair($candidateBody, $coveringBody);
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it a')
@@ -5079,10 +5081,7 @@ it('merges, never deletes, a test whose subjects without a token of their own pa
     string $coveringBody,
     array $differsBy,
 ): void {
-    $report = analyzeTokenTest(
-        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
-        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
-    );
+    $report = analyzeTestPair($candidateBody, $coveringBody);
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it a')
@@ -5109,6 +5108,21 @@ it('merges, never deletes, a test whose subjects without a token of their own pa
         'expect($r[\'a\'])->toBe(2); expect($r[\'b\'])->toBe(1);',
         ['in:expect:$r[\'a\']/call:toBe#0/value:1', 'in:expect:$r[\'b\']/call:toBe#0/value:2'],
     ],
+    'enum case values as the actual values of assertSame()' => [
+        '$this->assertSame(1, Status::A->value); $this->assertSame(2, Status::B->value);',
+        '$this->assertSame(2, Status::A->value); $this->assertSame(1, Status::B->value);',
+        ['in:expect:Status::A->value/call:assertSame#0/value:1', 'in:expect:Status::B->value/call:assertSame#0/value:2'],
+    ],
+    'enum case values as the subjects of expect()' => [
+        'expect(Status::A->value)->toBe(1); expect(Status::B->value)->toBe(2);',
+        'expect(Status::A->value)->toBe(2); expect(Status::B->value)->toBe(1);',
+        ['in:expect:Status::A->value/call:toBe#0/value:1', 'in:expect:Status::B->value/call:toBe#0/value:2'],
+    ],
+    'lists as the subjects of expect()' => [
+        'expect([1])->toBe(3); expect([2])->toBe(4);',
+        'expect([1])->toBe(4); expect([2])->toBe(3);',
+        ['in:expect:[1]/call:toBe#0/value:3', 'in:expect:[2]/call:toBe#0/value:4'],
+    ],
     'literals as the actual values of assertSame()' => [
         '$this->assertSame(5, \'5\'); $this->assertSame(6, \'6\');',
         '$this->assertSame(6, \'5\'); $this->assertSame(5, \'6\');',
@@ -5128,6 +5142,11 @@ it('merges, never deletes, a test whose subjects without a token of their own pa
         '$a = 5; $b = 6; expect($a)->toBe(5); expect($b)->toBe(6);',
         '$a = 5; $b = 6; expect($a)->toBe(6); expect($b)->toBe(5);',
         ['in:expect:value:5/call:toBe#0/value:5', 'in:expect:value:6/call:toBe#0/value:6'],
+    ],
+    'maps as the subjects of expect()' => [
+        'expect([\'a\' => 1])->toBe(3); expect([\'a\' => 2])->toBe(4);',
+        'expect([\'a\' => 1])->toBe(4); expect([\'a\' => 2])->toBe(3);',
+        ['in:expect:[\'a\' => 1]/call:toBe#0/value:3', 'in:expect:[\'a\' => 2]/call:toBe#0/value:4'],
     ],
     'variables as array keys' => [
         'store([$a => 1, $b => 2]);',
@@ -5152,10 +5171,7 @@ it('pairs literal subjects with their values only in a test that asserts two or 
     array $differsBy,
     Action $action,
 ): void {
-    $report = analyzeTokenTest(
-        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
-        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
-    );
+    $report = analyzeTestPair($candidateBody, $coveringBody);
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->differsBy)->toBe($differsBy)
@@ -5185,10 +5201,7 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
     string $coveringBody,
     array $differsBy,
 ): void {
-    $report = analyzeTokenTest(
-        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
-        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
-    );
+    $report = analyzeTestPair($candidateBody, $coveringBody);
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it a')
