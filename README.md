@@ -443,13 +443,17 @@ test lacks.
   `in:function:recalculate#2/property:id`, and `expect(linksOf($account))->toContain($canvaUserId)` has
   `in:expect:function:linksOf/call:toContain#0/variable:canvaUserId`. A static or a nullsafe property is a property
   too: `connect(self::$enShop)` has `in:function:connect#0/property:enShop` and `connect($shop?->url)` has
-  `in:function:connect#0/property:url`. Each variable or property inside an operator, a cast, a ternary or an
-  interpolated string that is the argument carries the position of that argument, so
-  `toBe('no_segment_tag_' . $campaign->title)`, `toBe("no_segment_tag_{$campaign->title}")` and
-  `toBe((string) $campaign->title)` all have `in:expect:function:resolveUtm/call:toBe#0/property:title` for
-  `expect(resolveUtm($campaign))`, and `connect($primary ? $enShop : -$debit)` has
-  `in:function:connect#0/variable:primary`, `in:function:connect#0/variable:enShop` and
-  `in:function:connect#0/variable:debit`. Each variable or property that is a key or a value of an array that a
+  `in:function:connect#0/property:url`. A variable or property inside a cast that is the argument carries the position
+  of that argument, so `toBe((string) $campaign->title)` has
+  `in:expect:function:resolveUtm/call:toBe#0/property:title` for `expect(resolveUtm($campaign))`. The cast has a token
+  of its own (see *Casts*). Each variable or property inside an operator, a ternary or an interpolated string that is
+  the argument carries the position of that argument and the prefix `operand:`, because the argument holds the name and
+  is not the name. So `toBe('no_segment_tag_' . $campaign->title)` and `toBe("no_segment_tag_{$campaign->title}")` both
+  have `in:expect:function:resolveUtm/call:toBe#0/operand:property:title`, and
+  `connect($primary ? $enShop : -$debit)` has `in:function:connect#0/operand:variable:primary`,
+  `in:function:connect#0/operand:variable:enShop` and `in:function:connect#0/operand:variable:debit`. A test that
+  passes `$x` and a test that passes `$x . $y`, `$c ? $x : 1`, `-$x` or `"{$x}"` differ, and neither is `delete`
+  against the other. Each variable or property that is a key or a value of an array that a
   call or an assertion receives, at any depth, carries the position of that argument too, and so does the variable
   that an array element read holds, such as `$row` in `$row['email']`. Such a name has the prefix `element:`, because
   the argument holds the variable and is not the variable. Before the prefix, the name carries its place inside the
@@ -459,7 +463,9 @@ test lacks.
   `in:expect:function:f/call:toBe#0/element:variable:rows`, `.../value:list-item/element:variable:x`,
   `.../value:list-item/value:list-item/element:variable:x` and `.../value:'a'/element:variable:x`, while `toBe($x)` has
   `.../variable:x`. A key that is itself a variable or a property names the value under it, so `[$k => $x]` has
-  `.../element:variable:k` and `.../variable:k/element:variable:x`. So a test that passes `$x` and a test that passes
+  `.../element:variable:k` and `.../variable:k/element:variable:x`. The prefixes `element:` and `operand:` combine in
+  the order the name is reached, so `toBe([$x . $y])` has `.../value:list-item/element:operand:variable:x` and
+  `toBe($rows[0] . 'a')` has `.../operand:element:variable:rows`. So a test that passes `$x` and a test that passes
   `[$x]` differ, and two tests that hold the same names at other places of one argument, such as
   `['from' => $a, 'to' => $b]` and `['from' => $b, 'to' => $a]`, differ too: neither is `delete` against the other.
   Names that swap places inside a list, such as `[$a, $b]` and `[$b, $a]`, differ by their order tokens (see *Order of

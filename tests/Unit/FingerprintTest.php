@@ -49,7 +49,7 @@ it('collects every node that carries a contract', function (): void {
         'in:call:Foo::create#8/non-literal',
         'in:call:Foo::create#9/non-literal',
         'in:call:Foo::create#10/non-literal',
-        'in:call:Foo::create#10/variable:value',
+        'in:call:Foo::create#10/operand:variable:value',
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
@@ -1215,7 +1215,7 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'enum case value in an operator passed to the code under test' => [
         'connect(Status::Active->value . $suffix);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/variable:suffix', 'const:Status::Active->value'],
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/operand:variable:suffix', 'const:Status::Active->value'],
     ],
     'nullsafe property passed to the code under test' => [
         'connect($shop?->url);',
@@ -1239,11 +1239,11 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/property:name', 'value:\'tag_\''],
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:property:name', 'value:\'tag_\''],
     ],
     'property joined to a string passed to a PHPUnit assertion' => [
         '$this->assertSame(\'a\' . $x->title, $y);',
-        ['call:assertSame', 'in:call:assertSame#0/property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
+        ['call:assertSame', 'in:call:assertSame#0/operand:property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
     ],
     'property of a variable passed by name' => [
         'articlesFor(articleId: $article->post_id);',
@@ -1257,13 +1257,26 @@ it('names the variable or the property that an argument of a call or of an asser
         'connect(self::$enShop);',
         ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop'],
     ],
+    'variable and an element read joined by operators inside an array passed to the code under test' => [
+        'store([\'k\' => $a . $b], $rows[0] . \'x\');',
+        [
+            'function:store',
+            'in:function:store#0/key:value:\'k\'',
+            'in:function:store#0/value:\'k\'/element:operand:variable:a',
+            'in:function:store#0/value:\'k\'/element:operand:variable:b',
+            'in:function:store#1/non-literal',
+            'in:function:store#1/operand:element:variable:rows',
+            'value:0',
+            'value:\'x\'',
+        ],
+    ],
     'variable and property joined by operators passed to the code under test' => [
         'store($prefix . $campaign->title . \'_\');',
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/property:title',
-            'in:function:store#0/variable:prefix',
+            'in:function:store#0/operand:property:title',
+            'in:function:store#0/operand:variable:prefix',
             'value:\'_\'',
         ],
     ],
@@ -1283,7 +1296,7 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'variable inside a short ternary passed to the code under test' => [
         'store($name ?: \'none\');',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/variable:name', 'value:\'none\''],
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:variable:name', 'value:\'none\''],
     ],
     'variable passed to a Pest assertion' => [
         'expect(linksOf($account))->toContain($canvaUserId);',
@@ -1304,9 +1317,9 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/property:enShop',
-            'in:function:store#0/variable:fallback',
-            'in:function:store#0/variable:primary',
+            'in:function:store#0/operand:property:enShop',
+            'in:function:store#0/operand:variable:fallback',
+            'in:function:store#0/operand:variable:primary',
         ],
     ],
     'variables inside a unary operator passed to the code under test' => [
@@ -1314,13 +1327,13 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/variable:debit',
+            'in:function:store#0/operand:variable:debit',
             'in:function:store#1/non-literal',
-            'in:function:store#1/variable:credit',
+            'in:function:store#1/operand:variable:credit',
             'in:function:store#2/non-literal',
-            'in:function:store#2/variable:active',
+            'in:function:store#2/operand:variable:active',
             'in:function:store#3/non-literal',
-            'in:function:store#3/variable:mask',
+            'in:function:store#3/operand:variable:mask',
         ],
     ],
 ]);

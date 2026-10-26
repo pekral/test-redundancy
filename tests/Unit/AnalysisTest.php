@@ -3996,7 +3996,7 @@ it('asks for a review of a test that passes another variable or property to the 
                 expect(connect($primary ? $reconnected : $fallback))->toBe(2);
             });
             PHP_SOURCE,
-        ['in:function:connect#0/variable:enShop'],
+        ['in:function:connect#0/operand:variable:enShop'],
     ],
 ]);
 
@@ -4060,7 +4060,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(balanceOf($account))->toBe(-$account->credit);
             });
             PHP_SOURCE,
-        ['in:expect:function:balanceOf/call:toBe#0/property:debit'],
+        ['in:expect:function:balanceOf/call:toBe#0/operand:property:debit'],
     ],
     'another property as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4096,7 +4096,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe("tag_{$campaign->name}");
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/property:title', 'value:\'no_segment_tag_\''],
+        ['in:expect:function:resolveUtm/call:toBe#0/operand:property:title', 'value:\'no_segment_tag_\''],
     ],
     'another property joined to a string as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4108,7 +4108,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe('tag_' . $campaign->name);
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/property:title', 'value:\'no_segment_tag_\''],
+        ['in:expect:function:resolveUtm/call:toBe#0/operand:property:title', 'value:\'no_segment_tag_\''],
     ],
     'variable the covering test expects only negated' => [
         <<<'PHP_SOURCE'
@@ -4441,6 +4441,11 @@ it('decides on a test by what the covering test passes in the slot that differs'
         'expect(f())->toBe($rows[0]);',
         Action::Review,
     ],
+    'a variable against the variable joined to a literal in an assertion' => [
+        'expect(f())->toBe($x);',
+        'expect(f())->toBe($x . \'a\');',
+        Action::Review,
+    ],
     'a variable as the key of a map against the variable itself' => [
         'expect(f())->toBe([$x => 1]);',
         'expect(f())->toBe($x);',
@@ -4454,6 +4459,41 @@ it('decides on a test by what the covering test passes in the slot that differs'
     'a variable in a list against the variable itself' => [
         'expect(f())->toBe([$x]);',
         'expect(f())->toBe($x);',
+        Action::Review,
+    ],
+    'a variable in an interpolated string of a call against the variable itself' => [
+        'foo("{$x}{$y}");',
+        'foo($x);',
+        Action::Review,
+    ],
+    'a variable in an operator in a list of a call against the variable in the list' => [
+        'foo([$x . $y]);',
+        'foo([$x]);',
+        Action::Review,
+    ],
+    'a variable in an operator of a call against the variable itself' => [
+        'foo($x . $y);',
+        'foo($x);',
+        Action::Review,
+    ],
+    'a variable in an operator of an assertion against the variable itself' => [
+        'expect(f())->toBe($x . $y);',
+        'expect(f())->toBe($x);',
+        Action::Review,
+    ],
+    'a variable in an operator under a key of a call against a literal' => [
+        'foo([\'k\' => $x . \'a\']);',
+        'foo([\'k\' => \'b\']);',
+        Action::Review,
+    ],
+    'a variable in a ternary of an assertion against the variable itself' => [
+        'expect(f())->toBe($c ? $x : 1);',
+        'expect(f())->toBe($x);',
+        Action::Review,
+    ],
+    'a variable in a unary operator of a call against the variable itself' => [
+        'foo(-$x);',
+        'foo($x);',
         Action::Review,
     ],
     'a variable that moves from the key to the value of an assertion map' => [
