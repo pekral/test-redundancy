@@ -481,6 +481,32 @@ it('gives a literal passed straight to a call the position of its argument', fun
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
+    'argument of a call of an array element' => [
+        '($this->actions[\'store\'])(true); ($this->actions[\'store\'])(true); ($actions[0])(1); (self::$actions[\'a\'][\'b\'])(2);',
+        [
+            'function:$actions[0]' => 1,
+            'function:$this->actions[\'store\']' => 2,
+            'function:self::$actions[\'a\'][\'b\']' => 1,
+            'in:function:$actions[0]#0/value:1' => 1,
+            'in:function:$this->actions[\'store\']#0/value:true' => 2,
+            'in:function:self::$actions[\'a\'][\'b\']#0/value:2' => 1,
+            'value:0' => 1,
+            'value:\'a\'' => 1,
+            'value:\'b\'' => 1,
+            'value:\'store\'' => 2,
+        ],
+    ],
+    'argument of a call of an array element whose key the token cannot carry' => [
+        '($actions[\'a/b\'])(true); ($actions[\'a#b\'])(true); ($actions[\'x:assertTrue\'])(true); ($actions[$name])(true);'
+            . ' ($actions[])(true); ($this->{$name}[\'a\'])(true);',
+        [
+            'value:true' => 6,
+            'value:\'a#b\'' => 1,
+            'value:\'a/b\'' => 1,
+            'value:\'a\'' => 1,
+            'value:\'x:assertTrue\'' => 1,
+        ],
+    ],
     'argument of a call of a property' => ['($this->store)(true); ($this->store)(true); ($this?->repository->store)(1); (self::$store)(2);', [
         'function:$this->store' => 2,
         'function:$this?->repository->store' => 1,

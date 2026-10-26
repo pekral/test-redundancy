@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
+  callable held in an array element. Before, a call such as `($this->actions['cleanUp'])('acme')` carried no token, so
+  two identical calls gave the same tokens as one call, and the test with one call was `delete`. Now such a call
+  carries `function:` and the callable as written, e.g. `function:$this->actions['cleanUp']` or `function:$actions[0]`,
+  like the call of a callable held in a property of #103. The fingerprint counts the call, so the candidate is
+  `review`, and its arguments carry a position. The key must be a literal integer or a literal string without `/`, `#`
+  or `:`, because those characters separate the parts of a token. A call through any other key, such as
+  `($this->actions[$name])()` or `($actions['a/b'])()`, still carries no token (#114).
 - A test whose interpolated string has another literal text than its covering test is no longer `delete`. Before,
   the literal parts of an interpolated string carried no token, so `toBe("Hello {$this->user->name}")` and
   `toBe("Hi {$this->user->name}")` had the same tokens, and the candidate was `delete` with an empty `differsBy`. Now
