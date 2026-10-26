@@ -14,6 +14,8 @@ enum Action: string
 
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
+    public const string ADD_ROW_STEP = 'Add a row with the values in differsBy to the dataset of "%s".';
+
     public const string CONFIRM_STEP = 'Confirm that %s together assert the same input and result.';
 
     public const string SHARED_DATASET_STEP = 'This row belongs to the named dataset "%s", which these tests also use: %s. '
@@ -69,7 +71,7 @@ enum Action: string
      * @param list<string> $coveringDiffersBy
      * @return list<string>
      */
-    public function steps(string $coveringTests, array $coveringDiffersBy): array
+    public function steps(string $coveringTests, array $coveringDiffersBy, ?string $coveringDataset = null): array
     {
         return [
             ...match ($this) {
@@ -78,7 +80,7 @@ enum Action: string
                     'Delete this test.',
                 ],
                 self::MergeIntoDataset => [
-                    sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests),
+                    $this->mergeStep($coveringTests, $coveringDataset),
                     'Delete this test.',
                 ],
                 self::ReviewDatasetRow => [
@@ -100,6 +102,13 @@ enum Action: string
             },
             self::VERIFY_STEP,
         ];
+    }
+
+    private function mergeStep(string $coveringTests, ?string $coveringDataset): string
+    {
+        return $coveringDataset === null
+            ? sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests)
+            : sprintf(self::ADD_ROW_STEP, $coveringDataset);
     }
 
 }

@@ -31,6 +31,13 @@ final class TestKey
         return explode(self::DATASET_SEPARATOR, $testCase, 2)[0];
     }
 
+    public static function datasetOf(string $testCase): ?string
+    {
+        $dataset = self::withoutDatasetRow($testCase);
+
+        return $dataset === $testCase ? null : $dataset;
+    }
+
     public static function isDatasetRow(string $testKey): bool
     {
         return str_contains(self::testCase($testKey), self::DATASET_SEPARATOR);

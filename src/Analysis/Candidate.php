@@ -137,6 +137,7 @@ final readonly class Candidate implements JsonSerializable
             ...$this->action()->steps(
                 $this->quoted($coveringTests),
                 $this->otherCoveringTokens(),
+                TestKey::datasetOf($this->coveredBy[0] ?? ''),
             ),
         ];
 
