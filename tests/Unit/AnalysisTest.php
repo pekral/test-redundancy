@@ -4993,6 +4993,30 @@ it('merges into a dataset a test that passes another value where its covering te
         ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
+it('reviews, never deletes, a test that passes a closure where its covering test passes the equal literal', function (
+    string $candidateBody,
+    string $coveringBody,
+    string $closureToken,
+): void {
+    $report = analyzeTestPair($candidateBody, $coveringBody);
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe([$closureToken])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'a closure as the argument of an assertion' => [
+        'expect(f())->toBe(fn () => 1);',
+        'expect(f())->toBe(1);',
+        'in:expect:function:f/call:toBe#0/closure',
+    ],
+    'a closure under a key of an array argument' => [
+        'foo([\'k\' => fn () => 1]);',
+        'foo([\'k\' => 1]);',
+        'in:function:foo#0/value:\'k\'/element:closure',
+    ],
+]);
+
 it('does not delete or merge a test that differs from its covering test only in a cast', function (
     string $candidateBody,
     string $coveringBody,
@@ -5292,6 +5316,14 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         [
             'bound:expect:function:json_encode#0:variable:a/call:toBe#0:fn() => foo()',
             'bound:expect:function:json_encode#0:variable:b/call:toBe#0:fn() => bar()',
+        ],
+    ],
+    'calls that expect operands that hold closures with other calls' => [
+        'expect(g($a))->toBe($c ?? fn () => foo()); expect(g($b))->toBe($c ?? fn () => bar());',
+        'expect(g($a))->toBe($c ?? fn () => bar()); expect(g($b))->toBe($c ?? fn () => foo());',
+        [
+            'bound:expect:function:g#0:variable:a/call:toBe#0:$c ?? fn() => foo()',
+            'bound:expect:function:g#0:variable:b/call:toBe#0:$c ?? fn() => bar()',
         ],
     ],
     'calls that measure other elements' => [

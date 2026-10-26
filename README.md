@@ -587,13 +587,25 @@ test lacks.
   `in:function:store#0/value:'k'/element:closure` and `store([fn () => 1])` has
   `in:function:store#0/value:list-item/element:closure`. A closure that another closure returns carries no token of
   its own. A closure is not data, because a dataset row cannot fill its slot with a literal. A candidate is
-  therefore `review`, and not `merge-into-dataset`, when its covering test passes a closure where the candidate
-  passes a literal, such as `foo('a')` against `foo(fn () => 1)` or `foo(function () { return 1; })`,
-  `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])`, `foo(['a'])` against `foo([fn () => 1])`, or `toBe('a')`
-  against `toBe(fn () => 1)`. The token of the closure is listed in `coveringDiffersBy`. Two tests that pass a closure at the same place carry the
-  same token, so closures that return other values, such as `foo(fn () => 'a')` against `foo(fn () => 1)`, stay
-  `merge-into-dataset`. A closure that a dataset row passes to a parameter of the test is no closure argument of the
-  body: the type of the parameter decides whether a row takes the literal (see *Dataset rows*).
+  therefore `review`, and not `merge-into-dataset`, when its covering test passes a closure that returns another value
+  where the candidate passes a literal, at a place the token covers: an argument of a call, a `new` expression or an
+  assertion, an array key or a list item, or an operand. Such are `foo('a')` against `foo(fn () => 1)` or
+  `foo(function () { return 1; })`, `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])`, `foo(['a'])` against
+  `foo([fn () => 1])`, or `toBe('a')` against `toBe(fn () => 1)`. The token of the closure is listed in
+  `coveringDiffersBy`. Two tests that pass a closure at the same place carry the same token, so closures that return
+  other values, such as `foo(fn () => 'a')` against `foo(fn () => 1)`, stay `merge-into-dataset`. A closure that a
+  dataset row passes to a parameter of the test is no closure argument of the body: the type of the parameter decides
+  whether a row takes the literal (see *Dataset rows*).
+  Two shapes keep their verdict. A literal that equals the value the closure returns, under an array key or in an
+  assertion argument, is still `delete`: `foo(['k' => 1])` against `foo(['k' => fn () => 1])`, or `toBe(1)` against
+  `toBe(fn () => 1)`. A closure in a `match` arm carries no token, so `foo(match ($x) { 1 => 'a' })` against
+  `foo(match ($x) { 1 => fn () => 1 })` is still `merge-into-dataset`.
+  Two shapes are `review` and not `delete`. A candidate that passes a closure where the covering test passes a literal
+  under an array key or in an assertion argument, such as `foo(['k' => fn () => 1])` against `foo(['k' => 1])` or
+  `toBe(fn () => 1)` against `toBe(1)`, is `review`. An argument of an assertion that holds a closure and no literal
+  keeps its source code in a `bound:` token, wherever the closure sits in the argument. So
+  `expect(g($a))->toBe($c ?? fn () => foo()); expect(g($b))->toBe($c ?? fn () => bar());` against the same pair with
+  `foo()` and `bar()` swapped is `review`.
 - **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
   `expect(activeState())` or `assertSame(5, $order->total())`, adds the token `read:` followed by its own token, such
   as `read:function:activeState`, beside the token itself. The token counts how many of the calls are such reads, so
