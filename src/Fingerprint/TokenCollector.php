@@ -22,6 +22,7 @@ use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\InterpolatedStringPart;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
 use PhpParser\NodeFinder;
@@ -130,7 +131,7 @@ final class TokenCollector
     public static function token(Node $node): ?string
     {
         return match (true) {
-            $node instanceof Scalar => self::scalar($node, ''),
+            $node instanceof Scalar, $node instanceof InterpolatedStringPart => self::scalar($node, ''),
             $node instanceof UnaryMinus => $node->expr instanceof Scalar ? self::scalar($node->expr, '-') : null,
             $node instanceof ConstFetch => 'value:' . $node->name->toLowerString(),
             $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
@@ -173,6 +174,7 @@ final class TokenCollector
     public static function carriesContract(Node $node): bool
     {
         return $node instanceof Scalar
+            || $node instanceof InterpolatedStringPart
             || $node instanceof UnaryMinus
             || $node instanceof ConstFetch
             || $node instanceof ClassConstFetch
@@ -376,7 +378,7 @@ final class TokenCollector
             && $node->name->toString() === 'not';
     }
 
-    private static function scalar(Scalar $scalar, string $sign): ?string
+    private static function scalar(Scalar|InterpolatedStringPart $scalar, string $sign): ?string
     {
         $value = property_exists($scalar, 'value') ? $scalar->value : null;
 
