@@ -49,7 +49,8 @@ it('collects every node that carries a contract', function (): void {
         'in:call:Foo::create#8/non-literal',
         'in:call:Foo::create#9/non-literal',
         'in:call:Foo::create#10/non-literal',
-        'in:call:Foo::create#10/operand:variable:value',
+        'in:call:Foo::create#10/operator:unaryminus',
+        'in:call:Foo::create#10/operator:unaryminus#0/operand:variable:value',
     ])->and(TokenCollector::collect(nodes: null))->toBe([]);
 });
 
@@ -626,6 +627,7 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'in:function:store#0/value:list-item' => 1,
         'in:function:store#0/value:true' => 1,
         'in:function:store#1/non-literal' => 1,
+        'in:function:store#1/operator:plus' => 1,
         'value:1' => 1,
         'value:2' => 1,
     ],
@@ -1232,7 +1234,13 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'enum case value in an operator passed to the code under test' => [
         'connect(Status::Active->value . $suffix);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/operand:variable:suffix', 'const:Status::Active->value'],
+        [
+            'function:connect',
+            'in:function:connect#0/non-literal',
+            'in:function:connect#0/operator:concat',
+            'in:function:connect#0/operator:concat#1/operand:variable:suffix',
+            'const:Status::Active->value',
+        ],
     ],
     'nullsafe property passed to the code under test' => [
         'connect($shop?->url);',
@@ -1269,11 +1277,23 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:variable:campaign/property:name', 'value:\'tag_\''],
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/operator:interpolatedstring',
+            'in:function:store#0/operator:interpolatedstring#1/operand:variable:campaign/property:name',
+            'value:\'tag_\'',
+        ],
     ],
     'property joined to a string passed to a PHPUnit assertion' => [
         '$this->assertSame(\'a\' . $x->title, $y);',
-        ['call:assertSame', 'in:call:assertSame#0/operand:variable:x/property:title', 'in:call:assertSame#1/variable:y', 'value:\'a\''],
+        [
+            'call:assertSame',
+            'in:call:assertSame#0/operator:concat',
+            'in:call:assertSame#0/operator:concat#1/operand:variable:x/property:title',
+            'in:call:assertSame#1/variable:y',
+            'value:\'a\'',
+        ],
     ],
     'property of a call result passed to the code under test' => [
         'connect($shop->current()->url);',
@@ -1308,10 +1328,12 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/key:value:\'k\'',
-            'in:function:store#0/value:\'k\'/element:operand:variable:a',
-            'in:function:store#0/value:\'k\'/element:operand:variable:b',
+            'in:function:store#0/value:\'k\'/operator:concat',
+            'in:function:store#0/value:\'k\'/operator:concat#0/element:operand:variable:a',
+            'in:function:store#0/value:\'k\'/operator:concat#1/element:operand:variable:b',
             'in:function:store#1/non-literal',
-            'in:function:store#1/operand:element:variable:rows',
+            'in:function:store#1/operator:concat',
+            'in:function:store#1/operator:concat#0/operand:element:variable:rows',
             'value:0',
             'value:\'x\'',
         ],
@@ -1321,8 +1343,10 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/operand:variable:campaign/property:title',
-            'in:function:store#0/operand:variable:prefix',
+            'in:function:store#0/operator:concat',
+            'in:function:store#0/operator:concat#0/operator:concat',
+            'in:function:store#0/operator:concat#0/operator:concat#0/operand:variable:prefix',
+            'in:function:store#0/operator:concat#0/operator:concat#1/operand:variable:campaign/property:title',
             'value:\'_\'',
         ],
     ],
@@ -1342,7 +1366,13 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'variable inside a short ternary passed to the code under test' => [
         'store($name ?: \'none\');',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/operand:variable:name', 'value:\'none\''],
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/operator:ternary',
+            'in:function:store#0/operator:ternary#0/operand:variable:name',
+            'value:\'none\'',
+        ],
     ],
     'variable passed to a Pest assertion' => [
         'expect(linksOf($account))->toContain($canvaUserId);',
@@ -1363,9 +1393,10 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/operand:variable:this/property:enShop',
-            'in:function:store#0/operand:variable:fallback',
-            'in:function:store#0/operand:variable:primary',
+            'in:function:store#0/operator:ternary',
+            'in:function:store#0/operator:ternary#0/operand:variable:primary',
+            'in:function:store#0/operator:ternary#1/operand:variable:this/property:enShop',
+            'in:function:store#0/operator:ternary#2/operand:variable:fallback',
         ],
     ],
     'variables inside a unary operator passed to the code under test' => [
@@ -1373,13 +1404,17 @@ it('names the variable or the property that an argument of a call or of an asser
         [
             'function:store',
             'in:function:store#0/non-literal',
-            'in:function:store#0/operand:variable:debit',
+            'in:function:store#0/operator:unaryminus',
+            'in:function:store#0/operator:unaryminus#0/operand:variable:debit',
             'in:function:store#1/non-literal',
-            'in:function:store#1/operand:variable:credit',
+            'in:function:store#1/operator:unaryplus',
+            'in:function:store#1/operator:unaryplus#0/operand:variable:credit',
             'in:function:store#2/non-literal',
-            'in:function:store#2/operand:variable:active',
+            'in:function:store#2/operator:booleannot',
+            'in:function:store#2/operator:booleannot#0/operand:variable:active',
             'in:function:store#3/non-literal',
-            'in:function:store#3/operand:variable:mask',
+            'in:function:store#3/operator:bitwisenot',
+            'in:function:store#3/operator:bitwisenot#0/operand:variable:mask',
         ],
     ],
 ]);
@@ -1387,6 +1422,8 @@ it('names the variable or the property that an argument of a call or of an asser
 it('tells an assertion from the code under test by the call a name token belongs to', function (string $token, bool $isAssertion): void {
     expect(TokenCollector::isAssertionToken($token))->toBe($isAssertion);
 })->with([
+    'operator in an argument of an assertion' => ['in:expect:function:f/call:toBe#0/operator:ternary', true],
+    'operator in an argument of the code under test' => ['in:function:store#0/operator:ternary', false],
     'property of an object passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:a/property:id', true],
     'variable passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId', true],
     'variable passed to the code under test whose name starts like an assertion' => ['in:function:store#0/variable:expected', false],

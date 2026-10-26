@@ -402,9 +402,10 @@ test lacks.
   `transfer([$a, $b])`, so `[$a, $b]` and `[$b, $a]`, or `[$a, 1]` and `[1, $a]`, differ and neither is `delete`
   against the other. A property takes part by its name, which names its object too, so `[$a->id, $b->id]` has
   `in:function:transfer#0/items:variable:a/property:id>variable:b/property:id` and is `review`, not `delete`, against
-  `[$b->id, $a->id]`. A non-empty array, and a call or a
+  `[$b->id, $a->id]`. A non-empty array, an operator (see *Argument names*), and a call or a
   `new` expression with arguments, take part by their source code, e.g.
-  `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
+  `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`,
+  `in:function:fullName#0/items:$first . $last>variable:title` for `fullName([$first . $last, $title])`, and
   `items:['id' => 1]>['id' => 2]` for two rows of a dataset. That source code is normalized: the quotes of a string,
   the base of an integer, the case of a constant and a comment do not change it, so `["id" => 0x10]` and
   `['id' => 16]` are the same element. A closure adds nothing. `differsBy` lists an order token only
@@ -457,13 +458,42 @@ test lacks.
   property inside a cast that is the argument carries the position of that argument, so `toBe((string) $campaign->title)`
   has `in:expect:function:resolveUtm/call:toBe#0/variable:campaign/property:title` for
   `expect(resolveUtm($campaign))`. The cast has a token of its own (see *Casts*). Each variable or property inside an operator, a ternary or an interpolated string that is
-  the argument carries the position of that argument and the prefix `operand:`, because the argument holds the name and
-  is not the name. So `toBe('no_segment_tag_' . $campaign->title)` and `toBe("no_segment_tag_{$campaign->title}")` both
-  have `in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title`, and
-  `connect($primary ? $enShop : -$debit)` has `in:function:connect#0/operand:variable:primary`,
-  `in:function:connect#0/operand:variable:enShop` and `in:function:connect#0/operand:variable:debit`. A test that
-  passes `$x` and a test that passes `$x . $y`, `$c ? $x : 1`, `-$x` or `"{$x}"` differ, and neither is `delete`
-  against the other. Each variable or property that is a key or a value of an array that a
+  the argument carries the position of that argument, the place of its operand and the prefix `operand:`, because the
+  argument holds the name and is not the name. The place of an operand is `operator:<kind>#<number>`: the kind of the
+  operator and the number of the operand, counted from 0 from the left. The kind is the name of the operator in lower
+  case, e.g. `plus`, `minus`, `concat`, `coalesce`, `unaryminus`, `booleannot`, `ternary` or `interpolatedstring`. A
+  ternary numbers its condition 0, the value if true 1 and the value if false 2. An interpolated string numbers each of
+  its parts, text and names alike. The operator itself carries `operator:<kind>` at its place. An operator inside an
+  operator adds its own place, outermost first. So `toBe('no_segment_tag_' . $campaign->title)` has
+  `in:expect:function:resolveUtm/call:toBe#0/operator:concat` and
+  `in:expect:function:resolveUtm/call:toBe#0/operator:concat#1/operand:variable:campaign/property:title`,
+  `toBe("no_segment_tag_{$campaign->title}")` has
+  `in:expect:function:resolveUtm/call:toBe#0/operator:interpolatedstring#1/operand:variable:campaign/property:title`,
+  and `connect($primary ? $enShop : -$debit)` has `in:function:connect#0/operator:ternary#0/operand:variable:primary`,
+  `in:function:connect#0/operator:ternary#1/operand:variable:enShop` and
+  `in:function:connect#0/operator:ternary#2/operator:unaryminus#0/operand:variable:debit`. A test that passes `$x` and
+  a test that passes `$x . $y`, `$c ? $x : 1`, `-$x` or `"{$x}"` differ, and neither is `delete` against the other.
+  Two tests whose arguments hold another operator, such as `foo($x + 1)` and `foo($x - 1)`, `foo(!$x)` and
+  `foo(-$x)`, or `foo(1 + 2)` and `foo(1 - 2)`, differ too. So do two tests whose arguments hold the same names at
+  other places, such as `foo($x . $y)` and `foo($y . $x)`, or `toBe($c ? $x : $y)` and `toBe($c ? $y : $x)`, and a
+  test whose operator has fewer operands than the one of its covering test, such as `foo($x . $y)` covered by
+  `foo($x . $y . $z)`. The candidate is `review` in each of these cases. These operators are the binary operators, the
+  ternary, the interpolated string and the unary `-`, `+`, `!` and `~`. A negative number, such as `-5`, is a literal
+  and not an operator. The following shapes are still `delete`:
+  - Literal operands that swap places, such as `foo(1 - 2)` against `foo(2 - 1)`, because a literal operand carries
+    no place (see *Enclosing calls*). A name that changes its place with them, as in `foo($x - 1)` against
+    `foo(1 - $x)`, still differs.
+  - An operator in no argument of a call or an assertion, such as one that a closure returns or one assigned to a
+    variable that the test passes on. It carries no token, so `foo(fn () => $x + 1)` against `foo(fn () => $x - 1)`
+    and `$y = $x + 1; foo($y)` against `$y = $x - 1; foo($y)` are `delete`. An operator in an argument of a call
+    inside a closure carries its token, so `foo(fn () => bar($x + 1))` against `foo(fn () => bar($x - 1))` is
+    `review`.
+  - An operator that only the covering test has, around an argument that carries no name, such as `foo(f())` covered
+    by `foo(f() . 'a')`. Like a name that only the covering test has, it does not turn the candidate into
+    `review`.
+  - An operator that is not in the list above, such as `instanceof`, because it carries no token.
+
+  Each variable or property that is a key or a value of an array that a
   call or an assertion receives, at any depth, carries the position of that argument too, and so does the variable
   that an array element read holds, such as `$row` in `$row['email']`. Such a name has the prefix `element:`, because
   the argument holds the variable and is not the variable. Before the prefix, the name carries its place inside the
@@ -474,8 +504,9 @@ test lacks.
   `.../value:list-item/value:list-item/element:variable:x` and `.../value:'a'/element:variable:x`, while `toBe($x)` has
   `.../variable:x`. A key that is itself a variable or a property names the value under it, so `[$k => $x]` has
   `.../element:variable:k` and `.../variable:k/element:variable:x`. The prefixes `element:` and `operand:` combine in
-  the order the name is reached, so `toBe([$x . $y])` has `.../value:list-item/element:operand:variable:x` and
-  `toBe($rows[0] . 'a')` has `.../operand:element:variable:rows`. So a test that passes `$x` and a test that passes
+  the order the name is reached, so `toBe([$x . $y])` has
+  `.../value:list-item/operator:concat#0/element:operand:variable:x` and `toBe($rows[0] . 'a')` has
+  `.../operator:concat#0/operand:element:variable:rows`. So a test that passes `$x` and a test that passes
   `[$x]` differ, and two tests that hold the same names at other places of one argument, such as
   `['from' => $a, 'to' => $b]` and `['from' => $b, 'to' => $a]`, differ too: neither is `delete` against the other.
   Names that swap places inside a list, such as `[$a, $b]` and `[$b, $a]`, differ by their order tokens (see *Order of
@@ -491,7 +522,7 @@ test lacks.
   `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is still `delete`, as
   `transfer([$a->get(), $b->get()])` against `transfer([$b->get(), $a->get()])` is. Properties that swap places inside
   an operator, a ternary or an interpolated string, such as `transfer($a->id . $b->id)` against
-  `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument. A
+  `transfer($b->id . $a->id)`, differ by the place of each operand, and the candidate is `review`. A
   property whose name is not written out, such as `$a->$field` or `$a->{'id'}`, has no name token, so
   `transfer($a->$field)` against `transfer($b->$field)` is `delete` too. A
   parameter of the test closure or test method carries no name, because each dataset row fills it with another value. A
@@ -513,7 +544,8 @@ test lacks.
   An assertion, such as a Pest expectation (`expect`, `toBe`) or a PHPUnit `assert*` or `expect*` call, is left out
   of the path of a value that reaches it through another call: `expect(add(1, 2))` has the token
   `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`. An operand of an operator, a cast or a closure body
-  keeps no call path: `store(1 + 2)` has the tokens `value:1` and `value:2`. The literal part of an interpolated
+  keeps no call path: `store(1 + 2)` has the tokens `value:1` and `value:2`. The operator itself carries a token at
+  the place of the argument, `in:function:store#0/operator:plus` (see *Argument names*). The literal part of an interpolated
   string keeps no call path either: `store("tag_{$name}")` has the token `value:'tag_'`. A list item keeps the call
   path only as a direct item of an argument: `store([1])` has the token `in:function:store#0/value:1`, but
   `store([[1]])` has `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. So `store([[1]])` does

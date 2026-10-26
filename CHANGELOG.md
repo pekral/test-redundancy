@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test whose argument holds another operator, the same names at other places, or fewer operands than its covering
+  test is no longer `delete`. Before, an operator carried no token and a name inside it carried no place. So
+  `foo($x + 1)` and `foo($x - 1)`, `foo(!$x)` and `foo(-$x)`, `foo(1 + 2)` and `foo(1 - 2)`, `foo($x . $y)` and
+  `foo($y . $x)`, and `toBe($c ? $x : $y)` and `toBe($c ? $y : $x)` had the same tokens, and one of each pair was
+  `delete`. `foo($x . $y)` covered by `foo($x . $y . $z)` was `delete` too. Now an operator in an argument of a call
+  or an assertion carries `operator:<kind>` at its place, e.g. `in:function:foo#0/operator:plus`. A name inside it
+  carries the place of its operand before the prefix `operand:`, e.g.
+  `in:function:foo#0/operator:concat#1/operand:variable:y` for `$y` in `foo($x . $y)`. A ternary numbers its condition
+  0, the value if true 1 and the value if false 2, and an operator inside an operator adds its own place, outermost
+  first. These candidates are `review`. So are properties that swap places inside an operator, such as
+  `transfer($a->id . $b->id)` against `transfer($b->id . $a->id)`. An operator in a list now takes part in the order
+  of the list by its source code, e.g. `in:function:fullName#0/items:$first . $last>variable:title`, so
+  `fullName([$first . $last, $title])` against `fullName([$title, $first . $last])` is `review` too. Four shapes stay
+  `delete`. Literal operands that swap places, such as `foo(1 - 2)` against `foo(2 - 1)`, carry no place. An operator
+  in no argument of a call or an assertion, such as one that a closure returns or one assigned to a variable that the
+  test passes on, carries no token. An operator that only the covering test has, around an argument that carries no name,
+  such as `foo(f())` covered by `foo(f() . 'a')`, does not turn the candidate into `review`, like a name. An operator
+  other than a binary operator, a ternary, an interpolated string or a unary `-`, `+`, `!` or `~`, such as
+  `instanceof`, carries no token (#131).
 - A test that passes or expects the same properties of other or swapped objects as its covering test is no longer
   `delete` when each property with a written-out name is a whole argument, a list element, an array key or value, an
   assertion subject or an expected value. Before, the name token of a property carried no token for its object. So `transfer([$a->id, $b->id])`
@@ -21,11 +40,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `in:function:transfer#0/variable:a/property:id/value:1`. So `transfer([$a->id => 1, $b->id => 2])` against
   `transfer([$a->id => 2, $b->id => 1])` is `merge-into-dataset`, not `delete`. A nullsafe or a static property as the
   subject of an assertion is named the same way, so `$x = $a?->id; expect($x)->toBe(1)` against
-  `$x = $b?->id; expect($x)->toBe(1)` is `review`. Three shapes stay `delete`. A property of an object that has no name,
+  `$x = $b?->id; expect($x)->toBe(1)` is `review`. Two shapes stay `delete`. A property of an object that has no name,
   such as the result of a call in `$a->get()->id` or an element read in `$a['x']->id`, keeps `property:<name>` alone, so
-  `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is `delete`. Properties
-  that swap places inside an operator, a ternary or an interpolated string, such as `transfer($a->id . $b->id)` against
-  `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument.
+  `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is `delete`.
   A property whose name is not written out, such as `$a->$field` or `$a->{'id'}`, has no name token, so
   `transfer($a->$field)` against `transfer($b->$field)` is `delete` too (#130).
 

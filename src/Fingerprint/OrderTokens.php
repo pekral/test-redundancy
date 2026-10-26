@@ -203,7 +203,8 @@ final class OrderTokens
     {
         return ($element instanceof Array_ && $element->items !== [])
             || ($element instanceof CallLike && $element->getRawArgs() !== [])
-            || $element instanceof Cast;
+            || $element instanceof Cast
+            || NonLiteralArguments::isOperator($element);
     }
 
 }

@@ -3091,6 +3091,16 @@ it('keeps a dataset row or a test whose list has its elements in another order t
         'it sums the amounts in descending order',
         ['in:function:total#0/items:new Money(1)>new Money(2)'],
     ],
+    'operators' => [
+        <<<'PHP'
+            <?php
+            it('joins the first name first', fn () => fullName([$first . $last, $title]));
+            it('joins the title first', fn () => fullName([$title, $first . $last]));
+            PHP,
+        'it joins the first name first',
+        'it joins the title first',
+        ['in:function:fullName#0/items:$first . $last>variable:title'],
+    ],
     'static calls with arguments' => [
         <<<'PHP'
             <?php
@@ -4005,7 +4015,7 @@ it('asks for a review of a test that passes another variable or property to the 
                 expect(connect($primary ? $reconnected : $fallback))->toBe(2);
             });
             PHP_SOURCE,
-        ['in:function:connect#0/operand:variable:enShop'],
+        ['in:function:connect#0/operator:ternary#1/operand:variable:enShop'],
     ],
 ]);
 
@@ -4069,7 +4079,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(balanceOf($account))->toBe(-$account->credit);
             });
             PHP_SOURCE,
-        ['in:expect:function:balanceOf/call:toBe#0/operand:variable:account/property:debit'],
+        ['in:expect:function:balanceOf/call:toBe#0/operator:unaryminus#0/operand:variable:account/property:debit'],
     ],
     'another property as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4105,7 +4115,10 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe("tag_{$campaign->name}");
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
+        [
+            'in:expect:function:resolveUtm/call:toBe#0/operator:interpolatedstring#1/operand:variable:campaign/property:title',
+            'value:\'no_segment_tag_\'',
+        ],
     ],
     'another property joined to a string as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4117,7 +4130,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe('tag_' . $campaign->name);
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
+        ['in:expect:function:resolveUtm/call:toBe#0/operator:concat#1/operand:variable:campaign/property:title', 'value:\'no_segment_tag_\''],
     ],
     'variable the covering test expects only negated' => [
         <<<'PHP_SOURCE'
@@ -4157,6 +4170,124 @@ it('asks for a review of a test whose interpolated string has another literal te
         ->and($report->candidates[0]->differsBy)->toBe(['value:\'Hello \''])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
+
+it('asks for a review of a test whose argument has another operator or other places of its operands than its covering test', function (
+    string $source,
+    string ...$differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it covers the plain case' => ['src/Store.php:5'], 'it covers the other case' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'another binary operator' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo($x + 1);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo($x - 1);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:plus',
+        'in:function:foo#0/operator:plus#0/operand:variable:x',
+    ],
+    'another operator between literals' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo(1 + 2);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo(1 - 2);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:plus',
+    ],
+    'another unary operator' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo(!$x);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo(-$x);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:booleannot',
+        'in:function:foo#0/operator:booleannot#0/operand:variable:x',
+    ],
+    'one operand fewer than the covering test' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo($x . $y);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo($x . $y . $z);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:concat#0/operand:variable:x',
+        'in:function:foo#0/operator:concat#1/operand:variable:y',
+    ],
+    'swapped names in an interpolated string' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo("{$x}-{$y}");
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo("{$y}-{$x}");
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:interpolatedstring#0/operand:variable:x',
+        'in:function:foo#0/operator:interpolatedstring#2/operand:variable:y',
+    ],
+    'swapped operands' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                foo($x . $y);
+                expect(true)->toBeTrue();
+            });
+            it('covers the other case', function (): void {
+                foo($y . $x);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE,
+        'in:function:foo#0/operator:concat#0/operand:variable:x',
+        'in:function:foo#0/operator:concat#1/operand:variable:y',
+    ],
+    'swapped ternary branches' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the plain case', function (): void {
+                expect(f())->toBe($c ? $x : $y);
+            });
+            it('covers the other case', function (): void {
+                expect(f())->toBe($c ? $y : $x);
+            });
+            PHP_SOURCE,
+        'in:expect:function:f/call:toBe#0/operator:ternary#1/operand:variable:x',
+        'in:expect:function:f/call:toBe#0/operator:ternary#2/operand:variable:y',
+    ],
+]);
 
 it('asks for a review of a test that passes optional arguments its covering test omits and relies on their defaults', function (
     string $source,
