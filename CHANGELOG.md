@@ -12,11 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   that holds a variable or a property. Before, the key `$subscriber->email` in `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])`
   carried no token, so a candidate with `toBe([])` was `merge-into-dataset`, although a dataset row cannot hold the key.
   Now each variable or property that is a key or a value of an array that an assertion receives, at any depth, carries
-  `variable:` or `property:` at the position of that argument, such as
-  `in:expect:variable:response/call:updatedEmails/call:toBe#0/property:email`. The token is listed in
+  `element:variable:` or `element:property:` at the position of that argument, such as
+  `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:property:email`. The token is listed in
   `coveringDiffersBy`, and the candidate is `review`. The same holds for an array that a call other than an assertion
   receives, such as `store(['key' => $id])`, and for the variable or property that an array element read holds, such as
-  `$row` in `toBe($row['email'])`. An enum case read, such as `Status::Active->value`, stays a value and carries no
+  `$row` in `toBe($row['email'])`. The `element:` prefix keeps such a name apart from the same name passed as the
+  whole argument, so `toBe([$x])` and `toBe($x)` differ, and neither test is `delete` against the other. An enum case read, such as `Status::Active->value`, stays a value and carries no
   name, also inside an operator or a ternary, so a covering test with `connect(Status::Active->value . 'x')` is
   `merge-into-dataset` against `connect('a' . 'x')`, because a dataset row holds the enum value (#116).
 - A test that calls the code under test once is no longer `delete` against a test that calls it twice through a

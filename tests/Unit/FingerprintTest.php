@@ -134,7 +134,7 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     'actual argument without a token' => ['self::assertSame(foo(), $rows[\'id\']);', [
         'call:self::assertSame' => 1,
         'function:foo' => 1,
-        'in:call:self::assertSame#1/variable:rows' => 1,
+        'in:call:self::assertSame#1/element:variable:rows' => 1,
         'read:function:foo' => 1,
         'value:\'id\'' => 1,
     ],
@@ -614,17 +614,17 @@ it('gives a list the number of its items, so a repeated item counts', function (
 })->with([
     'list of one variable read three times' => ['notify([$click, $click, $click]);', [
         'function:notify' => 1,
+        'in:function:notify#0/element:variable:click' => 3,
         'in:function:notify#0/value:list-item' => 3,
-        'in:function:notify#0/variable:click' => 3,
     ],
     ],
     'list that unpacks another array' => [
         'notify([...$clicks, $click]);',
-        ['function:notify' => 1, 'in:function:notify#0/variable:clicks' => 1, 'in:function:notify#0/variable:click' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/element:variable:clicks' => 1, 'in:function:notify#0/element:variable:click' => 1],
     ],
     'map' => [
         'notify([\'a\' => $click]);',
-        ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1, 'in:function:notify#0/variable:click' => 1],
+        ['function:notify' => 1, 'in:function:notify#0/key:value:\'a\'' => 1, 'in:function:notify#0/element:variable:click' => 1],
     ],
 ]);
 
@@ -1102,10 +1102,10 @@ it('gives a non-literal argument of a call that is no assertion the token of its
             'function:store' => 1,
             'in:function:store#0/value:1' => 1,
             'in:function:store#1/const:Size::Large' => 1,
+            'in:function:store#2/element:variable:id' => 1,
             'in:function:store#2/value:list-item' => 1,
-            'in:function:store#2/variable:id' => 1,
+            'in:function:store#3/element:variable:id' => 1,
             'in:function:store#3/key:value:\'key\'' => 1,
-            'in:function:store#3/variable:id' => 1,
             'in:function:store#4/const:Size::Large->value' => 1,
         ],
     ],
@@ -1176,7 +1176,7 @@ it('names the variable or the property that an argument of a call or of an asser
             'expect:function:linksOf/call:toBe',
             'function:expect',
             'function:linksOf',
-            'in:expect:function:linksOf/call:toBe#0/property:email',
+            'in:expect:function:linksOf/call:toBe#0/element:property:email',
             'in:expect:function:linksOf/call:toBe#0/call:email/key:value:\'a\'',
             'in:expect:function:linksOf/call:toBe#0/call:email/value:\'a\'/value:1',
             'read:function:linksOf',
@@ -1224,7 +1224,7 @@ it('names the variable or the property that an argument of a call or of an asser
         '$this->assertSame([\'a\' => [\'b\' => $id]], $result);',
         [
             'call:assertSame',
-            'in:call:assertSame#0/variable:id',
+            'in:call:assertSame#0/element:variable:id',
             'in:call:assertSame#0/key:value:\'a\'',
             'in:call:assertSame#0/value:\'a\'/key:value:\'b\'',
             'in:call:assertSame#1/variable:result',

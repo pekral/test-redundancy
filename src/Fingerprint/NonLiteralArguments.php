@@ -31,7 +31,9 @@ final class NonLiteralArguments
 
     private const string SUFFIX = 'non-literal';
 
-    private const string IDENTITY = '(?:variable|property):[^/]+';
+    private const string ELEMENT_PREFIX = 'element:';
+
+    private const string IDENTITY = '(?:' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
 
     private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
 
@@ -171,7 +173,7 @@ final class NonLiteralArguments
                 static fn (string $suffix): string => NodeContext::pathPrefix($paths, $value) . $suffix,
                 [...($isAssertion || $value instanceof Array_ ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
             ),
-            $callToken === null ? [] : self::nonLiteralValues($call),
+            $callToken === null ? [] : self::tokenizedValues($call),
         ));
     }
 
@@ -184,11 +186,11 @@ final class NonLiteralArguments
         return match (true) {
             $value instanceof BinaryOp => self::namesOfEach([$value->left, $value->right], $parameters),
             $value instanceof InterpolatedString => self::namesOfEach($value->parts, $parameters),
-            $value instanceof Array_ => self::namesOfEach(
+            $value instanceof Array_ => self::elementNames(
                 array_merge([], ...array_map(static fn (ArrayItem $item): array => [$item->key, $item->value], $value->items)),
                 $parameters,
             ),
-            $value instanceof ArrayDimFetch => self::namesOfEach([$value->var, $value->dim], $parameters),
+            $value instanceof ArrayDimFetch => self::elementNames([$value->var, $value->dim], $parameters),
             $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
             $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
                 || $value instanceof BitwiseNot => self::namesOf($value->expr, $parameters),
@@ -196,6 +198,19 @@ final class NonLiteralArguments
             NodeContext::enumCaseReadBy($value) !== null => [],
             default => array_filter([self::identity($value)], is_string(...)),
         };
+    }
+
+    /**
+     * @param array<\PhpParser\Node|null> $values
+     * @param list<string> $parameters
+     * @return list<string>
+     */
+    private static function elementNames(array $values, array $parameters): array
+    {
+        return array_map(
+            static fn (string $name): string => str_starts_with($name, self::ELEMENT_PREFIX) ? $name : self::ELEMENT_PREFIX . $name,
+            self::namesOfEach($values, $parameters),
+        );
     }
 
     /**
@@ -214,7 +229,7 @@ final class NonLiteralArguments
     /**
      * @return list<\PhpParser\Node\Expr>
      */
-    private static function nonLiteralValues(CallLike $call): array
+    private static function tokenizedValues(CallLike $call): array
     {
         $values = array_map(
             static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,

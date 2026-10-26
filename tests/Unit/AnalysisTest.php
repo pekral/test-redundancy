@@ -2845,7 +2845,7 @@ it('keeps a test that passes the same item several times in one list against a t
                 expect($this->cacheManager->claimUnregistered($clicks))->toHaveCount(1);
             });
             PHP,
-        ['in:call:claimUnregistered#0/function:collect#0/variable:click', 'in:call:claimUnregistered#0/function:collect#0/value:list-item'],
+        ['in:call:claimUnregistered#0/function:collect#0/element:variable:click', 'in:call:claimUnregistered#0/function:collect#0/value:list-item'],
         Action::Review,
     ],
 ]);
@@ -3701,7 +3701,7 @@ it('asks for a review of a test whose argument holds a property that the coverin
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
-        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/property:email'])
+        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/element:property:email'])
         ->and(valueAt($json, 'action'))->toBe('review');
 })->with([
     'wrapping call' => [
@@ -4293,17 +4293,17 @@ it('decides on a test whose covering test fills the differing slot of an asserti
     'property as an array key' => [
         '[$subscriber->email => [\'field1\' => \'value1\']]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/property:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:property:email'],
     ],
     'property as an array value' => [
         '[\'email\' => $subscriber->email]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/property:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:property:email'],
     ],
     'variable as an array key' => [
         '[$email => [\'field1\' => \'value1\']]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/variable:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:variable:email'],
     ],
 ]);
 
@@ -4332,6 +4332,16 @@ it('decides on a test by what the covering test passes in the slot that differs'
         ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
         ->and($report->candidates[0]->action())->toBe($action);
 })->with([
+    'an element read of a variable against the variable itself' => [
+        'expect(f())->toBe($rows[0]);',
+        'expect(f())->toBe($rows);',
+        Action::Review,
+    ],
+    'an element read of a variable of a call against the variable itself' => [
+        'foo($map[$key]);',
+        'foo($map);',
+        Action::Review,
+    ],
     'array element in an array of an assertion against an empty array' => [
         'expect(f())->toBe([$row[\'email\'] => 1]);',
         'expect(f())->toBe([]);',
@@ -4350,6 +4360,31 @@ it('decides on a test by what the covering test passes in the slot that differs'
     'array of a call that holds a variable against a literal' => [
         'foo([\'k\' => $x, \'n\' => 1]);',
         'foo([\'k\' => \'lit\', \'n\' => 1]);',
+        Action::Review,
+    ],
+    'a variable against a list that holds the variable in a call' => [
+        'foo($x);',
+        'foo([$x]);',
+        Action::Review,
+    ],
+    'a variable against a list that holds the variable in an assertion' => [
+        'expect(f())->toBe($x);',
+        'expect(f())->toBe([$x]);',
+        Action::Review,
+    ],
+    'a variable against an element read of the variable' => [
+        'expect(f())->toBe($rows);',
+        'expect(f())->toBe($rows[0]);',
+        Action::Review,
+    ],
+    'a variable as the key of a map against the variable itself' => [
+        'expect(f())->toBe([$x => 1]);',
+        'expect(f())->toBe($x);',
+        Action::Review,
+    ],
+    'a variable in a list against the variable itself' => [
+        'expect(f())->toBe([$x]);',
+        'expect(f())->toBe($x);',
         Action::Review,
     ],
     'enum case value in an operator against a literal' => [
