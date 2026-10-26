@@ -11,6 +11,7 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\Cast;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\PropertyFetch;
@@ -139,6 +140,10 @@ final class NodeContext
      */
     public static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
     {
+        if ($value instanceof Cast) {
+            return [...self::valueIds($value), ...self::argumentValueIds($value->expr, $isAssertion, $isArgument)];
+        }
+
         $passedItems = match (true) {
             $value instanceof Array_ => array_filter(
                 $value->items,
