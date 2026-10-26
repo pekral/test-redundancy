@@ -25,27 +25,28 @@ final readonly class RedundancyAnalyzer
         $analyzedTests = array_filter(array_merge([], ...array_values($testsByFile)), static fn (array $lines): bool => $lines !== []);
         $fixedTests = $this->fixedTests($analyzedTests, $testsByFile, $map);
         $eliminated = $this->eliminate($analyzedTests, $fixedTests);
-        $equalRows = $this->rowsOfAnEqualStandaloneTest(
-            $eliminated,
-            $analyzedTests,
-            [...array_diff_key($analyzedTests, $eliminated), ...$fixedTests],
-        );
+        $equalRows = $this->rowsOfAnEqualStandaloneTest($eliminated, $analyzedTests, $fixedTests);
         $removed = array_diff_key($eliminated, array_flip($equalRows));
         $pool = [...array_diff_key($analyzedTests, $removed), ...$fixedTests];
+        $coverings = $this->coverings($removed, $analyzedTests, $pool, $equalRows);
         $reports = [];
 
         foreach ($testsByFile as $testFile => $tests) {
             $candidates = [];
 
             foreach (array_keys(array_intersect_key($removed, $tests)) as $testKey) {
-                $coverPool = $this->coverPool($testKey, $analyzedTests, $removed, $pool);
                 $candidates[] = $this->candidate(
                     $testKey,
                     $testFile,
-                    $tests[$testKey],
-                    isset($equalRows[$testKey]) ? [$equalRows[$testKey]] : $this->coveredBy($testKey, $tests[$testKey], $coverPool, $pool),
-                    $coverPool,
-                    equalRow: isset($equalRows[$testKey]),
+                    $coverings[$testKey],
+                    isset($equalRows[$testKey])
+                        ? []
+                        : $this->unionOnlyLines(
+                            $testKey,
+                            $tests[$testKey],
+                            $coverings[$testKey],
+                            $this->coverPool($testKey, $analyzedTests, $removed, $pool),
+                        ),
                 );
             }
 
@@ -56,21 +57,35 @@ final readonly class RedundancyAnalyzer
     }
 
     /**
-     * @param array<string, true> $lines
-     * @param list<string> $coveredBy
-     * @param array<string, array<string, true>> $coverPool
+     * @param array<string, true> $removed
+     * @param array<string, array<string, true>> $analyzedTests
+     * @param array<string, array<string, true>> $pool
+     * @param array<string, string> $equalRows
+     * @return array<string, list<string>>
      */
-    private function candidate(string $testKey, string $file, array $lines, array $coveredBy, array $coverPool, bool $equalRow): Candidate
+    private function coverings(array $removed, array $analyzedTests, array $pool, array $equalRows): array
     {
-        $differsBy = $this->fingerprints->difference($testKey, $coveredBy);
-        $unionOnlyLines = $differsBy === [] && !$equalRow
-            ? $this->linesOnlyTheUnionReaches($testKey, $lines, $coveredBy, $coverPool)
-            : [];
+        $coverings = [];
 
+        foreach (array_keys($removed) as $testKey) {
+            $coverings[$testKey] = isset($equalRows[$testKey])
+                ? [$equalRows[$testKey]]
+                : $this->coveredBy($testKey, $analyzedTests[$testKey], $this->coverPool($testKey, $analyzedTests, $removed, $pool), $pool);
+        }
+
+        return $coverings;
+    }
+
+    /**
+     * @param list<string> $coveredBy
+     * @param list<string> $unionOnlyLines
+     */
+    private function candidate(string $testKey, string $file, array $coveredBy, array $unionOnlyLines): Candidate
+    {
         return new Candidate(
             $testKey,
             array_map(static fn (string $covering): string => self::display($covering, $file), $coveredBy),
-            $differsBy,
+            $this->fingerprints->difference($testKey, $coveredBy),
             $this->fingerprints->coveringDifference($testKey, $coveredBy),
             $unionOnlyLines,
             $this->fingerprints->assertsNothing($testKey),
@@ -78,6 +93,19 @@ final readonly class RedundancyAnalyzer
             $this->fingerprints->datasetParameters($testKey, $coveredBy),
             $this->fingerprints->omittedArguments($testKey, $coveredBy),
         );
+    }
+
+    /**
+     * @param array<string, true> $lines
+     * @param list<string> $coveredBy
+     * @param array<string, array<string, true>> $coverPool
+     * @return list<string>
+     */
+    private function unionOnlyLines(string $testKey, array $lines, array $coveredBy, array $coverPool): array
+    {
+        return $this->fingerprints->difference($testKey, $coveredBy) === []
+            ? $this->linesOnlyTheUnionReaches($testKey, $lines, $coveredBy, $coverPool)
+            : [];
     }
 
     /**
@@ -129,11 +157,12 @@ final readonly class RedundancyAnalyzer
     /**
      * @param array<string, true> $removed
      * @param array<string, array<string, true>> $analyzedTests
-     * @param array<string, array<string, true>> $pool
+     * @param array<string, array<string, true>> $fixedTests
      * @return array<string, string>
      */
-    private function rowsOfAnEqualStandaloneTest(array $removed, array $analyzedTests, array $pool): array
+    private function rowsOfAnEqualStandaloneTest(array $removed, array $analyzedTests, array $fixedTests): array
     {
+        $pool = [...array_diff_key($analyzedTests, $removed), ...$fixedTests];
         $equalRows = [];
 
         foreach (array_filter(array_keys($removed), TestKey::isDatasetRow(...)) as $rowKey) {
@@ -145,6 +174,7 @@ final readonly class RedundancyAnalyzer
             );
 
             if (count($coveredBy) === 1
+                && isset($removed[$coveredBy[0]])
                 && !TestKey::isDatasetRow($coveredBy[0])
                 && $this->fingerprints->difference($coveredBy[0], [$rowKey]) === []
             ) {

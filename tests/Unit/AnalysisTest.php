@@ -4603,7 +4603,7 @@ it('deletes a test whose values equal a row of the covering dataset and keeps th
         ]);
 });
 
-it('keeps the first of two dataset rows that equal a test and covers the other by it', function (): void {
+it('covers a dataset row by an equal sibling row and keeps that sibling for the equal standalone test', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -4631,4 +4631,31 @@ it('keeps the first of two dataset rows that equal a test and covers the other b
         ->and($report->candidates[0]->coveredBy)->toBe(['it runs for any shape › blank domain name'])
         ->and($report->candidates[1]->action())->toBe(Action::Delete)
         ->and($report->candidates[1]->coveredBy)->toBe(['it runs for any shape › blank domain name']);
+});
+
+it('reports a dataset row covered by a kept standalone test that runs a line of its own', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with([
+                'basic domain' => ['example.com'],
+                'empty domain name' => [''],
+            ]);
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it runs for any shape › empty domain name' => ['src/D.php:5'],
+            'it notifies nobody when empty' => ['src/D.php:5', 'src/D.php:6'],
+            'it runs for any shape › basic domain' => ['src/D.php:5', 'src/D.php:7'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it runs for any shape › empty domain name')
+        ->and($report->candidates[0]->action())->toBe(Action::Delete)
+        ->and($report->candidates[0]->coveredBy)->toBe(['it notifies nobody when empty']);
 });
