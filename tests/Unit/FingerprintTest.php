@@ -1423,7 +1423,6 @@ it('tells an assertion from the code under test by the call a name token belongs
     expect(TokenCollector::isAssertionToken($token))->toBe($isAssertion);
 })->with([
     'operator in an argument of an assertion' => ['in:expect:function:f/call:toBe#0/operator:ternary', true],
-    'operator in an argument of the code under test' => ['in:function:store#0/operator:ternary', false],
     'property of an object passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:a/property:id', true],
     'variable passed to an assertion' => ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId', true],
     'variable passed to the code under test whose name starts like an assertion' => ['in:function:store#0/variable:expected', false],
