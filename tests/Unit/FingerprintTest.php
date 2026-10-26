@@ -978,6 +978,12 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
         );
 });
 
+it('fingerprints a first-class-callable throws() as the bare call', function (): void {
+    $fingerprints = fingerprintsOf('<?php test(\'rejects\', function (): void { fail(); })->throws(...);');
+
+    expect($fingerprints['rejects'])->toBe(['function:fail' => 1, 'call:throws' => 1]);
+});
+
 it('fingerprints PHPUnit tests and their data providers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php
