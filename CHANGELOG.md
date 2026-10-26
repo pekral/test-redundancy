@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-26
+
 ### Changed
 
 - Each argument of a Pest `->throws()`, `->throwsIf()` or `->throwsUnless()` now carries the token
@@ -689,7 +691,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.7...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.8...HEAD
+[0.1.8]: https://github.com/pekral/test-redundancy/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/pekral/test-redundancy/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/pekral/test-redundancy/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/pekral/test-redundancy/compare/0.1.4...0.1.5
