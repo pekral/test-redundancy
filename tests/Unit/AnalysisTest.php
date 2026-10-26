@@ -4329,6 +4329,58 @@ it('asks for a review of a test whose argument has another operator or other pla
     ],
 ]);
 
+it('asks for a review of a test that spreads an argument its covering test passes plain, or the other way round', function (
+    string $candidateStatement,
+    string $coveringStatement,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('a', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            it('b', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE, $candidateStatement, $coveringStatement),
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5']],
+    );
+
+    expect(array_map(
+        static fn (Candidate $candidate): array => [$candidate->testCase(), $candidate->differsBy, $candidate->action()],
+        $report->candidates,
+    ))->toBe([['it a', $differsBy, Action::Review]]);
+})->with([
+    'a plain variable' => [
+        'foo($x);',
+        'foo(...$x);',
+        ['in:function:foo#0/variable:x'],
+    ],
+    'a spread call' => [
+        'foo(...f());',
+        'foo(f());',
+        ['in:function:foo#0/operator:spread'],
+    ],
+    'a spread constant' => [
+        'foo(...Foo::ITEMS);',
+        'foo(Foo::ITEMS);',
+        ['in:function:foo#0/operator:spread', 'in:function:foo#0/operator:spread#0/const:Foo::ITEMS'],
+    ],
+    'a spread list' => [
+        'foo(...[1, 2]);',
+        'foo([1, 2]);',
+        ['in:function:foo#0/operator:spread'],
+    ],
+    'a spread variable' => [
+        'foo(...$x);',
+        'foo($x);',
+        ['in:function:foo#0/operator:spread', 'in:function:foo#0/operator:spread#0/operand:variable:x'],
+    ],
+]);
+
 it('asks to merge a test whose literal operands its covering test passes at swapped places', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP_SOURCE'

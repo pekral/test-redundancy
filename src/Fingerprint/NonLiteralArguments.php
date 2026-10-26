@@ -38,6 +38,8 @@ final class NonLiteralArguments
 
     private const string OPERATOR_PREFIX = 'operator:';
 
+    private const string SPREAD = 'spread';
+
     private const string KIND = '(?:' . self::ELEMENT_PREFIX . '|' . self::OPERAND_PREFIX . ')';
 
     private const string NAME = '(?:variable|property):[^/]+(?:/property:[^/]+)*';
@@ -205,11 +207,16 @@ final class NonLiteralArguments
         $isAssertion = $callToken !== null && TokenCollector::isAssertionToken($callToken);
 
         return array_merge([], ...array_map(
-            static fn (Expr $value): array => array_map(
-                static fn (string $suffix): string => NodeContext::pathPrefix($paths, $value) . $suffix,
-                [...($isAssertion || $value instanceof Array_ ? [] : [self::SUFFIX]), ...self::namesOf($value, $parameters)],
+            static fn (Arg $argument): array => array_map(
+                static fn (string $suffix): string => NodeContext::pathPrefix($paths, $argument->value) . $suffix,
+                [
+                    ...($isAssertion || !self::isNonLiteral($argument->value) ? [] : [self::SUFFIX]),
+                    ...($argument->unpack
+                        ? self::operatorNames(self::SPREAD, [$argument->value], $parameters)
+                        : self::namesOf($argument->value, $parameters)),
+                ],
             ),
-            $callToken === null ? [] : self::tokenizedValues($call),
+            $callToken === null ? [] : self::tokenizedArguments($call),
         ));
     }
 
@@ -222,7 +229,7 @@ final class NonLiteralArguments
         $operands = self::operandsOf($value);
 
         return match (true) {
-            $operands !== null => self::operatorNames($value, $operands, $parameters),
+            $operands !== null => self::operatorNames(NodeContext::kindOf($value), $operands, $parameters),
             $value instanceof Array_ => array_merge([], ...array_map(
                 static fn (ArrayItem $item): array => [
                     ...self::kindedNames(self::ELEMENT_PREFIX, [$item->key], $parameters),
@@ -276,9 +283,9 @@ final class NonLiteralArguments
      * @param list<string> $parameters
      * @return list<string>
      */
-    private static function operatorNames(Expr $operator, array $operands, array $parameters): array
+    private static function operatorNames(string $kind, array $operands, array $parameters): array
     {
-        $token = self::OPERATOR_PREFIX . NodeContext::kindOf($operator);
+        $token = self::OPERATOR_PREFIX . $kind;
 
         return array_merge([$token], ...array_map(
             static fn (int $place, ?Node $operand): array => self::placed($token . '#' . $place, self::operandNames($operand, $parameters)),
@@ -339,18 +346,14 @@ final class NonLiteralArguments
     }
 
     /**
-     * @return list<\PhpParser\Node\Expr>
+     * @return list<\PhpParser\Node\Arg>
      */
-    private static function tokenizedValues(CallLike $call): array
+    private static function tokenizedArguments(CallLike $call): array
     {
-        $values = array_map(
-            static fn (Node $argument): ?Expr => $argument instanceof Arg ? $argument->value : null,
-            $call->getRawArgs(),
-        );
-
         return array_values(array_filter(
-            $values,
-            static fn (?Expr $value): bool => $value !== null && (self::isNonLiteral($value) || $value instanceof Array_),
+            $call->getRawArgs(),
+            static fn (Node $argument): bool => $argument instanceof Arg
+                && ($argument->unpack || self::isNonLiteral($argument->value) || $argument->value instanceof Array_),
         ));
     }
 

@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that spreads a variable or a property where its covering test passes it plain, or the other way round, is no
+  longer `delete`. Before, a spread argument carried the same tokens as the plain argument, so `foo(...$x)` and
+  `foo($x)` had the same tokens, and one of them was `delete`. Now the spread of an argument of a call or an assertion
+  is the operator `spread` with the spread value as operand 0, e.g. `in:function:foo#0/operator:spread` and
+  `in:function:foo#0/operator:spread#0/operand:variable:x` for `foo(...$x)`. A test that spreads a call, a list or a
+  constant, such as `foo(...f())`, `foo(...[1, 2])` or `foo(...Foo::ITEMS)`, covered by the test that passes it plain
+  is `review` too. Two shapes stay `delete`. A test that passes plain an argument that carries no name, such as
+  `foo(f())`, `foo([1, 2])` or `foo(Foo::ITEMS)`, covered by the test that spreads it, because a spread that only the
+  covering test has does not turn the candidate into `review`, like any other operator. A spread inside a list, such
+  as `foo([...$x, ...$y])` against `foo([...$y, ...$x])`, carries no token (#132).
 - A test whose argument holds another operator, the same names at other places, or fewer operands than its covering
   test is no longer `delete`. Before, an operator carried no token and a name inside it carried no place. So
   `foo($x + 1)` and `foo($x - 1)`, `foo(!$x)` and `foo(-$x)`, `foo(1 + 2)` and `foo(1 - 2)`, `foo($x . $y)` and
