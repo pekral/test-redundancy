@@ -353,12 +353,14 @@ test lacks.
   - A closure or an arrow function stands for the value it returns, so `expect(fn () => import(1))->toThrow(A::class)`
     has the subject `function:import`. The value a closure returns is the expression of each of its own `return`
     statements, and not of a `return` statement in a closure or a function nested in it.
-  - A literal, a constant and any other expression that carries no token, such as the element read `$r['a']`, give
-    no prefix to the token of the assertion, which keeps e.g. `call:toBe`. When a test has two or more assertions with
-    different such subjects, each argument of these assertions carries its subject in its path: a literal or a
-    constant by its token, any other expression by its source code. `expect('5')->toBe(5)` next to
-    `expect('6')->toBe(6)` has `in:expect:value:'5'/call:toBe#0/value:5`, and `expect($r['a'])->toBe(1)` next to
-    `expect($r['b'])->toBe(2)` has `in:expect:$r['a']/call:toBe#0/value:1`. So a test that pairs the same subjects
+  - A literal, a constant and any other expression that carries no token, such as the element read `$r['a']`, a list,
+    a map or the enum case read `Status::A->value`, give no prefix to the token of the assertion, which keeps e.g.
+    `call:toBe`. When a test has two or more assertions with different such subjects, each argument of these
+    assertions carries its subject in its path: a literal, a constant or an empty array by its token, any other
+    expression by its source code. `expect('5')->toBe(5)` next to `expect('6')->toBe(6)` has
+    `in:expect:value:'5'/call:toBe#0/value:5`, `expect($r['a'])->toBe(1)` next to `expect($r['b'])->toBe(2)` has
+    `in:expect:$r['a']/call:toBe#0/value:1`, and `expect([1])->toBe(3)` next to `expect([2])->toBe(4)` has
+    `in:expect:[1]/call:toBe#0/value:3`. So a test that pairs the same subjects
     with swapped values is `merge-into-dataset`, not `delete`. A test with one such subject keeps
     `in:call:toBe#0/value:5`. A test with two or more such subjects is `review`, not `merge-into-dataset`, against a
     covering test that asserts other such subjects, because each subject is a place of its own.
