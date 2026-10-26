@@ -234,7 +234,8 @@ already lists does not count, because a row replaces the whole value. For exampl
 `in:function:dispatchBulkStep#0/property:name` for `dispatchBulkStep($account->name)` against
 `dispatchBulkStep('happypet')`, a row with the values in `differsBy` would still pass that variable or property, so the
 case of the candidate would be lost: the name tokens (see *Argument names*) are listed in `coveringDiffersBy` and the
-action is `review`. When that test passes an argument at a position where `differsBy` lists no value, such as
+action is `review`. A name token or a `non-literal` token is never data, also when its path crosses the key of an
+array, such as `in:function:foo#0/value:'k'/function:bar#0/variable:x` for `foo(['k' => bar($x)])`. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
 pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
 action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
@@ -447,10 +448,17 @@ test lacks.
   `in:function:connect#0/variable:debit`. Each variable or property that is a key or a value of an array that a
   call or an assertion receives, at any depth, carries the position of that argument too, and so does the variable
   that an array element read holds, such as `$row` in `$row['email']`. Such a name has the prefix `element:`, because
-  the argument holds the variable and is not the variable: `toBe([$x])` and `toBe($rows[0])` have
-  `in:expect:function:f/call:toBe#0/element:variable:x` and `.../element:variable:rows`, while `toBe($x)` has
-  `.../variable:x`. So a test that passes `$x` and a test that passes `[$x]` differ, and neither is `delete` against
-  the other. `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
+  the argument holds the variable and is not the variable. Before the prefix, the name carries its place inside the
+  argument: the key of each array it sits under, written as in the path of a value (see *Array keys and values*), or
+  `value:list-item` for an element of a list. A key, and the variable that an element read holds, take the place of
+  their array or element read. `toBe($rows[0])`, `toBe([$x])`, `toBe([[$x]])` and `toBe(['a' => $x])` have
+  `in:expect:function:f/call:toBe#0/element:variable:rows`, `.../value:list-item/element:variable:x`,
+  `.../value:list-item/value:list-item/element:variable:x` and `.../value:'a'/element:variable:x`, while `toBe($x)` has
+  `.../variable:x`. A key that is itself a variable or a property names the value under it, so `[$k => $x]` has
+  `.../element:variable:k` and `.../variable:k/element:variable:x`. So a test that passes `$x` and a test that passes
+  `[$x]` differ, and two tests that hold the same names at other places of one argument, such as
+  `['from' => $a, 'to' => $b]` and `['from' => $b, 'to' => $a]`, differ too: neither is `delete` against the other.
+  `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
   `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:property:email`. A candidate with `toBe([])` is
   then `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. So two tests that pass or expect different
   variables or properties differ in `differsBy`, and the candidate is `review`. A property is named without its

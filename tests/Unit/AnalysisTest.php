@@ -2881,7 +2881,10 @@ it('keeps a test that passes the same item several times in one list against a t
                 expect($this->cacheManager->claimUnregistered($clicks))->toHaveCount(1);
             });
             PHP,
-        ['in:call:claimUnregistered#0/function:collect#0/element:variable:click', 'in:call:claimUnregistered#0/function:collect#0/value:list-item'],
+        [
+            'in:call:claimUnregistered#0/function:collect#0/value:list-item/element:variable:click',
+            'in:call:claimUnregistered#0/function:collect#0/value:list-item',
+        ],
         Action::Review,
     ],
 ]);
@@ -3737,7 +3740,7 @@ it('asks for a review of a test whose argument holds a property that the coverin
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it covers the plain case')
-        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/element:property:email'])
+        ->and(valueAt($json, 'differsBy'))->toBe(['in:function:keepSubscribed#0/function:collect#0/value:list-item/element:property:email'])
         ->and(valueAt($json, 'action'))->toBe('review');
 })->with([
     'wrapping call' => [
@@ -4334,7 +4337,7 @@ it('decides on a test whose covering test fills the differing slot of an asserti
     'property as an array value' => [
         '[\'email\' => $subscriber->email]',
         Action::Review,
-        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/element:property:email'],
+        ['in:expect:variable:response/call:getUpdatedEmailsWithCustomFields/call:toBe#0/value:\'email\'/element:property:email'],
     ],
     'variable as an array key' => [
         '[$email => [\'field1\' => \'value1\']]',
@@ -4368,6 +4371,21 @@ it('decides on a test by what the covering test passes in the slot that differs'
         ->and($report->candidates[0]->testCase())->toBe('it covers the plain case')
         ->and($report->candidates[0]->action())->toBe($action);
 })->with([
+    'a closure under a key of a call against a literal that the covering test passes' => [
+        'foo([\'k\' => bar(\'a\')]);',
+        'foo([\'k\' => bar(fn () => 1)]);',
+        Action::Review,
+    ],
+    'a list that holds a variable under a key of a call against an empty list' => [
+        'foo([\'k\' => bar([$x])]);',
+        'foo([\'k\' => bar([])]);',
+        Action::Review,
+    ],
+    'an element read of a variable against a list that holds the variable' => [
+        'expect(f())->toBe($x[0]);',
+        'expect(f())->toBe([$x]);',
+        Action::Review,
+    ],
     'an element read of a variable against the variable itself' => [
         'expect(f())->toBe($rows[0]);',
         'expect(f())->toBe($rows);',
@@ -4376,6 +4394,16 @@ it('decides on a test by what the covering test passes in the slot that differs'
     'an element read of a variable of a call against the variable itself' => [
         'foo($map[$key]);',
         'foo($map);',
+        Action::Review,
+    ],
+    'an element read under a key of a call against a literal' => [
+        'foo([\'k\' => bar($r[\'a\'])]);',
+        'foo([\'k\' => bar(\'a\')]);',
+        Action::Review,
+    ],
+    'a property that moves from the key to the value of an assertion map' => [
+        'expect(f())->toBe([$a->id => \'x\']);',
+        'expect(f())->toBe([\'x\' => $a->id]);',
         Action::Review,
     ],
     'array element in an array of an assertion against an empty array' => [
@@ -4418,9 +4446,29 @@ it('decides on a test by what the covering test passes in the slot that differs'
         'expect(f())->toBe($x);',
         Action::Review,
     ],
+    'a variable in a list against the variable in a nested list' => [
+        'expect(f())->toBe([$x]);',
+        'expect(f())->toBe([[$x]]);',
+        Action::Review,
+    ],
     'a variable in a list against the variable itself' => [
         'expect(f())->toBe([$x]);',
         'expect(f())->toBe($x);',
+        Action::Review,
+    ],
+    'a variable that moves from the key to the value of an assertion map' => [
+        'expect(f())->toBe([$x => 1]);',
+        'expect(f())->toBe([1 => $x]);',
+        Action::Review,
+    ],
+    'a variable that moves to another key of an assertion map' => [
+        'expect(f())->toBe([\'a\' => $x, \'b\' => 1]);',
+        'expect(f())->toBe([\'a\' => 1, \'b\' => $x]);',
+        Action::Review,
+    ],
+    'a variable under a key of a call against a literal' => [
+        'foo([\'k\' => bar($x)]);',
+        'foo([\'k\' => bar(\'a\')]);',
         Action::Review,
     ],
     'enum case value in an operator against a literal' => [
@@ -4431,6 +4479,21 @@ it('decides on a test by what the covering test passes in the slot that differs'
     'enum case value in an operator against a runtime property' => [
         'foo($order->value . \'x\');',
         'foo(Status::Active->value . \'x\');',
+        Action::Review,
+    ],
+    'two variables that swap the key and the value of a map of a call' => [
+        'foo([$k => $x]);',
+        'foo([$x => $k]);',
+        Action::Review,
+    ],
+    'two variables that swap the keys of a map of a call' => [
+        'transfer([\'from\' => $a, \'to\' => $b]);',
+        'transfer([\'from\' => $b, \'to\' => $a]);',
+        Action::Review,
+    ],
+    'two variables that swap the keys of an assertion map' => [
+        'expect(f())->toBe([\'from\' => $a, \'to\' => $b]);',
+        'expect(f())->toBe([\'from\' => $b, \'to\' => $a]);',
         Action::Review,
     ],
 ]);

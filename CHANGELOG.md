@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test whose covering test holds a variable or a property at another place inside the same argument is no longer
+  `merge-into-dataset` or `delete`. Before, a name inside an array carried only the place of the argument, so
+  `toBe(['a' => $x, 'b' => 1])` and `toBe(['a' => 1, 'b' => $x])` had the same name token, the candidate was
+  `merge-into-dataset`, and `transfer(['from' => $a, 'to' => $b])` against `transfer(['from' => $b, 'to' => $a])`
+  was `delete`. Now the name also carries its place inside the argument: the key of each array it sits under, or
+  `value:list-item` for an element of a list, e.g. `in:expect:function:f/call:toBe#0/value:'a'/element:variable:x`. A
+  key that is a variable or a property names the value under it, e.g. `.../variable:k/element:variable:x` for
+  `[$k => $x]`. These candidates are `review`. A name token or a `non-literal` token whose path crosses the key of an
+  array, such as `in:function:foo#0/value:'k'/function:bar#0/variable:x` for `foo(['k' => bar($x)])`, is no longer
+  read as data, so it is listed in `coveringDiffersBy` and the candidate against `foo(['k' => bar('a')])` is
+  `review`, not `merge-into-dataset` (#122).
 - A test that calls the code under test once is no longer `delete` against a test that calls it twice through a
   callable held in a class constant. Before, a call such as `(self::HANDLER)('acme')` or
   `(Actions::ALL['cleanUp'])('acme')` carried no token, so two identical calls gave the same tokens as one call, and the
