@@ -33,7 +33,11 @@ final class NonLiteralArguments
 
     private const string ELEMENT_PREFIX = 'element:';
 
-    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
+    private const string OPERAND_PREFIX = 'operand:';
+
+    private const string KIND = '(?:' . self::ELEMENT_PREFIX . '|' . self::OPERAND_PREFIX . ')';
+
+    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::KIND . '+)?(?:variable|property):[^/]+';
 
     private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
 
@@ -189,19 +193,20 @@ final class NonLiteralArguments
     private static function namesOf(Expr $value, array $parameters): array
     {
         return match (true) {
-            $value instanceof BinaryOp => self::namesOfEach([$value->left, $value->right], $parameters),
-            $value instanceof InterpolatedString => self::namesOfEach($value->parts, $parameters),
+            $value instanceof BinaryOp => self::kindedNames(self::OPERAND_PREFIX, [$value->left, $value->right], $parameters),
+            $value instanceof InterpolatedString => self::kindedNames(self::OPERAND_PREFIX, $value->parts, $parameters),
             $value instanceof Array_ => array_merge([], ...array_map(
                 static fn (ArrayItem $item): array => [
-                    ...self::elementNames([$item->key], $parameters),
-                    ...self::placed(self::itemPosition($item), self::elementNames([$item->value], $parameters)),
+                    ...self::kindedNames(self::ELEMENT_PREFIX, [$item->key], $parameters),
+                    ...self::placed(self::itemPosition($item), self::kindedNames(self::ELEMENT_PREFIX, [$item->value], $parameters)),
                 ],
                 $value->items,
             )),
-            $value instanceof ArrayDimFetch => self::elementNames([$value->var, $value->dim], $parameters),
-            $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
-            $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
-                || $value instanceof BitwiseNot => self::namesOf($value->expr, $parameters),
+            $value instanceof ArrayDimFetch => self::kindedNames(self::ELEMENT_PREFIX, [$value->var, $value->dim], $parameters),
+            $value instanceof Ternary => self::kindedNames(self::OPERAND_PREFIX, [$value->cond, $value->if, $value->else], $parameters),
+            $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
+                || $value instanceof BitwiseNot => self::kindedNames(self::OPERAND_PREFIX, [$value->expr], $parameters),
+            $value instanceof Cast => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
             NodeContext::enumCaseReadBy($value) !== null => [],
             default => array_filter([self::identity($value)], is_string(...)),
@@ -213,10 +218,15 @@ final class NonLiteralArguments
      * @param list<string> $parameters
      * @return list<string>
      */
-    private static function elementNames(array $values, array $parameters): array
+    private static function kindedNames(string $kind, array $values, array $parameters): array
     {
         return array_map(
-            static fn (string $name): string => str_contains($name, self::ELEMENT_PREFIX) ? $name : self::ELEMENT_PREFIX . $name,
+            static function (string $name) use ($kind): string {
+                $steps = explode('/', $name);
+                $identity = array_pop($steps);
+
+                return str_contains($identity, $kind) ? $name : implode('/', [...$steps, $kind . $identity]);
+            },
             self::namesOfEach($values, $parameters),
         );
     }

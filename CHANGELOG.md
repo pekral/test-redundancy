@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test is no longer `delete` or `merge-into-dataset` when one of the two tests holds a variable or a property
+  inside an operator, a ternary or an interpolated string and the other passes the name as the whole argument. Before, a
+  name inside such an argument carried the same token as the name passed alone, e.g.
+  `in:function:foo#0/variable:x` for both `foo($x . $y)` and `foo($x)`, so `foo($x)` was `delete` against
+  `foo($x . $y)`, `expect(f())->toBe($x)` was `delete` against `expect(f())->toBe($c ? $x : 1)`, and
+  `expect(f())->toBe($x . 'a')` was `merge-into-dataset` against `expect(f())->toBe($x)`. Now such a name has the
+  prefix `operand:`, e.g. `in:function:foo#0/operand:variable:x`, also inside a unary operator such as `-$x` or `!$x`,
+  and these candidates are `review`. The prefix combines with `element:` in the order the name is reached, so
+  `foo([$x . $y])` has `in:function:foo#0/value:list-item/element:operand:variable:x` and is no longer `delete`
+  against `foo([$x])`. A name inside a cast keeps its token, because the cast carries a token of its own (#123).
 - A test whose covering test holds a variable or a property at another place inside the same argument is no longer
   `merge-into-dataset` or `delete`. Before, a name inside an array carried only the place of the argument, so
   `toBe(['a' => $x, 'b' => 1])` and `toBe(['a' => 1, 'b' => $x])` had the same name token, the candidate was
