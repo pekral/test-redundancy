@@ -481,6 +481,20 @@ it('gives a literal passed straight to a call the position of its argument', fun
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
+    'argument of a call of a property' => ['($this->store)(true); ($this->store)(true); ($this?->repository->store)(1); (self::$store)(2);', [
+        'function:$this->store' => 2,
+        'function:$this?->repository->store' => 1,
+        'function:self::$store' => 1,
+        'in:function:$this->store#0/value:true' => 2,
+        'in:function:$this?->repository->store#0/value:1' => 1,
+        'in:function:self::$store#0/value:2' => 1,
+    ],
+    ],
+    'argument of a call of a property the test names at run time' => ['($this->{$name})(true); ($class::$store)(false);', [
+        'value:false' => 1,
+        'value:true' => 1,
+    ],
+    ],
     'argument of a call of a variable' => ['$store(true);', ['function:$store' => 1, 'in:function:$store#0/value:true' => 1]],
     'argument of a method call, a static call and a new expression' => ['$cart->add(1); Cart::make(-2); new Item(Size::Large);', [
         'call:add' => 1,
