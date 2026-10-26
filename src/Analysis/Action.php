@@ -83,8 +83,7 @@ enum Action: string
         array $coveringDiffersBy,
         ?string $coveringDataset = null,
         ?SharedDataset $coveringSharedDataset = null,
-    ): array
-    {
+    ): array {
         return [
             ...match ($this) {
                 self::Delete => [
