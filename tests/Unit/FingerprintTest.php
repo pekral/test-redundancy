@@ -422,7 +422,13 @@ it('gives each pair of list elements a token, so the order of the elements count
         'in:function:store#0/items:const:CouponType::FIXED->value>value:\'b\'' => 1,
     ],
     ],
-    'elements that no token names' => ['store([1, $item, 2]);', ['in:function:store#0/items:value:1>value:2' => 1]],
+    'a variable between literals' => ['store([1, $item, 2]);', [
+        'in:function:store#0/items:value:1>value:2' => 1,
+        'in:function:store#0/items:value:1>variable:item' => 1,
+        'in:function:store#0/items:variable:item>value:2' => 1,
+    ],
+    ],
+    'elements that no token names' => ['store([1, $rows[0], 2]);', ['in:function:store#0/items:value:1>value:2' => 1]],
     'one element' => ['store([1]);', []],
     'the same elements in another order' => ['store([5, 3]);', ['in:function:store#0/items:value:5>value:3' => 1]],
     'three elements' => ['store([1, 2, 3]);', [
@@ -654,6 +660,7 @@ it('gives a list the number of its items, so a repeated item counts', function (
 })->with([
     'list of one variable read three times' => ['notify([$click, $click, $click]);', [
         'function:notify' => 1,
+        'in:function:notify#0/items:variable:click>variable:click' => 3,
         'in:function:notify#0/value:list-item' => 3,
         'in:function:notify#0/value:list-item/element:variable:click' => 3,
     ],

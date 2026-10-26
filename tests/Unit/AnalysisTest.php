@@ -4466,9 +4466,39 @@ it('decides on a test by what the covering test passes in the slot that differs'
         'expect(f())->toBe([\'a\' => 1, \'b\' => $x]);',
         Action::Review,
     ],
+    'a variable that swaps places with a literal in a list of a call' => [
+        'transfer([$a, 1]);',
+        'transfer([1, $a]);',
+        Action::Review,
+    ],
     'a variable under a key of a call against a literal' => [
         'foo([\'k\' => bar($x)]);',
         'foo([\'k\' => bar(\'a\')]);',
+        Action::Review,
+    ],
+    'a variable under a key that contains a hash against a literal' => [
+        'foo([\'a#b\' => $x]);',
+        'foo([\'a#b\' => 1]);',
+        Action::Review,
+    ],
+    'a variable under a key that is a hash against a literal' => [
+        'foo([\'#\' => $x]);',
+        'foo([\'#\' => 1]);',
+        Action::Review,
+    ],
+    'a variable under a key that starts with a hash in an assertion map against a literal' => [
+        'expect(f())->toBe([\'#id\' => $x]);',
+        'expect(f())->toBe([\'#id\' => 1]);',
+        Action::Review,
+    ],
+    'a variable under a key with a newline of a call against a literal' => [
+        'foo(["a\nb" => bar($x)]);',
+        'foo(["a\nb" => bar(\'a\')]);',
+        Action::Review,
+    ],
+    'a variable under a nested key that contains a hash against a literal' => [
+        'foo([\'a\' => [\'b#\' => $x]]);',
+        'foo([\'a\' => [\'b#\' => 1]]);',
         Action::Review,
     ],
     'enum case value in an operator against a literal' => [
@@ -4479,6 +4509,26 @@ it('decides on a test by what the covering test passes in the slot that differs'
     'enum case value in an operator against a runtime property' => [
         'foo($order->value . \'x\');',
         'foo(Status::Active->value . \'x\');',
+        Action::Review,
+    ],
+    'two variables that swap keys that contain a hash' => [
+        'transfer([\'f#\' => $a, \'t#\' => $b]);',
+        'transfer([\'f#\' => $b, \'t#\' => $a]);',
+        Action::Review,
+    ],
+    'two variables that swap places in a list of a call' => [
+        'transfer([$a, $b]);',
+        'transfer([$b, $a]);',
+        Action::Review,
+    ],
+    'two variables that swap places in a list of an assertion' => [
+        'expect(f())->toBe([$a, $b]);',
+        'expect(f())->toBe([$b, $a]);',
+        Action::Review,
+    ],
+    'two variables that swap places in a list under a key of a call' => [
+        'transfer([\'k\' => [$a, $b]]);',
+        'transfer([\'k\' => [$b, $a]]);',
         Action::Review,
     ],
     'two variables that swap the key and the value of a map of a call' => [

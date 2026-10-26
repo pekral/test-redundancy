@@ -389,12 +389,16 @@ test lacks.
   elements has three such tokens. The same elements in another order give other tokens, so two dataset rows or tests
   whose lists differ only in the order of their elements, such as `[3, 5]` and `[5, 3]`, differ in `differsBy`, and the
   candidate is `review`, not `delete`. An element takes part when it carries a token of its own: a literal, a constant,
-  an enum case, a call or a `new` expression without arguments, or an empty array. A non-empty array, and a call or a
+  an enum case, a call or a `new` expression without arguments, or an empty array. A variable or a property takes part
+  by its name (see *Argument names*), e.g. `in:function:transfer#0/items:variable:a>variable:b` for
+  `transfer([$a, $b])`, so `[$a, $b]` and `[$b, $a]`, or `[$a, 1]` and `[1, $a]`, differ and neither is `delete`
+  against the other. A property is named without its object, so `[$a->id, $b->id]` and `[$b->id, $a->id]` give the
+  same tokens. A non-empty array, and a call or a
   `new` expression with arguments, take part by their source code, e.g.
   `in:function:total#0/items:new Money(1)>new Money(2)` for `total([new Money(1), new Money(2)])`, and
   `items:['id' => 1]>['id' => 2]` for two rows of a dataset. That source code is normalized: the quotes of a string,
   the base of an integer, the case of a constant and a comment do not change it, so `["id" => 0x10]` and
-  `['id' => 16]` are the same element. A variable and a closure add nothing. `differsBy` lists an order token only
+  `['id' => 16]` are the same element. A closure adds nothing. `differsBy` lists an order token only
   when the covering test has the same two elements in the other order. The order token of an element that the
   covering test lacks is not listed, because that element is listed already. So a test whose list has another or an
   extra element of any kind stays `merge-into-dataset`, and a test that swaps elements the covering test also has is
@@ -458,6 +462,8 @@ test lacks.
   `.../element:variable:k` and `.../variable:k/element:variable:x`. So a test that passes `$x` and a test that passes
   `[$x]` differ, and two tests that hold the same names at other places of one argument, such as
   `['from' => $a, 'to' => $b]` and `['from' => $b, 'to' => $a]`, differ too: neither is `delete` against the other.
+  Names that swap places inside a list, such as `[$a, $b]` and `[$b, $a]`, differ by their order tokens (see *Order of
+  list elements*).
   `expect($response->updatedEmails())->toBe([$subscriber->email => ['field1' => 'value1']])` has
   `in:expect:variable:response/call:updatedEmails/call:toBe#0/element:property:email`. A candidate with `toBe([])` is
   then `review`, not `merge-into-dataset`, against that test, because a dataset row cannot hold the key. So two tests that pass or expect different

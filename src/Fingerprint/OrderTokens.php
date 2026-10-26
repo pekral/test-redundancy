@@ -160,8 +160,13 @@ final class OrderTokens
         }
 
         $element = TokenCollector::nameOf($item->value, $readProperties);
+        $name = NonLiteralArguments::identity($item->value);
 
-        return $element !== null && TokenCollector::carriesContract($element[0]) ? $element : null;
+        return match (true) {
+            $element !== null && TokenCollector::carriesContract($element[0]) => $element,
+            $name !== null => [$item->value, $name],
+            default => null,
+        };
     }
 
     private static function sourceOf(Expr $element): string
