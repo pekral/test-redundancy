@@ -278,7 +278,7 @@ final class NonLiteralArguments
      */
     private static function operatorNames(Expr $operator, array $operands, array $parameters): array
     {
-        $token = self::OPERATOR_PREFIX . strtolower(substr((string) strrchr($operator->getType(), '_'), 1));
+        $token = self::OPERATOR_PREFIX . NodeContext::kindOf($operator);
 
         return array_merge([$token], ...array_map(
             static fn (int $place, ?Node $operand): array => self::placed(
