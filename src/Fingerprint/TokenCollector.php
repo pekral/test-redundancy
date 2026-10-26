@@ -17,6 +17,7 @@ use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
+use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
@@ -135,7 +136,9 @@ final class TokenCollector
             $node instanceof ClassConstFetch => $node->class instanceof Name && $node->name instanceof Identifier
                 ? sprintf('const:%s::%s', $node->class->toString(), $node->name->toString())
                 : null,
-            $node instanceof MethodCall, $node instanceof PropertyFetch => $node->name instanceof Identifier
+            $node instanceof MethodCall,
+            $node instanceof NullsafeMethodCall,
+            $node instanceof PropertyFetch => $node->name instanceof Identifier
                 ? self::negation($node->var) . 'call:' . $node->name->toString()
                 : null,
             $node instanceof StaticCall => $node->class instanceof Name && $node->name instanceof Identifier
@@ -173,7 +176,7 @@ final class TokenCollector
             || $node instanceof UnaryMinus
             || $node instanceof ConstFetch
             || $node instanceof ClassConstFetch
-            || ($node instanceof MethodCall && !self::isNegation($node))
+            || (($node instanceof MethodCall || $node instanceof NullsafeMethodCall) && !self::isNegation($node))
             || ($node instanceof PropertyFetch && self::callsExpectationMethod($node))
             || $node instanceof StaticCall
             || $node instanceof FuncCall
