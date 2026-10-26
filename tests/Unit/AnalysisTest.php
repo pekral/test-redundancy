@@ -2363,6 +2363,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         ['function:store', 'in:function:store#0/value:\'a@example.com\'', 'in:expect:function:stored/call:toBe#0/value:1'],
         Action::Review,
     ],
+    'an import run once against twice through a command held in an array element under a key with a colon' => [
+        <<<'PHP'
+            <?php
+            it('imports the products', function (): void {
+                ($this->commands['import:products'])('acme');
+                expect(importedProductIds())->toBe(['KEEP']);
+            });
+            it('stays idempotent when the import runs twice', function (): void {
+                ($this->commands['import:products'])('acme');
+                ($this->commands['import:products'])('acme');
+                expect(importedProductIds())->toBe(['KEEP']);
+            });
+            PHP,
+        'it imports the products',
+        'it stays idempotent when the import runs twice',
+        [],
+        Action::Review,
+    ],
     'a string resolved once against twice through an action held in a property' => [
         <<<'PHP'
             <?php
