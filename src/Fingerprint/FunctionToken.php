@@ -13,13 +13,11 @@ use PhpParser\Node\Expr\StaticPropertyFetch;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
-use PhpParser\Node\Scalar\Int_;
-use PhpParser\Node\Scalar\String_;
 
 final class FunctionToken
 {
 
-    private const string KEY_SEPARATOR_PATTERN = '~[/#:]~';
+    private const array KEY_ESCAPES = ['%' => '%25', '/' => '%2F', '#' => '%23', ':' => '%3A'];
 
     public static function of(FuncCall $call): ?string
     {
@@ -44,12 +42,11 @@ final class FunctionToken
     private static function elementName(ArrayDimFetch $element): ?string
     {
         $receiver = self::callableName($element->var);
-        $key = $element->dim;
+        $key = $element->dim !== null && TokenCollector::isData($element->dim) ? TokenCollector::token($element->dim) : null;
 
-        return $receiver === null || !($key instanceof Int_ || $key instanceof String_)
-            || preg_match(self::KEY_SEPARATOR_PATTERN, (string) $key->value) === 1
+        return $receiver === null || $key === null
             ? null
-            : $receiver . '[' . var_export($key->value, return: true) . ']';
+            : $receiver . '[' . strtr((string) preg_replace(TokenCollector::DATA_TOKEN_PATTERN, '', $key), self::KEY_ESCAPES) . ']';
     }
 
     private static function propertyName(PropertyFetch|NullsafePropertyFetch $property): ?string

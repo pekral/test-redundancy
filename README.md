@@ -284,10 +284,13 @@ test lacks.
   A call of a callable that a variable, a property or an array element holds counts too: `($action)($account)` carries
   `function:$action`, `($this->action)($account)` carries `function:$this->action`, `(self::$action)($account)`
   carries `function:self::$action`, and `($this->actions['cleanUp'])($account)` carries
-  `function:$this->actions['cleanUp']`. An array element carries the token only when its key is a literal integer or a
-  literal string without `/`, `#` or `:`. A nullsafe method call `$action?->handle($account)` carries `call:handle`, like the
-  method call `$action->handle($account)`. A test that makes such a call once is therefore `review` against a covering
-  test that makes it twice, because the covering test makes the call more times (see *No missing call or object*). A
+  `function:$this->actions['cleanUp']`. The key of an array element is written like a `value:` or `const:` token without
+  its prefix, e.g. `$actions[0]`, `$actions[-1]` or `$actions[self%3A%3AK]`. In the key, `%`, `/`, `#` and `:` are
+  written as `%25`, `%2F`, `%23` and `%3A`, because `/`, `#` and `:` separate the parts of a token, so
+  `($this->commands['import:products'])($account)` carries `function:$this->commands['import%3Aproducts']`. A nullsafe
+  method call `$action?->handle($account)` carries `call:handle`, like the method call `$action->handle($account)`. A
+  test that makes such a call once is therefore `review` against a covering test that makes it twice, because the
+  covering test makes the call more times (see *No missing call or object*). A
   callable that the test names only at run time, such as `($this->{$name})()` or `($this->actions[$name])()`, carries
   no token.
 - **Loops.** A call, function call or `new` expression in the body of a `foreach`, `for`, `while` or `do` loop carries a

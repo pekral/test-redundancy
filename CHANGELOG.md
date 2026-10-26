@@ -13,9 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   two identical calls gave the same tokens as one call, and the test with one call was `delete`. Now such a call
   carries `function:` and the callable as written, e.g. `function:$this->actions['cleanUp']` or `function:$actions[0]`,
   like the call of a callable held in a property of #103. The fingerprint counts the call, so the candidate is
-  `review`, and its arguments carry a position. The key must be a literal integer or a literal string without `/`, `#`
-  or `:`, because those characters separate the parts of a token. A call through any other key, such as
-  `($this->actions[$name])()` or `($actions['a/b'])()`, still carries no token (#114).
+  `review`, and its arguments carry a position. The key is written like a `value:` or `const:` token without its
+  prefix, so a literal integer, a literal string, a negative number and a constant key all carry a token, e.g.
+  `function:$actions[-1]`. In the key, `%`, `/`, `#` and `:` are written as `%25`, `%2F`, `%23` and `%3A`, because
+  `/`, `#` and `:` separate the parts of a token: `($this->commands['import:products'])('acme')` carries
+  `function:$this->commands['import%3Aproducts']`, and a key such as `'x:assertTrue'` is not read as an assertion. A
+  call through a key or a receiver named only at run time, such as `($this->actions[$name])()`, still carries no
+  token (#114).
 - A test whose interpolated string has another literal text than its covering test is no longer `delete`. Before,
   the literal parts of an interpolated string carried no token, so `toBe("Hello {$this->user->name}")` and
   `toBe("Hi {$this->user->name}")` had the same tokens, and the candidate was `delete` with an empty `differsBy`. Now

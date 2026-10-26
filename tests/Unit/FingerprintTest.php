@@ -496,14 +496,34 @@ it('gives a literal passed straight to a call the position of its argument', fun
             'value:\'store\'' => 2,
         ],
     ],
-    'argument of a call of an array element whose key the token cannot carry' => [
-        '($actions[\'a/b\'])(true); ($actions[\'a#b\'])(true); ($actions[\'x:assertTrue\'])(true); ($actions[$name])(true);'
-            . ' ($actions[])(true); ($this->{$name}[\'a\'])(true);',
+    'argument of a call of an array element named only at run time' => [
+        '($actions[$name])(true); ($actions[])(true); ($this->{$name}[\'a\'])(true);',
         [
-            'value:true' => 6,
-            'value:\'a#b\'' => 1,
-            'value:\'a/b\'' => 1,
+            'value:true' => 3,
             'value:\'a\'' => 1,
+        ],
+    ],
+    'argument of a call of an array element whose key carries a token separator, a sign or a constant' => [
+        '($actions[\'a/b\'])(true); ($actions[\'a#b\'])(true); ($actions[\'x:assertTrue\'])(true); ($actions[\'a%2Fb\'])(true);'
+            . ' ($actions[-1])(true); ($actions[self::K])(true);',
+        [
+            'const:self::K' => 1,
+            'function:$actions[-1]' => 1,
+            'function:$actions[self%3A%3AK]' => 1,
+            'function:$actions[\'a%2Fb\']' => 1,
+            'function:$actions[\'a%23b\']' => 1,
+            'function:$actions[\'a%252Fb\']' => 1,
+            'function:$actions[\'x%3AassertTrue\']' => 1,
+            'in:function:$actions[-1]#0/value:true' => 1,
+            'in:function:$actions[self%3A%3AK]#0/value:true' => 1,
+            'in:function:$actions[\'a%2Fb\']#0/value:true' => 1,
+            'in:function:$actions[\'a%23b\']#0/value:true' => 1,
+            'in:function:$actions[\'a%252Fb\']#0/value:true' => 1,
+            'in:function:$actions[\'x%3AassertTrue\']#0/value:true' => 1,
+            'value:-1' => 1,
+            'value:\'a#b\'' => 1,
+            'value:\'a%2Fb\'' => 1,
+            'value:\'a/b\'' => 1,
             'value:\'x:assertTrue\'' => 1,
         ],
     ],
