@@ -148,7 +148,7 @@ final class TokenCollector
                 : null,
             $node instanceof FuncCall => FunctionToken::of($node),
             $node instanceof New_ => $node->class instanceof Name ? 'new:' . $node->class->toString() : null,
-            $node instanceof Cast => 'cast:' . self::castType($node),
+            $node instanceof Cast => CastToken::of($node),
             $node instanceof Array_ => self::arrayToken($node),
             default => null,
         };
@@ -161,7 +161,7 @@ final class TokenCollector
     public static function nameOf(?Expr $node, array $readProperties): ?array
     {
         $node = $node === null ? null : NodeContext::enumCaseReadBy($node) ?? $node;
-        $token = $node === null ? null : self::token($node);
+        $token = $node instanceof Cast ? CastToken::withOperandName($node, $readProperties) : ($node === null ? null : self::token($node));
 
         return $node === null || $token === null ? null : [$node, $token . ($readProperties[spl_object_id($node)] ?? '')];
     }
@@ -215,12 +215,14 @@ final class TokenCollector
     private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues, array $readProperties): array
     {
         $paths = [];
-        $pathNodes = $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike);
+        $isPathNode = static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike || $node instanceof Cast;
 
-        foreach ($pathNodes as $pathNode) {
-            $segments = $pathNode instanceof ArrayItem
-                ? self::keySegments($nodeFinder, $pathNode, $readProperties)
-                : self::argumentSegments($pathNode, $assignedValues);
+        foreach ($nodeFinder->find($nodes, $isPathNode) as $pathNode) {
+            $segments = match (true) {
+                $pathNode instanceof ArrayItem => self::keySegments($nodeFinder, $pathNode, $readProperties),
+                $pathNode instanceof Cast => CastToken::segments($nodeFinder, $pathNode),
+                default => self::argumentSegments($pathNode, $assignedValues),
+            };
 
             foreach ($segments as $nodeId => $segment) {
                 $paths[$nodeId][] = $segment;
@@ -333,7 +335,9 @@ final class TokenCollector
      */
     private static function prefix(array $arrayKeys, array $paths, Node $node, string $token): string
     {
-        $pathPrefix = preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 ? NodeContext::pathPrefix($paths, $node) : '';
+        $pathPrefix = preg_match(self::DATA_TOKEN_PATTERN, $token) === 1 || $node instanceof Cast
+            ? NodeContext::pathPrefix($paths, $node)
+            : '';
 
         return $pathPrefix . (isset($arrayKeys[spl_object_id($node)]) ? self::KEY_PREFIX : '');
     }
@@ -379,11 +383,6 @@ final class TokenCollector
         return ($node instanceof PropertyFetch || $node instanceof MethodCall)
             && $node->name instanceof Identifier
             && $node->name->toString() === 'not';
-    }
-
-    private static function castType(Cast $cast): string
-    {
-        return str_replace('double', 'float', strtolower(substr($cast->getType(), strlen('Expr_Cast_'))));
     }
 
     private static function scalar(Scalar|InterpolatedStringPart $scalar, string $sign): ?string

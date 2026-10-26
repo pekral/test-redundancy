@@ -11,6 +11,7 @@ use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Cast;
+use PhpParser\Node\Expr\Cast\Double;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Expression;
@@ -169,7 +170,7 @@ final class OrderTokens
 
             public function leaveNode(Node $node): ?Node
             {
-                $node->setAttributes([]);
+                $node->setAttributes($node instanceof Double ? ['kind' => Double::KIND_FLOAT] : []);
 
                 return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
             }
