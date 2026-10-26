@@ -90,6 +90,11 @@ final class NodeContext
         return $path === null ? '' : 'in:' . implode('/', $path) . '/';
     }
 
+    public static function kindOf(Node $node): string
+    {
+        return strtolower(substr((string) strrchr($node->getType(), '_'), 1));
+    }
+
     public static function enumCaseReadBy(Node $node): ?ClassConstFetch
     {
         return $node instanceof PropertyFetch && $node->var instanceof ClassConstFetch ? $node->var : null;

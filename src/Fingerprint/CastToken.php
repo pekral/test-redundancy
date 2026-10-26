@@ -12,7 +12,7 @@ final class CastToken
 
     public static function of(Cast $cast, ?string $operandToken = null): string
     {
-        return 'cast:' . str_replace('double', 'float', strtolower(substr($cast->getType(), strlen('Expr_Cast_'))))
+        return 'cast:' . str_replace('double', 'float', NodeContext::kindOf($cast))
             . ($operandToken === null ? '' : '/' . $operandToken);
     }
 
