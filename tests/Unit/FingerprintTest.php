@@ -1184,7 +1184,7 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'property cast passed to the code under test' => [
         'connect((int) $this->enShop);',
-        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop', 'cast:int'],
+        ['function:connect', 'in:function:connect#0/non-literal', 'in:function:connect#0/property:enShop', 'in:function:connect#0/cast:int'],
     ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
@@ -1286,28 +1286,37 @@ it('gives a cast a token for its type next to the tokens of its expression', fun
 
     expect(array_keys(TokenCollector::collect($statements)))->toEqualCanonicalizing($expected);
 })->with([
-    'float cast written as double' => ['(double) \'1.5\';', ['cast:float', 'value:\'1.5\'']],
-    'integer cast written as integer' => ['(integer) \'5\';', ['cast:int', 'value:\'5\'']],
+    'float cast written as double' => ['(double) \'1.5\';', ['cast:float', 'in:cast:float/value:\'1.5\'']],
+    'integer cast written as integer' => ['(integer) \'5\';', ['cast:int', 'in:cast:int/value:\'5\'']],
     'object cast of a map passed to the code under test' => [
         'store((object) [\'code\' => null]);',
-        ['function:store', 'in:function:store#0/non-literal', 'cast:object', 'key:value:\'code\'', 'in:value:\'code\'/value:null'],
+        [
+            'function:store',
+            'in:function:store#0/non-literal',
+            'in:function:store#0/cast:object',
+            'in:cast:object/key:value:\'code\'',
+            'in:cast:object/value:\'code\'/value:null',
+        ],
     ],
     'string cast as the subject of an assertion' => [
         'expect((string) $response->body())->toBe(\'x\');',
         [
             'function:expect',
-            'expect:cast:string/call:toBe',
-            'in:expect:cast:string/call:toBe#0/value:\'x\'',
-            'cast:string',
-            'read:cast:string',
+            'expect:cast:string/variable:response/call:body/call:toBe',
+            'in:expect:cast:string/variable:response/call:body/call:toBe#0/value:\'x\'',
+            'in:function:expect#0/cast:string',
+            'read:in:function:expect#0/cast:string',
             'call:body',
             'read:call:body',
         ],
     ],
 ]);
 
-it('orders the casts in a list by their source, like other composite elements', function (): void {
-    $statements = new ParserFactory()->createForHostVersion()->parse('<?php store([(object) [\'a\' => 1], (int) $id]);');
+it('orders the casts in a list by their source, like other composite elements', function (string $code, string $orderToken): void {
+    $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 
-    expect(TokenCollector::collect($statements))->toHaveKey('in:function:store#0/items:(object) [\'a\' => 1]>(int) $id', 1);
-});
+    expect(TokenCollector::collect($statements))->toHaveKey($orderToken, 1);
+})->with([
+    'float cast printed as the type its cast token names' => ['store([(float) $a, (int) $b]);', 'in:function:store#0/items:(float) $a>(int) $b'],
+    'object and integer casts' => ['store([(object) [\'a\' => 1], (int) $id]);', 'in:function:store#0/items:(object) [\'a\' => 1]>(int) $id'],
+]);

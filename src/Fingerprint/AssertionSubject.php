@@ -10,6 +10,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
+use PhpParser\Node\Expr\Cast;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
@@ -152,7 +153,14 @@ final class AssertionSubject
 
     private static function partToken(Expr $part, bool $withLiteralArguments): ?string
     {
-        $token = $part instanceof PropertyFetch ? NonLiteralArguments::identity($part) : TokenCollector::token($part);
+        $token = match (true) {
+            $part instanceof PropertyFetch => NonLiteralArguments::identity($part),
+            $part instanceof Cast => CastToken::of(
+                $part,
+                NonLiteralArguments::identity($part->expr) ?? self::token($part->expr, $withLiteralArguments),
+            ),
+            default => TokenCollector::token($part),
+        };
 
         return match (true) {
             $token === null || preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,

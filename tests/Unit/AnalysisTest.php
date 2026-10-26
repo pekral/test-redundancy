@@ -4416,10 +4416,39 @@ it('does not delete or merge a test that differs from its covering test only in 
         ->and($report->candidates[0]->coveringTokensForReview())->toBe($coveringDiffersBy)
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
+    'a cast of an array key that the covering test does not cast' => [
+        'store([(string) $k => 1]);',
+        'store([$k => 1]);',
+        ['in:function:store#0/key:cast:string', 'in:function:store#0/cast:string/variable:k/value:1'],
+        [],
+    ],
     'a cast of a property to an integer where the covering test passes the property' => [
         'connect((int) $this->enShop);',
         'connect($this->enShop);',
-        ['cast:int'],
+        ['in:function:connect#0/cast:int'],
+        [],
+    ],
+    'a cast that the covering test moves to another argument' => [
+        'store((int) $a, $b);',
+        'store($a, (int) $b);',
+        ['in:function:store#0/cast:int'],
+        [],
+    ],
+    'a cast that the covering test moves to another list item' => [
+        'store([(object) [\'a\' => 1], [\'b\' => 2]]);',
+        'store([[\'a\' => 1], (object) [\'b\' => 2]]);',
+        [
+            'in:cast:object/key:value:\'a\'',
+            'in:cast:object/value:\'a\'/value:1',
+            'key:value:\'b\'',
+            'in:value:\'b\'/value:2',
+        ],
+        ['key:value:\'a\'', 'in:cast:object/key:value:\'b\''],
+    ],
+    'a cast that the covering test moves to another property argument' => [
+        'connect((int) $this->a, $this->b);',
+        'connect($this->a, (int) $this->b);',
+        ['in:function:connect#0/cast:int'],
         [],
     ],
     'a cast to an object in a list where the covering test passes an empty list' => [
@@ -4427,9 +4456,9 @@ it('does not delete or merge a test that differs from its covering test only in 
         'expect(enrich(new LengthAwarePaginator([], 0, 50)))->toBeEmpty();',
         [
             'in:function:enrich#0/new:LengthAwarePaginator#0/value:list-item',
-            'cast:object',
-            'key:value:\'code\'',
-            'in:value:\'code\'/value:null',
+            'in:function:enrich#0/new:LengthAwarePaginator#0/cast:object',
+            'in:cast:object/key:value:\'code\'',
+            'in:cast:object/value:\'code\'/value:null',
             'in:function:enrich#0/new:LengthAwarePaginator#1/value:1',
         ],
         [],
@@ -4437,7 +4466,45 @@ it('does not delete or merge a test that differs from its covering test only in 
     'an array in a list where the covering test casts it to an object' => [
         'store([[\'code\' => null]]);',
         'store([(object) [\'code\' => null]]);',
-        [],
-        ['cast:object'],
+        ['key:value:\'code\'', 'in:value:\'code\'/value:null'],
+        ['in:function:store#0/cast:object', 'in:cast:object/key:value:\'code\''],
+    ],
+]);
+
+it('merges, never deletes, a test whose cast subjects or cast keys hold the values of its covering test swapped', function (
+    string $candidateBody,
+    string $coveringBody,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+})->with([
+    'cast calls as the subjects of assertSame()' => [
+        'assertSame(\'x\', (string) $r->body()); assertSame(\'y\', (string) $r->status());',
+        'assertSame(\'y\', (string) $r->body()); assertSame(\'x\', (string) $r->status());',
+        [
+            'in:expect:cast:string/variable:r/call:body/function:assertSame#0/value:\'x\'',
+            'in:expect:cast:string/variable:r/call:status/function:assertSame#0/value:\'y\'',
+        ],
+    ],
+    'cast calls as the subjects of expect()' => [
+        'expect((string) $r->body())->toBe(\'x\'); expect((string) $r->status())->toBe(\'y\');',
+        'expect((string) $r->body())->toBe(\'y\'); expect((string) $r->status())->toBe(\'x\');',
+        [
+            'in:expect:cast:string/variable:r/call:body/call:toBe#0/value:\'x\'',
+            'in:expect:cast:string/variable:r/call:status/call:toBe#0/value:\'y\'',
+        ],
+    ],
+    'cast constants as array keys' => [
+        'store([(string) Foo::A => 1, (string) Foo::B => 2]);',
+        'store([(string) Foo::A => 2, (string) Foo::B => 1]);',
+        ['in:function:store#0/cast:string/const:Foo::A/value:1', 'in:function:store#0/cast:string/const:Foo::B/value:2'],
     ],
 ]);
