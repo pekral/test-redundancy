@@ -596,14 +596,18 @@ test lacks.
   other values, such as `foo(fn () => 'a')` against `foo(fn () => 1)`, stay `merge-into-dataset`. A closure that a
   dataset row passes to a parameter of the test is no closure argument of the body: the type of the parameter decides
   whether a row takes the literal (see *Dataset rows*).
-  Two shapes keep their verdict. A literal that equals the value the closure returns, under an array key or in an
+  Three shapes keep their verdict. A literal that equals the value the closure returns, under an array key or in an
   assertion argument, is still `delete`: `foo(['k' => 1])` against `foo(['k' => fn () => 1])`, or `toBe(1)` against
   `toBe(fn () => 1)`. A closure in a `match` arm carries no token, so `foo(match ($x) { 1 => 'a' })` against
-  `foo(match ($x) { 1 => fn () => 1 })` is still `merge-into-dataset`.
-  Two shapes are `review` and not `delete`. A candidate that passes a closure where the covering test passes a literal
-  under an array key or in an assertion argument, such as `foo(['k' => fn () => 1])` against `foo(['k' => 1])` or
-  `toBe(fn () => 1)` against `toBe(1)`, is `review`. An argument of an assertion that holds a closure and no literal
-  keeps its source code in a `bound:` token, wherever the closure sits in the argument. So
+  `foo(match ($x) { 1 => fn () => 1 })` is still `merge-into-dataset`. The same holds for a candidate whose `match` arm
+  holds the closure: `toBe(match ($x) { 1 => fn () => 1 })` against `toBe(match ($x) { 1 => 1 })` is still `delete`,
+  and with `fn () => 2` it is still `merge-into-dataset`.
+  Two shapes are `review`, and no longer `delete` or `merge-into-dataset`. A candidate that passes a closure where the
+  covering test passes a literal under an array key or in an assertion argument is `review`, whether the literal equals
+  the value the closure returns or not: `foo(['k' => fn () => 1])` against `foo(['k' => 1])`, or `toBe(fn () => 2)`
+  against `toBe(1)`. The same holds as an operand: `foo($a ?? fn () => 2)` against `foo($a ?? 1)`. An argument of an
+  assertion that holds a closure and no literal keeps its source code in a `bound:` token, wherever the closure sits in
+  the argument. So
   `expect(g($a))->toBe($c ?? fn () => foo()); expect(g($b))->toBe($c ?? fn () => bar());` against the same pair with
   `foo()` and `bar()` swapped is `review`.
 - **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
