@@ -59,7 +59,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `store((object) ['code' => null])`, so `store((int) '5', (int) '6')` and `store((int) '6', (int) '5')` are
   `merge-into-dataset`, never `delete`. An alias carries the token of its type, so `(integer)` carries `cast:int`, and
   `(double)` carries `cast:float` and is ordered as `(float)`. The token is listed in `differsBy`, and the candidate is
-  `review`. The variable or property inside a cast keeps its name token, so
+  `review`. A cast that only the covering test has in an argument of a call that is not an assertion, such as
+  `store((string) $x)` against `store($x)`, is listed in `coveringDiffersBy`, and the candidate is `review`. The variable or property inside a cast keeps its name token, so
   `connect((int) $this->enShop)` still carries `in:function:connect#0/property:enShop`. A cast that an assertion
   receives as its subject, or that is an array key, carries the cast together with what it casts, e.g.
   `expect:cast:string/variable:response/call:body/call:toBe` for `expect((string) $response->body())->toBe('x')` and
