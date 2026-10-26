@@ -53,7 +53,8 @@ enum Action: string
         . 'otherwise keep this test.';
 
     public const string EXPECTED_EXCEPTION_STEP = 'The covering test %s expects the exception in coveringDiffersBy (%s) '
-        . 'through throws(), throwsIf() or throwsUnless() on the whole test, and this test does not expect it. '
+        . 'through throws(), throwsIf() or throwsUnless() on the whole test, '
+        . 'and this test does not expect it through the same call. '
         . 'A dataset cannot vary such an expectation per row, so a row with the values in differsBy would still expect '
         . 'the exception of the covering test, and the case of this test would be lost. '
         . 'To merge this test, move the expectation of both tests into their bodies as expect(fn () => …)->toThrow(), '

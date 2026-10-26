@@ -153,7 +153,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `testCases`, `coveredLines` | Test cases of the file, and the source lines they cover. |
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. A single test that runs every line of the candidate and has an empty `differsBy` is preferred, so a test that passes the values of a dataset row is covered by that row, and the action is `delete`. That preferred single test can be a kept test, or a candidate that this report removes after this one. The action of that candidate then decides whether the shared input stays. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
-| `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). It also lists the arguments and the calls of a Pest `->throws()`, `->throwsIf()` or `->throwsUnless()` that only the covering test has, while `unionOnlyLines` is empty — see the same section. The `review` steps name them. Empty for every other candidate. |
+| `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). It also lists the arguments and the calls of a Pest `->throws()`, `->throwsIf()` or `->throwsUnless()` that only the covering test has, when one test covers the candidate and `unionOnlyLines` is empty — see the same section. The `review` steps name them. Empty for every other candidate. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. A `merge-into-dataset` candidate whose covering test is a row of a dataset test gets the step `Add a row with the values in differsBy to the dataset of "<test>".`, because that test already has a dataset; when that dataset is a named dataset (`dataset('name', …)`) that other tests of the same file also use with `->with('name')` at any position of their chain or as any argument of a `->with()`, the step names the dataset and those tests instead, because the new row is added to each of them (a name passed through a variable, a constant or a spread argument, a test the analysis does not parse, and a test inside a `describe()` block bound with `describe(…)->with('name')`, are not detected, so the step stays the plain one); a plain covering test gets `Turn "<test>" into one test with a dataset and add a row with the values in differsBy.` |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
@@ -281,17 +281,23 @@ call is chained on the whole `it()` or `test()`, so a dataset cannot vary it per
 carries the token `call:<method>#<position>/` before its value, without the `in:` prefix of an argument in the body.
 For example, `->throws(EmailNotFound::class, 'The website is empty.')` carries `call:throws#0/const:EmailNotFound::class`
 and `call:throws#1/value:'The website is empty.'`. A named argument carries its name instead of its position, such as
-`call:throws#exceptionMessage/value:'The website is empty.'`. When the candidate and the covering test differ in the
-class, the message, the code or the condition of such a call, the candidate is `review`, not `merge-into-dataset`: a
-row with the values in `differsBy` would still expect the exception of the covering test, so the case of the candidate
-would be lost. While `unionOnlyLines` is empty, the arguments and the calls of this kind that only the covering test
-has are listed in `coveringDiffersBy`, such as `call:throws#0/const:InvalidUrlAddress::class` and `call:throws`. The
-steps then name them and say to move the expectation of both tests into the body as `expect(fn () => …)->toThrow()`,
-with the class and the message as row values. An exception that a test expects in its body, such as
-`expect(fn () => …)->toThrow(EmailNotFound::class)` or PHPUnit's `$this->expectException(EmailNotFound::class)` and
-`$this->expectExceptionMessage('…')`, is data, because a row can pass the class or the message to it, so such a
-candidate can still be `merge-into-dataset`. An argument of `->throws()` that is a variable, such as
-`->throws($exception)`, carries no token, so it is not compared.
+`call:throws#exceptionMessage/value:'The website is empty.'`. An argument that is not a literal or a constant also
+carries its source code, such as `call:throwsIf#0/source:$onLinux` for `->throwsIf($onLinux, …)`,
+`call:throwsIf#0/source:fn() => $this->onLinux` for a closure, and
+`call:throws#1/source:"The website {$website} is empty."` for an interpolated string. When an argument of such a call
+in the candidate differs from the covering test, the candidate is `review`, not `merge-into-dataset`: a row with the
+values in `differsBy` would still expect the exception of the covering test, so the case of the candidate would be
+lost. The argument can be the class, the message, the code or the condition, and it can be a variable, a property, a
+closure, an operator or an interpolated string. A difference only in whitespace or comments is not a difference.
+When one test covers the candidate and `unionOnlyLines` is empty, the arguments and the calls of this kind that only
+the covering test has are listed in `coveringDiffersBy`, such as `call:throws#0/const:InvalidUrlAddress::class` and
+`call:throws`. The steps then name them and say to move the expectation of both tests into the body as
+`expect(fn () => …)->toThrow()`, with the class and the message as row values. An exception that a test expects in its
+body, such as `expect(fn () => …)->toThrow(EmailNotFound::class)` or PHPUnit's
+`$this->expectException(EmailNotFound::class)` and `$this->expectExceptionMessage('…')`, is data, because a row can pass
+the class or the message to it, so such a candidate can still be `merge-into-dataset`. The analysis compares the source
+code of an argument, never its value at run time. Two tests whose arguments have the same source code are not told
+apart, such as `->throws($exception)` in both tests while the variable holds another class in each.
 
 ### How `differsBy` names a difference
 

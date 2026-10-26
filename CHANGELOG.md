@@ -14,21 +14,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `call:throws#1/value:'Empty.'` in `PestFingerprints::of()`, `PestFingerprints::analyse()`, `differsBy` and
   `coveringDiffersBy`, not `const:EmailNotFound::class` and `value:'Empty.'`. A PHP caller or a script that looks for
   the plain `const:` or `value:` token of such an argument must look for the prefixed token, or use
-  `PestFingerprints::isExpectedExceptionToken()` (#145).
+  `PestFingerprints::isExpectedExceptionToken()`. An argument that is not a literal or a constant also carries the
+  token `call:<method>#<position>/source:<source code>`, such as `call:throwsIf#0/source:$onLinux` for
+  `->throwsIf($onLinux, …)`. The new `PestFingerprints::expectedExceptionTokens()` keeps the tokens of such calls and
+  their arguments from a list of tokens (#145).
 
 ### Fixed
 
-- A candidate is no longer `merge-into-dataset` when it and the covering test differ in the class, the message, the
-  code or the condition of a Pest `->throws()`, `->throwsIf()` or `->throwsUnless()`. Such a call is chained on the
-  whole test, so a dataset cannot vary it per row, and the merge step kept one exception for every row: the expected
-  exception of the candidate was lost. The class appeared in `differsBy` as the plain data token
-  `const:EmailNotFound::class`, and the class of the covering test was listed nowhere. Now the arguments of such a call
-  are not data and the candidate is `review`. While `unionOnlyLines` is empty, `coveringDiffersBy` lists the arguments
-  and the calls of this kind that only the covering test has, and the steps name them and say to move the expectation
-  into the body as `expect(fn () => …)->toThrow()` with the class and the message as row values (#145). An exception that a test expects in its body, through Pest's
+- A candidate is no longer `merge-into-dataset` when an argument of a Pest `->throws()`, `->throwsIf()` or
+  `->throwsUnless()` in the candidate differs from the covering test. The argument can be the class, the message, the
+  code or the condition, and it can be a variable, a property, a closure, an operator or an interpolated string, such
+  as `->throwsIf($onLinux, …)` against `->throwsIf($onMac, …)`. A difference only in whitespace or comments is not a
+  difference. Such a call is chained on the whole test, so a dataset cannot vary it per row, and the merge step kept
+  one exception for every row: the expected exception of the candidate was lost. The class appeared in `differsBy` as
+  the plain data token `const:EmailNotFound::class`, and the class of the covering test was listed nowhere. Now the
+  arguments of such a call are not data and the candidate is `review`. When one test covers the candidate and
+  `unionOnlyLines` is empty, `coveringDiffersBy` lists the arguments and the calls of this kind that only the covering
+  test has. The steps then name them and say to move the expectation into the body as `expect(fn () => …)->toThrow()`,
+  with the class and the message as row values (#145). An exception that a test expects in its body, through Pest's
   `toThrow()` or PHPUnit's `expectException()` and `expectExceptionMessage()`, stays data, because a row can pass the
-  class or the message to it. An argument of `->throws()` that is a variable, such as `->throws($exception)`, carries
-  no token and is still not compared.
+  class or the message to it. The analysis compares the source code of an argument, never its value at run time: two
+  tests whose arguments have the same source code, such as `->throws($exception)` in both tests, are not told apart.
 
 ## [0.1.7] - 2026-10-26
 

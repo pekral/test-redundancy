@@ -2151,6 +2151,60 @@ it('reviews, and does not merge, a test that expects another exception than the 
         ['in:function:validate#0/value:\'\'', 'call:throws#1/value:\'The website is empty.\''],
         'call:throws#1/value:\'The website is invalid.\'',
     ],
+    'another operator in the condition of throwsIf()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throwsIf($response === null, InvalidUrlAddress::class);
+            it('rejects another input', fn () => validate('a'))->throwsIf($response !== null, InvalidUrlAddress::class);
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throwsIf#0/source:$response === null'],
+        'call:throwsIf#0/source:$response !== null',
+    ],
+    'another property read by the closure condition of throwsIf()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throwsIf(fn () => $this->onLinux, InvalidUrlAddress::class);
+            it('rejects another input', fn () => validate('a'))->throwsIf(fn () => $this->onMac, InvalidUrlAddress::class);
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throwsIf#0/source:fn() => $this->onLinux'],
+        'call:throwsIf#0/source:fn() => $this->onMac',
+    ],
+    'another variable as the condition of throwsIf()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throwsIf($onLinux, InvalidUrlAddress::class);
+            it('rejects another input', fn () => validate('a'))->throwsIf($onMac, InvalidUrlAddress::class);
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throwsIf#0/source:$onLinux'],
+        'call:throwsIf#0/source:$onMac',
+    ],
+    'another variable as the condition of throwsUnless()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throwsUnless($onLinux, InvalidUrlAddress::class);
+            it('rejects another input', fn () => validate('a'))->throwsUnless($onMac, InvalidUrlAddress::class);
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throwsUnless#0/source:$onLinux'],
+        'call:throwsUnless#0/source:$onMac',
+    ],
+    'another variable as the exception class of throws()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throws($emailNotFound);
+            it('rejects another input', fn () => validate('a'))->throws($invalidUrlAddress);
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throws#0/source:$emailNotFound'],
+        'call:throws#0/source:$invalidUrlAddress',
+    ],
+    'another variable interpolated into the exception message of throws()' => [
+        <<<'PHP'
+            <?php
+            it('rejects one input', fn () => validate(''))->throws(InvalidArgumentException::class, "The website {$website} is empty.");
+            it('rejects another input', fn () => validate('a'))->throws(InvalidArgumentException::class, "The website {$domain} is empty.");
+            PHP,
+        ['in:function:validate#0/value:\'\'', 'call:throws#1/source:"The website {$website} is empty."'],
+        'call:throws#1/source:"The website {$domain} is empty."',
+    ],
     'no exception against the throws() of the covering test' => [
         <<<'PHP'
             <?php
@@ -2201,6 +2255,34 @@ it('asks for a review of a test whose covering test runs the same code and expec
         'call:throws#1/value:\'Validation failed:expected an absolute URL\'',
     ],
 ]);
+
+it('names the test-level throws() of no covering test when two tests cover the candidate', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('validates a website', fn () => validate(''));
+            it('rejects a website', fn () => validate('a'))->throws(InvalidUrlAddress::class);
+            it('accepts a website', fn () => validate('b'));
+            PHP,
+        linesByTest: [
+            'it validates a website' => ['src/Validator.php:5', 'src/Validator.php:6'],
+            'it rejects a website' => ['src/Validator.php:5', 'src/Validator.php:7'],
+            'it accepts a website' => ['src/Validator.php:6', 'src/Validator.php:8'],
+        ],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it validates a website')
+        ->and(valueAt($json, 'coveredBy'))->toBe(['it rejects a website', 'it accepts a website'])
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'steps'))->toBe([
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
+});
 
 it('still merges a test whose covering test expects the same exception through its test-level throws()', function (): void {
     $report = analyzeTokenTest(
