@@ -36,11 +36,17 @@ final class NonLiteralArguments
 
     private const string OPERAND_PREFIX = 'operand:';
 
+    private const string OPERATOR_PREFIX = 'operator:';
+
     private const string KIND = '(?:' . self::ELEMENT_PREFIX . '|' . self::OPERAND_PREFIX . ')';
 
     private const string NAME = '(?:variable|property):[^/]+(?:/property:[^/]+)*';
 
-    private const string IDENTITY = '(?:(?:(?!' . self::CALL . ')[^/]+/)*' . self::KIND . '+)?' . self::NAME;
+    private const string PLACES = '(?:(?!' . self::CALL . ')[^/]+/)*';
+
+    private const string OPERATOR = self::OPERATOR_PREFIX . '\\w+';
+
+    private const string IDENTITY = '(?:(?:' . self::PLACES . self::KIND . '+)?' . self::NAME . '|' . self::PLACES . self::OPERATOR . ')';
 
     private const string KINDED_NAME_PATTERN = '~(?:^|/)\\K' . self::KIND . '*' . self::NAME . '$~';
 
@@ -119,6 +125,11 @@ final class NonLiteralArguments
             $value instanceof StaticPropertyFetch => self::propertyOf($value->class, $value->name),
             default => null,
         };
+    }
+
+    public static function isOperator(Expr $value): bool
+    {
+        return self::operandsOf($value) !== null;
     }
 
     public static function nameOrToken(?Expr $node): ?string
@@ -208,9 +219,10 @@ final class NonLiteralArguments
      */
     private static function namesOf(Expr $value, array $parameters): array
     {
+        $operands = self::operandsOf($value);
+
         return match (true) {
-            $value instanceof BinaryOp => self::kindedNames(self::OPERAND_PREFIX, [$value->left, $value->right], $parameters),
-            $value instanceof InterpolatedString => self::kindedNames(self::OPERAND_PREFIX, $value->parts, $parameters),
+            $operands !== null => self::operatorNames($value, $operands, $parameters),
             $value instanceof Array_ => array_merge([], ...array_map(
                 static fn (ArrayItem $item): array => [
                     ...self::kindedNames(self::ELEMENT_PREFIX, [$item->key], $parameters),
@@ -219,9 +231,6 @@ final class NonLiteralArguments
                 $value->items,
             )),
             $value instanceof ArrayDimFetch => self::kindedNames(self::ELEMENT_PREFIX, [$value->var, $value->dim], $parameters),
-            $value instanceof Ternary => self::kindedNames(self::OPERAND_PREFIX, [$value->cond, $value->if, $value->else], $parameters),
-            $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
-                || $value instanceof BitwiseNot => self::kindedNames(self::OPERAND_PREFIX, [$value->expr], $parameters),
             $value instanceof Cast => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
             NodeContext::enumCaseReadBy($value) !== null => [],
@@ -244,6 +253,41 @@ final class NonLiteralArguments
             ) ?? $name,
             self::namesOfEach($values, $parameters),
         );
+    }
+
+    /**
+     * @return array<\PhpParser\Node|null>|null
+     */
+    private static function operandsOf(Expr $value): ?array
+    {
+        return match (true) {
+            TokenCollector::isData($value) => null,
+            $value instanceof BinaryOp => [$value->left, $value->right],
+            $value instanceof InterpolatedString => $value->parts,
+            $value instanceof Ternary => [$value->cond, $value->if, $value->else],
+            $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
+                || $value instanceof BitwiseNot => [$value->expr],
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<\PhpParser\Node|null> $operands
+     * @param list<string> $parameters
+     * @return list<string>
+     */
+    private static function operatorNames(Expr $operator, array $operands, array $parameters): array
+    {
+        $token = self::OPERATOR_PREFIX . strtolower(substr((string) strrchr($operator->getType(), '_'), 1));
+
+        return array_merge([$token], ...array_map(
+            static fn (int $place, ?Node $operand): array => self::placed(
+                $token . '#' . $place,
+                self::kindedNames(self::OPERAND_PREFIX, [$operand], $parameters),
+            ),
+            array_keys($operands),
+            $operands,
+        ));
     }
 
     private static function propertyOf(Expr|Name $object, Expr|Identifier $property): ?string
