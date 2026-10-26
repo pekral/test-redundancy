@@ -15,15 +15,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `delete`. `foo($x . $y)` covered by `foo($x . $y . $z)` was `delete` too. Now an operator in an argument of a call
   or an assertion carries `operator:<kind>` at its place, e.g. `in:function:foo#0/operator:plus`. A name inside it
   carries the place of its operand before the prefix `operand:`, e.g.
-  `in:function:foo#0/operator:concat#1/operand:variable:y` for `$y` in `foo($x . $y)`. A ternary numbers its condition
-  0, the value if true 1 and the value if false 2, and an operator inside an operator adds its own place, outermost
-  first. These candidates are `review`. So are properties that swap places inside an operator, such as
-  `transfer($a->id . $b->id)` against `transfer($b->id . $a->id)`. An operator in a list now takes part in the order
-  of the list by its source code, e.g. `in:function:fullName#0/items:$first . $last>variable:title`, so
-  `fullName([$first . $last, $title])` against `fullName([$title, $first . $last])` is `review` too. Four shapes stay
-  `delete`. Literal operands that swap places, such as `foo(1 - 2)` against `foo(2 - 1)`, carry no place. An operator
-  in no argument of a call or an assertion, such as one that a closure returns or one assigned to a variable that the
-  test passes on, carries no token. An operator that only the covering test has, around an argument that carries no name,
+  `in:function:foo#0/operator:concat#1/operand:variable:y` for `$y` in `foo($x . $y)`. A literal or a constant operand
+  carries its place before its own token, e.g. `in:function:foo#0/operator:minus#0/value:1` for `1` in `foo(1 - 2)`. A
+  ternary numbers its condition 0, the value if true 1 and the value if false 2, and an operator inside an operator
+  adds its own place, outermost first. These candidates are `review`. So are `foo(1 + 2)` covered by
+  `foo(1 + 2 + 3)`, `foo(f() . 'a')` covered by `foo(f() . 'a' . 'b')`, and properties that swap places inside an
+  operator, such as `transfer($a->id . $b->id)` against `transfer($b->id . $a->id)`. Literal operands that swap
+  places, such as `foo(1 - 2)` against `foo(2 - 1)`, are `merge-into-dataset`. An operator in a list now takes part in
+  the order of the list by its source code, e.g. `in:function:fullName#0/items:$first . $last>variable:title`, so
+  `fullName([$first . $last, $title])` against `fullName([$title, $first . $last])` is `review` too. Three shapes stay
+  `delete`. An operator in no argument of a call or an assertion, such as one that a closure returns or one assigned
+  to a variable that the test passes on, carries no token. An operator that only the covering test has, around an argument that carries no name,
   such as `foo(f())` covered by `foo(f() . 'a')`, does not turn the candidate into `review`, like a name. An operator
   other than a binary operator, a ternary, an interpolated string or a unary `-`, `+`, `!` or `~`, such as
   `instanceof`, carries no token (#131).

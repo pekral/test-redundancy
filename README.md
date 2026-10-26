@@ -464,8 +464,10 @@ test lacks.
   case, e.g. `plus`, `minus`, `concat`, `coalesce`, `unaryminus`, `booleannot`, `ternary` or `interpolatedstring`. A
   ternary numbers its condition 0, the value if true 1 and the value if false 2. An interpolated string numbers each of
   its parts, text and names alike. The operator itself carries `operator:<kind>` at its place. An operator inside an
-  operator adds its own place, outermost first. So `toBe('no_segment_tag_' . $campaign->title)` has
-  `in:expect:function:resolveUtm/call:toBe#0/operator:concat` and
+  operator adds its own place, outermost first. A literal or a constant operand carries its place too, before its own
+  token and with no prefix. So `toBe('no_segment_tag_' . $campaign->title)` has
+  `in:expect:function:resolveUtm/call:toBe#0/operator:concat`,
+  `in:expect:function:resolveUtm/call:toBe#0/operator:concat#0/value:'no_segment_tag_'` and
   `in:expect:function:resolveUtm/call:toBe#0/operator:concat#1/operand:variable:campaign/property:title`,
   `toBe("no_segment_tag_{$campaign->title}")` has
   `in:expect:function:resolveUtm/call:toBe#0/operator:interpolatedstring#1/operand:variable:campaign/property:title`,
@@ -477,12 +479,12 @@ test lacks.
   `foo(-$x)`, or `foo(1 + 2)` and `foo(1 - 2)`, differ too. So do two tests whose arguments hold the same names at
   other places, such as `foo($x . $y)` and `foo($y . $x)`, or `toBe($c ? $x : $y)` and `toBe($c ? $y : $x)`, and a
   test whose operator has fewer operands than the one of its covering test, such as `foo($x . $y)` covered by
-  `foo($x . $y . $z)`. The candidate is `review` in each of these cases. These operators are the binary operators, the
+  `foo($x . $y . $z)`, `foo(1 + 2)` covered by `foo(1 + 2 + 3)`, or `foo(f() . 'a')` covered by
+  `foo(f() . 'a' . 'b')`. The candidate is `review` in each of these cases. Two tests whose literal operands swap
+  places, such as `foo(1 - 2)` and `foo(2 - 1)`, differ by the place of each literal, and the candidate is
+  `merge-into-dataset`, as for literal arguments that swap places. These operators are the binary operators, the
   ternary, the interpolated string and the unary `-`, `+`, `!` and `~`. A negative number, such as `-5`, is a literal
   and not an operator. The following shapes are still `delete`:
-  - Literal operands that swap places, such as `foo(1 - 2)` against `foo(2 - 1)`, because a literal operand carries
-    no place (see *Enclosing calls*). A name that changes its place with them, as in `foo($x - 1)` against
-    `foo(1 - $x)`, still differs.
   - An operator in no argument of a call or an assertion, such as one that a closure returns or one assigned to a
     variable that the test passes on. It carries no token, so `foo(fn () => $x + 1)` against `foo(fn () => $x - 1)`
     and `$y = $x + 1; foo($y)` against `$y = $x - 1; foo($y)` are `delete`. An operator in an argument of a call
@@ -544,9 +546,12 @@ test lacks.
   An assertion, such as a Pest expectation (`expect`, `toBe`) or a PHPUnit `assert*` or `expect*` call, is left out
   of the path of a value that reaches it through another call: `expect(add(1, 2))` has the token
   `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`. An operand of an operator, a cast or a closure body
-  keeps no call path: `store(1 + 2)` has the tokens `value:1` and `value:2`. The operator itself carries a token at
-  the place of the argument, `in:function:store#0/operator:plus` (see *Argument names*). The literal part of an interpolated
-  string keeps no call path either: `store("tag_{$name}")` has the token `value:'tag_'`. A list item keeps the call
+  keeps no call path in its own token: `store(1 + 2)` has the tokens `value:1` and `value:2`. An operator in an
+  argument adds the place of the argument instead: the operator carries `in:function:store#0/operator:plus`, and each
+  literal operand carries its place in the operator, `in:function:store#0/operator:plus#0/value:1` and
+  `in:function:store#0/operator:plus#1/value:2` (see *Argument names*). The literal part of an interpolated string
+  keeps no call path in its own token either: `store("tag_{$name}")` has the token `value:'tag_'` and, at its place,
+  `in:function:store#0/operator:interpolatedstring#0/value:'tag_'`. A list item keeps the call
   path only as a direct item of an argument: `store([1])` has the token `in:function:store#0/value:1`, but
   `store([[1]])` has `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. So `store([[1]])` does
   not get the token of `store([1])` or `store(1)`, and `store(['tags' => ['a']])` does not get the token of
