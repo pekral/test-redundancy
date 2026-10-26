@@ -17,7 +17,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   prefix `operand:`, e.g. `in:function:foo#0/operand:variable:x`, also inside a unary operator such as `-$x` or `!$x`,
   and these candidates are `review`. The prefix combines with `element:` in the order the name is reached, so
   `foo([$x . $y])` has `in:function:foo#0/value:list-item/element:operand:variable:x` and is no longer `delete`
-  against `foo([$x])`. A name inside a cast keeps its token, because the cast carries a token of its own (#123).
+  against `foo([$x])`. This entry does not change a name inside a cast: it keeps its plain token, e.g.
+  `in:function:foo#0/variable:x` for `foo((string) $x)` (#123).
 - A test whose covering test holds a variable or a property at another place inside the same argument is no longer
   `merge-into-dataset` or `delete`. Before, a name inside an array carried only the place of the argument, so
   `toBe(['a' => $x, 'b' => 1])` and `toBe(['a' => 1, 'b' => $x])` had the same name token, the candidate was
