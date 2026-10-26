@@ -367,13 +367,18 @@ test lacks.
   - A test can assert one subject with two or more different argument lists, e.g. `$mapping->get(1)` and
     `$mapping->get(2)`. Then each of these assertions also has a `bound:` token. The token keeps the arguments of the
     subject and of the assertion as `#<position or name>:<value>`, so each expected value stays bound to its argument.
-    The value is the literal, or else the names the argument holds (see *Argument names*), such as `variable:a` or
-    `value:list-item/element:variable:a`, or else the source code of the argument, such as `bar($a)`. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
+    The value is the literal. An argument that holds no literal has the names it holds (see *Argument names*), such as
+    `variable:a` or `value:list-item/element:variable:a`, and an argument without names has its source code, such as
+    `bar($a)`. An argument that holds a literal, such as `$r['a']` or `[$a, 1]`, has its source code as well, so the
+    literal stays in the token. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
     `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, and
     `expect($manager->consumePipelineSkip($event, pipelineId: 99))->toBeFalse()` has
     `bound:expect:variable:manager/call:consumePipelineSkip#0:variable:event#pipelineId:99/call:toBeFalse`. A literal
-    or a constant as the receiver of the subject, or as the value that a cast subject casts, is kept as well, e.g.
-    `bound:expect:const:Status::A/call:label/call:toBe#0:'a'` and `bound:expect:cast:int/value:'5'/call:toBe#0:5`.
+    or a constant as the receiver of the subject is kept as well, e.g.
+    `bound:expect:const:Status::A/call:label/call:toBe#0:'a'`. The value that a cast subject casts is kept by its
+    token when it is a literal or a constant, and by its source code when it carries no token of its own, e.g.
+    `bound:expect:cast:int/value:'5'/call:toBe#0:5`, `bound:expect:cast:int/$r['a']/call:toBe#0:1` and
+    `bound:expect:cast:object/[1]/call:toEqual#0:1`.
     So `expect(json_encode($a))->toBe('x'); expect(json_encode($b))->toBe('y');` against the same assertions with the
     values swapped is `review`, not `delete`. The failure message of the
     assertion is left out, such as `'first'` in `toBe(Column::VALUE, 'first')` or in
