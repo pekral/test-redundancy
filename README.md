@@ -492,6 +492,8 @@ test lacks.
   `transfer([$a->get(), $b->get()])` against `transfer([$b->get(), $a->get()])` is. Properties that swap places inside
   an operator, a ternary or an interpolated string, such as `transfer($a->id . $b->id)` against
   `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument. A
+  property whose name is not written out, such as `$a->$field` or `$a->{'id'}`, has no name token, so
+  `transfer($a->$field)` against `transfer($b->$field)` is `delete` too. A
   parameter of the test closure or test method carries no name, because each dataset row fills it with another value. A
   property of a parameter is still named with the parameter, e.g. `variable:row/property:id` for `$row->id`. A variable
   that the test assigns once and passes on where it first reads it carries no name there, because that read is counted

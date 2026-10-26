@@ -9,8 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - A test that passes or expects the same properties of other or swapped objects as its covering test is no longer
-  `delete` when each property is a whole argument, a list element, an array key or value, an assertion subject or an
-  expected value. Before, the name token of a property carried no token for its object. So `transfer([$a->id, $b->id])`
+  `delete` when each property with a written-out name is a whole argument, a list element, an array key or value, an
+  assertion subject or an expected value. Before, the name token of a property carried no token for its object. So `transfer([$a->id, $b->id])`
   and `transfer([$b->id, $a->id])` had the same tokens, and one of them was `delete`. The same held for
   `transfer($a->id)` against `transfer($b->id)` and for `expect($a->id)->toBe(1)` against `expect($b->id)->toBe(1)`. Now
   the name of a property also names its object when the object is a variable, a property or a class, e.g.
@@ -21,12 +21,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `in:function:transfer#0/variable:a/property:id/value:1`. So `transfer([$a->id => 1, $b->id => 2])` against
   `transfer([$a->id => 2, $b->id => 1])` is `merge-into-dataset`, not `delete`. A nullsafe or a static property as the
   subject of an assertion is named the same way, so `$x = $a?->id; expect($x)->toBe(1)` against
-  `$x = $b?->id; expect($x)->toBe(1)` is `review`. Two shapes stay `delete`. A property of an object that has no name,
+  `$x = $b?->id; expect($x)->toBe(1)` is `review`. Three shapes stay `delete`. A property of an object that has no name,
   such as the result of a call in `$a->get()->id` or an element read in `$a['x']->id`, keeps `property:<name>` alone, so
   `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is `delete`. Properties
   that swap places inside an operator, a ternary or an interpolated string, such as `transfer($a->id . $b->id)` against
-  `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument
-  (#130).
+  `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument.
+  A property whose name is not written out, such as `$a->$field` or `$a->{'id'}`, has no name token, so
+  `transfer($a->$field)` against `transfer($b->$field)` is `delete` too (#130).
 
 ## [0.1.6] - 2026-10-26
 
