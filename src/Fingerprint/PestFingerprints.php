@@ -37,6 +37,8 @@ final readonly class PestFingerprints
 
     private const array REPEATING_METHODS = ['with', 'repeat'];
 
+    private const array EXPECTED_EXCEPTION_METHODS = ['throws', 'throwsIf', 'throwsUnless'];
+
     /**
      * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
      */
@@ -61,6 +63,12 @@ final readonly class PestFingerprints
         $tests = self::tests($statements);
 
         return new FileFingerprints(self::fingerprints($tests), self::sharedDatasets($tests), self::datasetParameters($tests));
+    }
+
+    public static function isExpectedExceptionToken(string $token): bool
+    {
+        return preg_match('~^call:(\w+)(?:#\w+/|$)~', $token, $matches) === 1
+            && in_array($matches[1], self::EXPECTED_EXCEPTION_METHODS, strict: true);
     }
 
     /**
@@ -164,11 +172,7 @@ final readonly class PestFingerprints
                 $dataset = $this->datasetName($datasetArgument);
                 $datasets = [...$datasets, ...$this->datasetNames($expression)];
             } elseif ($method !== null) {
-                $modifierTokens = TokenCollector::sum(
-                    $modifierTokens,
-                    TokenCollector::collect($expression->args),
-                    ['call:' . $method => 1],
-                );
+                $modifierTokens = TokenCollector::sum($modifierTokens, $this->modifierTokens($method, $expression));
             }
 
             $expression = $expression->var;
@@ -181,6 +185,26 @@ final readonly class PestFingerprints
             $dataset,
             array_values(array_unique(array_filter($datasets, static fn (?string $name): bool => $name !== null))),
         ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function modifierTokens(string $method, MethodCall $call): array
+    {
+        if (!in_array($method, self::EXPECTED_EXCEPTION_METHODS, strict: true)) {
+            return TokenCollector::sum(TokenCollector::collect($call->args), ['call:' . $method => 1]);
+        }
+
+        $tokens = ['call:' . $method => 1];
+
+        foreach ($call->getArgs() as $position => $argument) {
+            foreach (TokenCollector::collect($argument) as $token => $count) {
+                $tokens['call:' . $method . '#' . ($argument->name?->toString() ?? $position) . '/' . $token] = $count;
+            }
+        }
+
+        return $tokens;
     }
 
     /**

@@ -52,6 +52,13 @@ enum Action: string
         . 'To merge this test, make its whole expected value a row value of its own, so that the row expects none of them; '
         . 'otherwise keep this test.';
 
+    public const string EXPECTED_EXCEPTION_STEP = 'The covering test %s expects the exception in coveringDiffersBy (%s) '
+        . 'through throws(), throwsIf() or throwsUnless() on the whole test, and this test does not expect it. '
+        . 'A dataset cannot vary such an expectation per row, so a row with the values in differsBy would still expect '
+        . 'the exception of the covering test, and the case of this test would be lost. '
+        . 'To merge this test, move the expectation of both tests into their bodies as expect(fn () => …)->toThrow(), '
+        . 'with the exception class and the message as row values; otherwise keep this test.';
+
     public const string OMITTED_ARGUMENT_STEP = 'The covering test %s omits the arguments (%s) that this test passes '
         . 'and relies on their defaults. A dataset row passes every argument, so a merged row would pass them explicitly '
         . 'and the case "the argument is omitted, the default applies" would be lost. '
