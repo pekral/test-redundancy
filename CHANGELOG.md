@@ -17,11 +17,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   holds `->with('name')` at any position of its chain or as any argument of a `->with()`, so
   `->with('sizes')->with('name')` and `->with('sizes', 'name')` count too; before, only the first argument of the first
   `->with()` was read. The same detection now names those tests in the step of a row of a named dataset that
-  `delete` would remove (#87), which is `review`. A name inside an array or a spread argument, such as
-  `->with(['name'])` or `->with(...$names)`, is not read. A test the analysis does not parse, for example one whose
-  inline dataset has rows without a string key, and a test inside a `describe()` block that is bound to the dataset with
-  `describe(…)->with('name')`, are not detected as users, so the step then stays the plain add-row step. A named
-  dataset defined in another file is not parsed, so a candidate covered by one of its rows is `review`, as before.
+  `delete` would remove (#87), which is `review`. Only a string literal argument is read as a dataset name, so a test
+  that passes the name through a variable, a constant or a spread argument, such as `->with($name)`,
+  `->with(Names::SHAPES)` or `->with(...$names)`, is not detected as a user. A test the analysis does not parse, for
+  example one whose inline dataset has rows without a string key, and a test inside a `describe()` block that is bound
+  to the dataset with `describe(…)->with('name')`, are not detected as users, so the step then stays the plain add-row
+  step. A named dataset defined in another file is not parsed, so a candidate covered by one of its rows is `review`, as
+  before.
 - A test that passes a literal where its covering test passes a closure that returns another value is no longer
   `merge-into-dataset`. Before, a closure argument carried only the `non-literal` token of its position and the value
   it returns, so `foo('a')` against `foo(fn () => 1)`, `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])` and
