@@ -5539,6 +5539,69 @@ it('names the dataset of the covering row in the merge step of an analysed test'
         ->toBe('Add a row with the values in differsBy to the dataset of "it runs for any shape".');
 });
 
+it('names the named dataset of the covering row and the other tests that use it in the merge step', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            dataset('shapes', ['basic domain' => ['example.com']]);
+
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with('shapes');
+            it('also reads every shape', function (string $name): void {
+                expect(read($name))->toBeTrue();
+            })->with('shapes');
+            it('also writes every shape', function (string $name): void {
+                expect(write($name))->toBeTrue();
+            })->with('shapes');
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it notifies nobody when empty' => ['src/D.php:5'],
+            'it runs for any shape › basic domain' => ['src/D.php:5'],
+            'it also reads every shape › basic domain' => ['src/R.php:5'],
+            'it also writes every shape › basic domain' => ['src/W.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset)
+        ->and($report->candidates[0]->steps())->toBe([
+            'Add a row with the values in differsBy to the named dataset "shapes", '
+                . 'which these tests also use: "it also reads every shape", "it also writes every shape". '
+                . 'The row is added to each of them. '
+                . 'Add the row only when each of them stays correct with it; otherwise give "it runs for any shape" its own dataset.',
+            'Delete this test.',
+            Action::VERIFY_STEP,
+        ]);
+});
+
+it('keeps the plain merge step for a named dataset that only the covering test uses', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            dataset('shapes', ['basic domain' => ['example.com']]);
+
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with('shapes');
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it notifies nobody when empty' => ['src/D.php:5'],
+            'it runs for any shape › basic domain' => ['src/D.php:5'],
+        ],
+    );
+
+    expect($report->candidates[0]->action())->toBe(Action::MergeIntoDataset)
+        ->and($report->candidates[0]->steps()[0])
+        ->toBe('Add a row with the values in differsBy to the dataset of "it runs for any shape".');
+});
+
 it('deletes a test whose values equal a row of the covering dataset and keeps that row', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

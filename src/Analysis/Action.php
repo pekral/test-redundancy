@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Analysis;
 
+use Pekral\TestRedundancy\Fingerprint\SharedDataset;
+
 enum Action: string
 {
 
@@ -15,6 +17,11 @@ enum Action: string
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
     public const string ADD_ROW_STEP = 'Add a row with the values in differsBy to the dataset of "%s".';
+
+    public const string ADD_SHARED_ROW_STEP = 'Add a row with the values in differsBy to the named dataset "%s", '
+        . 'which these tests also use: %s. '
+        . 'The row is added to each of them. '
+        . 'Add the row only when each of them stays correct with it; otherwise give "%s" its own dataset.';
 
     public const string CONFIRM_STEP = 'Confirm that %s together assert the same input and result.';
 
@@ -71,7 +78,12 @@ enum Action: string
      * @param list<string> $coveringDiffersBy
      * @return list<string>
      */
-    public function steps(string $coveringTests, array $coveringDiffersBy, ?string $coveringDataset = null): array
+    public function steps(
+        string $coveringTests,
+        array $coveringDiffersBy,
+        ?string $coveringDataset = null,
+        ?SharedDataset $coveringSharedDataset = null,
+    ): array
     {
         return [
             ...match ($this) {
@@ -80,7 +92,7 @@ enum Action: string
                     'Delete this test.',
                 ],
                 self::MergeIntoDataset => [
-                    $this->mergeStep($coveringTests, $coveringDataset),
+                    $this->mergeStep($coveringTests, $coveringDataset, $coveringSharedDataset),
                     'Delete this test.',
                 ],
                 self::ReviewDatasetRow => [
@@ -104,11 +116,15 @@ enum Action: string
         ];
     }
 
-    private function mergeStep(string $coveringTests, ?string $coveringDataset): string
+    private function mergeStep(string $coveringTests, ?string $coveringDataset, ?SharedDataset $shared): string
     {
-        return $coveringDataset === null
-            ? sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests)
-            : sprintf(self::ADD_ROW_STEP, $coveringDataset);
+        if ($coveringDataset === null) {
+            return sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests);
+        }
+
+        return $shared === null
+            ? sprintf(self::ADD_ROW_STEP, $coveringDataset)
+            : sprintf(self::ADD_SHARED_ROW_STEP, $shared->name, $shared->quotedOtherTests(), $coveringDataset);
     }
 
 }
