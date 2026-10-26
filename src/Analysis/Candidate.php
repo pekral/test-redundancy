@@ -370,7 +370,7 @@ final readonly class Candidate implements JsonSerializable
 
     private static function isData(string $token): bool
     {
-        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1;
+        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 && !NonLiteralArguments::isNameOrPosition($token);
     }
 
 }

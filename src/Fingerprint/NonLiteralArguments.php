@@ -33,7 +33,7 @@ final class NonLiteralArguments
 
     private const string ELEMENT_PREFIX = 'element:';
 
-    private const string IDENTITY = '(?:' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
+    private const string IDENTITY = '(?:(?:[^/#]+/)*' . self::ELEMENT_PREFIX . ')?(?:variable|property):[^/]+';
 
     private const string CALL = '((?:call|function|new):[^/#]+)#\w+/';
 
@@ -90,6 +90,11 @@ final class NonLiteralArguments
     public static function identityPositionOf(string $token): ?string
     {
         return preg_match(self::IDENTITY_POSITION_PATTERN, $token, $matches) === 1 ? $matches[1] : null;
+    }
+
+    public static function isNameOrPosition(string $token): bool
+    {
+        return self::identityPositionOf($token) !== null || self::isToken($token);
     }
 
     public static function callOf(string $token): ?string
@@ -186,10 +191,13 @@ final class NonLiteralArguments
         return match (true) {
             $value instanceof BinaryOp => self::namesOfEach([$value->left, $value->right], $parameters),
             $value instanceof InterpolatedString => self::namesOfEach($value->parts, $parameters),
-            $value instanceof Array_ => self::elementNames(
-                array_merge([], ...array_map(static fn (ArrayItem $item): array => [$item->key, $item->value], $value->items)),
-                $parameters,
-            ),
+            $value instanceof Array_ => array_merge([], ...array_map(
+                static fn (ArrayItem $item): array => [
+                    ...self::elementNames([$item->key], $parameters),
+                    ...self::placed(self::itemPosition($item), self::elementNames([$item->value], $parameters)),
+                ],
+                $value->items,
+            )),
             $value instanceof ArrayDimFetch => self::elementNames([$value->var, $value->dim], $parameters),
             $value instanceof Ternary => self::namesOfEach([$value->cond, $value->if, $value->else], $parameters),
             $value instanceof Cast || $value instanceof UnaryMinus || $value instanceof UnaryPlus || $value instanceof BooleanNot
@@ -208,9 +216,27 @@ final class NonLiteralArguments
     private static function elementNames(array $values, array $parameters): array
     {
         return array_map(
-            static fn (string $name): string => str_starts_with($name, self::ELEMENT_PREFIX) ? $name : self::ELEMENT_PREFIX . $name,
+            static fn (string $name): string => str_contains($name, self::ELEMENT_PREFIX) ? $name : self::ELEMENT_PREFIX . $name,
             self::namesOfEach($values, $parameters),
         );
+    }
+
+    /**
+     * @param list<string> $names
+     * @return list<string>
+     */
+    private static function placed(?string $position, array $names): array
+    {
+        return $position === null ? $names : array_map(static fn (string $name): string => $position . '/' . $name, $names);
+    }
+
+    private static function itemPosition(ArrayItem $item): ?string
+    {
+        $key = $item->key;
+
+        return $key === null
+            ? TokenCollector::LIST_ITEM
+            : TokenCollector::nameOf($key, NodeContext::readProperties(new NodeFinder(), $key))[1] ?? self::identity($key);
     }
 
     /**
