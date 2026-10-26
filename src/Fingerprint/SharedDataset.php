@@ -14,9 +14,4 @@ final readonly class SharedDataset
     {
     }
 
-    public function quotedOtherTests(): string
-    {
-        return '"' . implode('", "', $this->otherTests) . '"';
-    }
-
 }

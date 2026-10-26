@@ -115,11 +115,11 @@ final readonly class Candidate implements JsonSerializable
     public function steps(): array
     {
         $sharedSteps = $this->sharedDataset === null ? [] : [
-            sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, $this->sharedDataset->quotedOtherTests()),
+            sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, Action::quoted($this->sharedDataset->otherTests)),
         ];
 
         if ($this->unionOnlyLines !== []) {
-            return [...$sharedSteps, sprintf(Action::UNION_ONLY_LINES_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
+            return [...$sharedSteps, sprintf(Action::UNION_ONLY_LINES_STEP, Action::quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
         if ($this->addsNoValueOrCall() && $this->coveringTokensForReview() !== []) {
@@ -127,7 +127,7 @@ final readonly class Candidate implements JsonSerializable
         }
 
         if ($this->sharedDataset !== null && $this->addsNoValueOrCall()) {
-            return [...$sharedSteps, sprintf(Action::CONFIRM_STEP, $this->quoted($this->coveredBy)), Action::VERIFY_STEP];
+            return [...$sharedSteps, sprintf(Action::CONFIRM_STEP, Action::quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
         $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
@@ -138,7 +138,7 @@ final readonly class Candidate implements JsonSerializable
             ...$this->coveringTokenSteps(Action::OMITTED_ARGUMENT_STEP, $this->omittedByCovering),
             ...$sharedSteps,
             ...$this->action()->steps(
-                $this->quoted($coveringTests),
+                Action::quoted($coveringTests),
                 $this->otherCoveringTokens(),
                 TestKey::datasetOf($this->coveredBy[0] ?? ''),
                 $this->coveringSharedDataset,
@@ -153,14 +153,6 @@ final readonly class Candidate implements JsonSerializable
     private function deleteOrReviewSharedRow(): Action
     {
         return $this->sharedDataset === null ? Action::Delete : Action::Review;
-    }
-
-    /**
-     * @param list<string> $testNames
-     */
-    private function quoted(array $testNames): string
-    {
-        return '"' . implode('", "', $testNames) . '"';
     }
 
     /**
@@ -228,7 +220,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringTokenSteps(string $step, array $tokens): array
     {
-        return $tokens === [] ? [] : [sprintf($step, $this->quoted($this->coveredBy), implode(', ', $tokens))];
+        return $tokens === [] ? [] : [sprintf($step, Action::quoted($this->coveredBy), implode(', ', $tokens))];
     }
 
     /**

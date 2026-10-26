@@ -115,6 +115,14 @@ enum Action: string
         ];
     }
 
+    /**
+     * @param list<string> $testNames
+     */
+    public static function quoted(array $testNames): string
+    {
+        return '"' . implode('", "', $testNames) . '"';
+    }
+
     private function mergeStep(string $coveringTests, ?string $coveringDataset, ?SharedDataset $shared): string
     {
         if ($coveringDataset === null) {
@@ -123,7 +131,7 @@ enum Action: string
 
         return $shared === null
             ? sprintf(self::ADD_ROW_STEP, $coveringDataset)
-            : sprintf(self::ADD_SHARED_ROW_STEP, $shared->name, $shared->quotedOtherTests(), $coveringDataset);
+            : sprintf(self::ADD_SHARED_ROW_STEP, $shared->name, self::quoted($shared->otherTests), $coveringDataset);
     }
 
 }
