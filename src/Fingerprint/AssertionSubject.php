@@ -192,7 +192,9 @@ final class AssertionSubject
     private static function argument(Arg $argument, int $position): string
     {
         $literal = TokenCollector::isData($argument->value) ? (string) TokenCollector::token($argument->value) : null;
-        $names = $literal === null ? NonLiteralArguments::namesOf($argument->value, parameters: []) : [];
+        $names = new NodeFinder()->findFirst($argument->value, TokenCollector::isData(...)) === null
+            ? NonLiteralArguments::namesOf($argument->value, parameters: [])
+            : [];
 
         return sprintf('#%s:%s', $argument->name?->toString() ?? $position, match (true) {
             $literal !== null => substr($literal, (int) strpos($literal, ':') + 1),
@@ -209,7 +211,7 @@ final class AssertionSubject
     private static function partToken(Expr $part, bool $withArguments): ?string
     {
         $token = match (true) {
-            $part instanceof Cast => CastToken::of($part, self::token($part->expr, $withArguments)),
+            $part instanceof Cast => CastToken::of($part, $withArguments ? self::castOperand($part->expr) : self::token($part->expr)),
             NodeContext::enumCaseReadBy($part) !== null => null,
             default => NonLiteralArguments::nameOrToken($part),
         };
@@ -220,6 +222,11 @@ final class AssertionSubject
             preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 => null,
             default => $token,
         };
+    }
+
+    private static function castOperand(Expr $operand): string
+    {
+        return self::token($operand) === null ? self::tokenOrSource($operand) : (string) self::token($operand, withArguments: true);
     }
 
     private static function expectedValue(Expr $chain): ?Expr

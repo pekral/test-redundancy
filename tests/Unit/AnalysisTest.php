@@ -5208,6 +5208,14 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         ->and($report->candidates[0]->differsBy)->toBe($differsBy)
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
+    'calls that encode a list with another literal' => [
+        'expect(json_encode([$a, 1]))->toBe(\'x\'); expect(json_encode([$a, 2]))->toBe(\'y\');',
+        'expect(json_encode([$a, 1]))->toBe(\'y\'); expect(json_encode([$a, 2]))->toBe(\'x\');',
+        [
+            'bound:expect:function:json_encode#0:[$a, 1]/call:toBe#0:\'x\'',
+            'bound:expect:function:json_encode#0:[$a, 2]/call:toBe#0:\'y\'',
+        ],
+    ],
     'calls that encode a list with another variable' => [
         'expect(json_encode([$a]))->toBe(\'x\'); expect(json_encode([$b]))->toBe(\'y\');',
         'expect(json_encode([$a]))->toBe(\'y\'); expect(json_encode([$b]))->toBe(\'x\');',
@@ -5229,6 +5237,26 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         'expect(json_encode(bar($a)))->toBe(\'y\'); expect(json_encode(bar($b)))->toBe(\'x\');',
         ['bound:expect:function:json_encode#0:bar($a)/call:toBe#0:\'x\'', 'bound:expect:function:json_encode#0:bar($b)/call:toBe#0:\'y\''],
     ],
+    'calls that measure other elements' => [
+        'expect(strlen($r[\'a\']))->toBe(1); expect(strlen($r[\'b\']))->toBe(2);',
+        'expect(strlen($r[\'a\']))->toBe(2); expect(strlen($r[\'b\']))->toBe(1);',
+        ['bound:expect:function:strlen#0:$r[\'a\']/call:toBe#0:1', 'bound:expect:function:strlen#0:$r[\'b\']/call:toBe#0:2'],
+    ],
+    'cast elements' => [
+        'expect((int) $r[\'a\'])->toBe(1); expect((int) $r[\'b\'])->toBe(2);',
+        'expect((int) $r[\'a\'])->toBe(2); expect((int) $r[\'b\'])->toBe(1);',
+        ['bound:expect:cast:int/$r[\'a\']/call:toBe#0:1', 'bound:expect:cast:int/$r[\'b\']/call:toBe#0:2'],
+    ],
+    'cast enum case reads' => [
+        'expect((string) Status::A->value)->toBe(\'1\'); expect((string) Status::B->value)->toBe(\'2\');',
+        'expect((string) Status::A->value)->toBe(\'2\'); expect((string) Status::B->value)->toBe(\'1\');',
+        ['bound:expect:cast:string/Status::A->value/call:toBe#0:\'1\'', 'bound:expect:cast:string/Status::B->value/call:toBe#0:\'2\''],
+    ],
+    'cast lists' => [
+        'expect((object) [1])->toEqual(1); expect((object) [2])->toEqual(2);',
+        'expect((object) [1])->toEqual(2); expect((object) [2])->toEqual(1);',
+        ['bound:expect:cast:object/[1]/call:toEqual#0:1', 'bound:expect:cast:object/[2]/call:toEqual#0:2'],
+    ],
     'cast literals' => [
         'expect((int) \'5\')->toBe(5); expect((int) \'6\')->toBe(6);',
         'expect((int) \'5\')->toBe(6); expect((int) \'6\')->toBe(5);',
@@ -5243,6 +5271,11 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         'expect(Status::A->label())->toBe(\'a\'); expect(Status::B->label())->toBe(\'b\');',
         'expect(Status::A->label())->toBe(\'b\'); expect(Status::B->label())->toBe(\'a\');',
         ['bound:expect:const:Status::A/call:label/call:toBe#0:\'a\'', 'bound:expect:const:Status::B/call:label/call:toBe#0:\'b\''],
+    ],
+    'methods called with other elements' => [
+        'expect($m->get($r[\'a\']))->toBe(1); expect($m->get($r[\'b\']))->toBe(2);',
+        'expect($m->get($r[\'a\']))->toBe(2); expect($m->get($r[\'b\']))->toBe(1);',
+        ['bound:expect:variable:m/call:get#0:$r[\'a\']/call:toBe#0:1', 'bound:expect:variable:m/call:get#0:$r[\'b\']/call:toBe#0:2'],
     ],
 ]);
 
