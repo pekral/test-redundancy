@@ -269,7 +269,7 @@ final readonly class Candidate implements JsonSerializable
             array_filter(
                 $this->assertsNothing ? $this->coveringTokens() : $this->coveringDiffersBy ?? [],
                 fn (string $token): bool => !TokenCollector::isAssertionToken($token)
-                    && NonLiteralArguments::identityPositionOf($token) === null
+                    && (NonLiteralArguments::identityPositionOf($token) === null || NonLiteralArguments::isCallArgument($token))
                     && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
             ),
         );
@@ -355,7 +355,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function isArgument(string $token): bool
     {
-        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null || NonLiteralArguments::isToken($token);
+        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null || NonLiteralArguments::isCallArgument($token);
     }
 
     private function isKey(string $token): bool
