@@ -20,21 +20,21 @@ function analyzer(): RedundancyAnalyzer
 /**
  * @param list<string> $coveredBy
  * @param list<string>|null $differsBy
- * @param list<string>|null $coveringDiffersBy
+ * @param list<string>|null $coveringDifference
  * @param list<string> $unionOnlyLines
  */
-function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDiffersBy = [], array $unionOnlyLines = []): Candidate
+function candidate(string $testCase, array $coveredBy, ?array $differsBy, ?array $coveringDifference = [], array $unionOnlyLines = []): Candidate
 {
-    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDiffersBy, $unionOnlyLines, assertsNothing: false);
+    return new Candidate('tests/FooTest.php :: ' . $testCase, $coveredBy, $differsBy, $coveringDifference, $unionOnlyLines, assertsNothing: false);
 }
 
 /**
  * @param list<string> $coveredBy
  * @param list<string>|null $differsBy
- * @param list<string> $coveringDiffersBy
+ * @param list<string> $coveringDifference
  * @param list<string> $unionOnlyLines
  */
-function sharedRow(array $coveredBy, ?array $differsBy, array $coveringDiffersBy = [], array $unionOnlyLines = []): Candidate
+function sharedRow(array $coveredBy, ?array $differsBy, array $coveringDifference = [], array $unionOnlyLines = []): Candidate
 {
     $dataset = new SharedDataset('collidingRows', ['it second', 'it third']);
 
@@ -42,7 +42,7 @@ function sharedRow(array $coveredBy, ?array $differsBy, array $coveringDiffersBy
         'tests/FooTest.php :: it first › one',
         $coveredBy,
         $differsBy,
-        $coveringDiffersBy,
+        $coveringDifference,
         $unionOnlyLines,
         assertsNothing: false,
         sharedDataset: $dataset,
@@ -132,7 +132,45 @@ it('reports the covering-side tokens that made the action review', function (Can
     'call in one of two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1'], ['call:forget']), []],
     'call in the covering test of a test that adds nothing' => [candidate('it works', ['it also works'], [], ['call:forget']), ['call:forget']],
     'data in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2']), []],
-    'unparsed' => [candidate('it works', ['it also works'], differsBy: null, coveringDiffersBy: null), []],
+    'unparsed' => [candidate('it works', ['it also works'], differsBy: null, coveringDifference: null), []],
+]);
+
+it('names coveringDiffersBy only the tokens that made the action review', function (FileReport $report, Action $action): void {
+    $candidate = $report->candidates[0];
+
+    expect($candidate->action())->toBe($action)
+        ->and($candidate->coveringDifference)->not->toBeEmpty()
+        ->and($candidate->jsonSerialize()['coveringDiffersBy'])->toBe([])
+        ->and($candidate)->not->toHaveProperty('coveringDiffersBy');
+})->with([
+    'cast only the covering test has (#136)' => [
+        fn (): FileReport => analyzeTestPair(
+            candidateBody: '$x = make(); expect(render())->toBe($x);',
+            coveringBody: '$x = make(); expect(render())->toBe((string) $x);',
+        ),
+        Action::Delete,
+    ],
+    'operator only the covering test has (#131)' => [
+        fn (): FileReport => analyzeTestPair(
+            candidateBody: 'foo(f()); expect(g())->toBe(1);',
+            coveringBody: 'foo(f() . \'a\'); expect(g())->toBe(1);',
+        ),
+        Action::Delete,
+    ],
+    'other values of a sibling dataset row' => [
+        fn (): FileReport => analyzeTokenTest(
+            source: "<?php\nit('a', function (\$v, \$w): void {\n    expect(f(\$v))->toBe(\$w);\n})->with(['one' => [1, 1], 'two' => [2, 2]]);\n",
+            linesByTest: ['it a › one' => ['src/Store.php:5'], 'it a › two' => ['src/Store.php:5']],
+        ),
+        Action::ReviewDatasetRow,
+    ],
+    'other values of one test of the same file' => [
+        fn (): FileReport => analyzeTestPair(
+            candidateBody: 'store(\'a\', 1); expect(g())->toBe(1);',
+            coveringBody: 'store(\'b\', 2); expect(g())->toBe(2);',
+        ),
+        Action::MergeIntoDataset,
+    ],
 ]);
 
 it('names the covering-side tokens in the review steps', function (): void {
@@ -352,7 +390,7 @@ it('asks for a review of a test whose covering test makes the same assertion on 
             'expect:variable:moment/call:format/call:toBe',
             'in:expect:variable:moment/call:format/call:toBe#0/value:\'2026-08-02 23:15:40\'',
         )
-        ->and($report->candidates[0]->coveringDiffersBy)->toContain('expect:call:applyTo/call:format/call:toBe')
+        ->and($report->candidates[0]->coveringDifference)->toContain('expect:call:applyTo/call:format/call:toBe')
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
@@ -1376,18 +1414,18 @@ it('does not list the literal a flat row and a sibling row with a nested list bo
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it registers › flat')
         ->and($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->coveringDiffersBy)->toContain('in:function:register#0/key:value:\'tags\'')
+        ->and($report->candidates[0]->coveringDifference)->toContain('in:function:register#0/key:value:\'tags\'')
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
 
 it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
     FileReport $report,
     string $test,
-    array $coveringDiffersBy,
+    array $coveringDifference,
 ): void {
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe($test)
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe($coveringDiffersBy)
+        ->and($report->candidates[0]->coveringDifference)->toBe($coveringDifference)
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
 })->with([
     'pest expectation of a dataset row' => [
@@ -2680,7 +2718,7 @@ it('still deletes a test without an assertion whose covering test only asserts m
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it approves example.com without an error')
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe(
+        ->and($report->candidates[0]->coveringDifference)->toBe(
             ['expect:function:approveDomain/call:toBe', 'function:expect', 'in:expect:function:approveDomain/call:toBe#0/value:\'approved\''],
         )
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
@@ -2984,7 +3022,7 @@ it('leaves the order of the keys of a covering test out of coveringDiffersBy', f
     );
 
     expect($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe([
+        ->and($report->candidates[0]->coveringDifference)->toBe([
             'in:function:store#0/key:value:\'b\'',
             'in:function:store#0/value:\'b\'/value:2',
         ]);
@@ -3331,7 +3369,7 @@ it('leaves the order of the list elements of a covering test out of coveringDiff
     );
 
     expect($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:2']);
+        ->and($report->candidates[0]->coveringDifference)->toBe(['in:function:store#0/value:list-item', 'in:function:store#0/value:2']);
 });
 
 it('reviews a test that arranges the records of its covering test in another order', function (): void {
@@ -3446,7 +3484,7 @@ it('lists a covering argument whose string has the prefix of an order token in i
     );
 
     expect($report->candidates[0]->testCase())->toBe('it fetches all')
-        ->and($report->candidates[0]->coveringDiffersBy)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
+        ->and($report->candidates[0]->coveringDifference)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 })->with([
     'calls' => ['/v1/calls:list'],
@@ -3478,7 +3516,7 @@ it('names the tests that use the dataset in the steps of every other action for 
         ->and($candidate->steps())->toBe($steps);
 })->with([
     'a covering test that sets a key the row lacks' => [
-        sharedRow(['it first › two'], [], coveringDiffersBy: ['in:function:store#0/key:value:\'b\'']),
+        sharedRow(['it first › two'], [], coveringDifference: ['in:function:store#0/key:value:\'b\'']),
         Action::Review,
         [
             SHARED_ROW_STEP,
