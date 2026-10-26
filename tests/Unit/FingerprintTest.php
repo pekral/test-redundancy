@@ -179,11 +179,25 @@ it('collects the subject of an assertion in the assertion tokens', function (str
         'read:function:add' => 1,
     ],
     ],
+    'nullsafe property passed to expect' => ['expect($template?->order)->toBeGreaterThan(0);', [
+        'expect:variable:template/property:order/call:toBeGreaterThan' => 1,
+        'function:expect' => 1,
+        'in:expect:variable:template/property:order/call:toBeGreaterThan#0/value:0' => 1,
+        'in:function:expect#0/variable:template/property:order' => 1,
+    ],
+    ],
     'property passed to expect' => ['expect($template->order)->toBeGreaterThan(0);', [
         'expect:variable:template/property:order/call:toBeGreaterThan' => 1,
         'function:expect' => 1,
         'in:expect:variable:template/property:order/call:toBeGreaterThan#0/value:0' => 1,
         'in:function:expect#0/variable:template/property:order' => 1,
+    ],
+    ],
+    'static property passed to expect' => ['expect(Template::$order)->toBeGreaterThan(0);', [
+        'expect:property:Template::order/call:toBeGreaterThan' => 1,
+        'function:expect' => 1,
+        'in:expect:property:Template::order/call:toBeGreaterThan#0/value:0' => 1,
+        'in:function:expect#0/property:Template::order' => 1,
     ],
     ],
     'value passed to and' => ['expect($user)->toBeTrue()->and(load())->not->toBeEmpty();', [

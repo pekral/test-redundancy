@@ -489,13 +489,15 @@ test lacks.
   `$class::$shop` has `variable:class/property:shop`. A property of an object that has no name, such as the result of
   a call or an element read in `$a->get()->id` or `$a['x']->id`, has `property:<name>` alone. So
   `transfer([$a->get()->id, $b->get()->id])` against `transfer([$b->get()->id, $a->get()->id])` is still `delete`, as
-  `transfer([$a->get(), $b->get()])` against `transfer([$b->get(), $a->get()])` is. A parameter of the test closure or
-  test method carries no name, because each dataset row fills it with another value. A property of a parameter is still
-  named with the parameter, e.g. `variable:row/property:id` for `$row->id`. A variable that the test assigns once and
-  passes on where it first reads it carries no name there, because that read is counted as the value the variable
-  holds. A later read of the variable carries the name. A name that only the covering test has does not turn a
-  `delete` candidate into `review`: the candidate passes another value at the same position, or the position token
-  already lists the argument.
+  `transfer([$a->get(), $b->get()])` against `transfer([$b->get(), $a->get()])` is. Properties that swap places inside
+  an operator, a ternary or an interpolated string, such as `transfer($a->id . $b->id)` against
+  `transfer($b->id . $a->id)`, are `delete` too, because an `operand:` token carries no place inside the argument. A
+  parameter of the test closure or test method carries no name, because each dataset row fills it with another value. A
+  property of a parameter is still named with the parameter, e.g. `variable:row/property:id` for `$row->id`. A variable
+  that the test assigns once and passes on where it first reads it carries no name there, because that read is counted
+  as the value the variable holds. A later read of the variable carries the name. A name that only the covering test has
+  does not turn a `delete` candidate into `review`: the candidate passes another value at the same position, or the
+  position token already lists the argument.
 - **Assertion reads.** A call that sits directly in an argument of an assertion, or in the receiver chain of that argument, such as
   `expect(activeState())` or `assertSame(5, $order->total())`, adds the token `read:` followed by its own token, such
   as `read:function:activeState`, beside the token itself. The token counts how many of the calls are such reads, so
