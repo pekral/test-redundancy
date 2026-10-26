@@ -8,6 +8,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that pairs the same subjects with swapped values, where a subject carries no token of its own, is no longer
+  `delete`. Before, the pairing of a subject with its value was lost in these shapes, so
+  `expect('5')->toBe(5); expect('6')->toBe(6);` and `expect('5')->toBe(6); expect('6')->toBe(5);` had the same tokens,
+  and one of them was `delete`. The same held for variables as subjects (`expect($a)->toBe(1)`), calls on other
+  variables as subjects (`expect(json_encode($a))->toBe('x')`), variables as array keys
+  (`store([$a => 1, $b => 2])`) and closures that return literals (`store(fn () => 1, fn () => 2)`). Now:
+  - A variable that the test does not assign once carries its name wherever a property does: as an assertion subject,
+    e.g. `expect:variable:a/call:toBe` and `in:expect:variable:a/call:toBe#0/value:1`, and as an array key, e.g.
+    `in:function:store#0/variable:a/value:1` and `in:function:store#0/keys:variable:a>variable:b`. These swapped pairs
+    are `merge-into-dataset`, and variable keys that swap places are `review`.
+  - When a test has two or more assertions with different subjects that carry no token, such as literals, constants
+    or element reads, each argument of these assertions carries its subject in its path: a literal or a constant by
+    its token, any other expression by its source code, e.g. `in:expect:value:'5'/call:toBe#0/value:5` and
+    `in:expect:$r['a']/call:toBe#0/value:1`. The swapped pair is `merge-into-dataset`. A test with one such subject
+    keeps `in:call:toBe#0/value:5`. A test with two or more such subjects is now `review`, not
+    `merge-into-dataset`, against a covering test that asserts other such subjects. The last argument of a PHPUnit
+    `assert*` call is the subject when every argument other than the failure message is a literal or a constant, so
+    `$this->assertSame(5, '5')` has the subject `'5'`. A variable as the failure message is never the subject.
+  - A `bound:` token (#96) keeps every argument of the subject and of the assertion, not only a literal: the names
+    the argument holds, or else its source code, e.g. `bound:expect:function:json_encode#0:variable:a/call:toBe#0:'x'`
+    and `bound:expect:function:json_encode#0:bar($a)/call:toBe#0:'x'`. It also keeps a literal or a constant as the
+    receiver of the subject or as the value that a cast subject casts, e.g.
+    `bound:expect:const:Status::A/call:label/call:toBe#0:'a'`. These swapped pairs are `review`.
+  - A closure or an arrow function passed to a call passes on the value it returns at the place of its argument, e.g.
+    `in:function:store#0/value:1` for `store(fn () => 1)`. A closure as the subject of an assertion stands for the
+    value it returns, so `expect(fn () => import(1))->toThrow(A::class)` has the subject `function:import`. The value
+    a closure returns is the expression of each of its own `return` statements.
+
+  Three shapes stay `delete`. A closure that the test assigns to a variable and then passes on, such as
+  `$f = fn () => 1; $g = fn () => 2; store($f, $g);` against the same test with the values swapped, carries no place.
+  An operator that a closure returns carries no token, as #131 states, so `store(fn () => $x + 1, fn () => $x + 2)`
+  against the closures swapped is `delete`. A call that is not an assertion and pairs a name with a literal in its
+  arguments, such as `store($a, 1); store($b, 2);` against `store($a, 2); store($b, 1);`, has no pairing token
+  (#133).
 - A test that spreads an argument of a call that is not an assertion where its covering test passes it plain, or the
   other way round, is no longer `delete`. Before, a spread argument carried the same tokens as the plain argument, so
   `foo(...$x)` and `foo($x)` had the same tokens, and one of them was `delete`. Now the spread of an argument of a call

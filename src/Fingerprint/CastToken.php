@@ -21,7 +21,7 @@ final class CastToken
      */
     public static function withOperandName(Cast $cast, array $readProperties): string
     {
-        return self::of($cast, TokenCollector::nameOf($cast->expr, $readProperties)[1] ?? NonLiteralArguments::identity($cast->expr));
+        return self::of($cast, TokenCollector::nameOf($cast->expr, $readProperties)[1] ?? null);
     }
 
     /**

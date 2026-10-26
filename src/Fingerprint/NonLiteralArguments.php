@@ -144,6 +144,7 @@ final class NonLiteralArguments
     {
         return match (true) {
             $node === null => null,
+            $node instanceof Variable,
             $node instanceof PropertyFetch,
             $node instanceof NullsafePropertyFetch,
             $node instanceof StaticPropertyFetch => self::identity($node),
@@ -189,6 +190,31 @@ final class NonLiteralArguments
     }
 
     /**
+     * @param list<string> $parameters
+     * @return list<string>
+     */
+    public static function namesOf(Expr $value, array $parameters): array
+    {
+        $operands = self::operandsOf($value);
+
+        return match (true) {
+            $operands !== null => self::operatorNames(NodeContext::kindOf($value), $operands, $parameters),
+            $value instanceof Array_ => array_merge([], ...array_map(
+                static fn (ArrayItem $item): array => [
+                    ...self::kindedNames(self::ELEMENT_PREFIX, [$item->key], $parameters),
+                    ...self::placed(self::itemPosition($item), self::kindedNames(self::ELEMENT_PREFIX, [$item->value], $parameters)),
+                ],
+                $value->items,
+            )),
+            $value instanceof ArrayDimFetch => self::kindedNames(self::ELEMENT_PREFIX, [$value->var, $value->dim], $parameters),
+            $value instanceof Cast => self::namesOf($value->expr, $parameters),
+            $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
+            NodeContext::enumCaseReadBy($value) !== null => [],
+            default => array_filter([self::identity($value)], is_string(...)),
+        };
+    }
+
+    /**
      * @param array<\PhpParser\Node\Expr\CallLike> $calls
      * @param array<int, list<string>> $paths
      * @param list<string> $parameters
@@ -224,31 +250,6 @@ final class NonLiteralArguments
             ),
             $callToken === null ? [] : self::tokenizedArguments($call),
         ));
-    }
-
-    /**
-     * @param list<string> $parameters
-     * @return list<string>
-     */
-    private static function namesOf(Expr $value, array $parameters): array
-    {
-        $operands = self::operandsOf($value);
-
-        return match (true) {
-            $operands !== null => self::operatorNames(NodeContext::kindOf($value), $operands, $parameters),
-            $value instanceof Array_ => array_merge([], ...array_map(
-                static fn (ArrayItem $item): array => [
-                    ...self::kindedNames(self::ELEMENT_PREFIX, [$item->key], $parameters),
-                    ...self::placed(self::itemPosition($item), self::kindedNames(self::ELEMENT_PREFIX, [$item->value], $parameters)),
-                ],
-                $value->items,
-            )),
-            $value instanceof ArrayDimFetch => self::kindedNames(self::ELEMENT_PREFIX, [$value->var, $value->dim], $parameters),
-            $value instanceof Cast => self::namesOf($value->expr, $parameters),
-            $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
-            NodeContext::enumCaseReadBy($value) !== null => [],
-            default => array_filter([self::identity($value)], is_string(...)),
-        };
     }
 
     /**
@@ -335,7 +336,7 @@ final class NonLiteralArguments
 
         return $key === null
             ? TokenCollector::LIST_ITEM
-            : TokenCollector::nameOf($key, NodeContext::readProperties(new NodeFinder(), $key))[1] ?? self::identity($key);
+            : TokenCollector::nameOf($key, NodeContext::readProperties(new NodeFinder(), $key))[1] ?? null;
     }
 
     /**

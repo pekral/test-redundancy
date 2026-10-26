@@ -110,6 +110,20 @@ final class OrderTokens
         ));
     }
 
+    public static function sourceOf(Expr $element): string
+    {
+        return new Standard()->prettyPrint(new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
+
+            public function leaveNode(Node $node): ?Node
+            {
+                $node->setAttributes($node instanceof Double ? ['kind' => Double::KIND_FLOAT] : []);
+
+                return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
+            }
+
+        })->traverse([$element]));
+    }
+
     /**
      * @param list<array{0: string, 1: string}> $orderedNames
      * @return array<string, int>
@@ -167,20 +181,6 @@ final class OrderTokens
             $name !== null => [$item->value, $name],
             default => null,
         };
-    }
-
-    private static function sourceOf(Expr $element): string
-    {
-        return new Standard()->prettyPrint(new NodeTraverser(new CloningVisitor(), new class () extends NodeVisitorAbstract {
-
-            public function leaveNode(Node $node): ?Node
-            {
-                $node->setAttributes($node instanceof Double ? ['kind' => Double::KIND_FLOAT] : []);
-
-                return $node instanceof ConstFetch ? new ConstFetch(new Name($node->name->toLowerString())) : null;
-            }
-
-        })->traverse([$element]));
     }
 
     /**

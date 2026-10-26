@@ -61,17 +61,19 @@ final class TokenCollector
         }
 
         $nodeFinder = new NodeFinder();
+        $subjects = AssertionSubject::byAssertion($nodeFinder, $nodes, $assignedValues);
+        $namedSubjects = AssertionSubject::named($subjects);
         $negatedScalars = NodeContext::negatedScalars($nodeFinder, $nodes);
         $readProperties = NodeContext::readProperties($nodeFinder, $nodes);
         $arrayKeys = NodeContext::arrayKeys($nodeFinder, $nodes);
-        $paths = self::paths($nodeFinder, $nodes, $assignedValues, $readProperties);
+        $paths = self::paths($nodeFinder, $nodes, AssertionSubject::paired($subjects), $readProperties);
         $loopBodies = NodeContext::loopBodies($nodeFinder, $nodes);
         $assertionReads = NodeContext::assertionReads($nodeFinder, $nodes);
         $tokens = NonLiteralArguments::tokens($nodeFinder, $nodes, $paths, $assertionReads, $parameters);
         $carriesToken = static fn (Node $node): bool => self::carriesContract($node) || self::listLength($node) > 0;
 
         foreach ($nodeFinder->find($nodes, $carriesToken) as $node) {
-            $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::tokenWithSubject($node, $assignedValues);
+            $token = isset($negatedScalars[spl_object_id($node)]) ? null : self::tokenWithSubject($node, $namedSubjects);
 
             if ($token === null) {
                 continue;
@@ -86,7 +88,7 @@ final class TokenCollector
         return self::sum(
             $tokens,
             OrderTokens::ofArrays($nodeFinder, $nodes, $paths, $readProperties),
-            self::boundAssertions($nodeFinder, $nodes, $assignedValues),
+            self::boundAssertions($nodeFinder, $nodes, $namedSubjects),
         );
     }
 
@@ -206,13 +208,18 @@ final class TokenCollector
         return $sum;
     }
 
+    public static function calledMethod(string $callToken): string
+    {
+        return substr($callToken, (int) strrpos($callToken, ':') + 1);
+    }
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param array<int, \PhpParser\Node\Expr> $subjects
      * @param array<int, string> $readProperties
      * @return array<int, list<string>>
      */
-    private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues, array $readProperties): array
+    private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $subjects, array $readProperties): array
     {
         $paths = [];
         $isPathNode = static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike || $node instanceof Cast;
@@ -221,7 +228,7 @@ final class TokenCollector
             $segments = match (true) {
                 $pathNode instanceof ArrayItem => self::keySegments($nodeFinder, $pathNode, $readProperties),
                 $pathNode instanceof Cast => CastToken::segments($nodeFinder, $pathNode),
-                default => self::argumentSegments($pathNode, $assignedValues),
+                default => self::argumentSegments($pathNode, $subjects),
             };
 
             foreach ($segments as $nodeId => $segment) {
@@ -244,12 +251,12 @@ final class TokenCollector
     }
 
     /**
-     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param array<int, \PhpParser\Node\Expr> $subjects
      * @return array<int, string>
      */
-    private static function argumentSegments(Node $call, array $assignedValues): array
+    private static function argumentSegments(Node $call, array $subjects): array
     {
-        $callToken = self::tokenWithSubject($call, $assignedValues);
+        $callToken = self::tokenWithSubject($call, $subjects);
         $arguments = $call instanceof CallLike ? $call->getRawArgs() : [];
         $isAssertion = $callToken !== null && self::isAssertion(self::calledMethod($callToken));
         $segments = [];
@@ -282,38 +289,33 @@ final class TokenCollector
     }
 
     /**
-     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param array<int, \PhpParser\Node\Expr> $subjects
      */
-    private static function tokenWithSubject(Node $node, array $assignedValues): ?string
+    private static function tokenWithSubject(Node $node, array $subjects): ?string
     {
         $token = self::token($node);
-        $subject = $token === null ? null : AssertionSubject::of($node, self::calledMethod($token), $assignedValues);
+        $subject = $subjects[spl_object_id($node)] ?? null;
 
-        return $token === null ? null : ($subject === null ? '' : 'expect:' . AssertionSubject::token($subject) . '/') . $token;
+        return $token === null ? null : ($subject === null ? '' : 'expect:' . AssertionSubject::tokenOrSource($subject) . '/') . $token;
     }
 
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
-     * @param array<string, \PhpParser\Node\Expr> $assignedValues
+     * @param array<int, \PhpParser\Node\Expr> $subjects
      * @return array<string, int>
      */
-    private static function boundAssertions(NodeFinder $nodeFinder, Node|array $nodes, array $assignedValues): array
+    private static function boundAssertions(NodeFinder $nodeFinder, Node|array $nodes, array $subjects): array
     {
         $assertionsBySubject = [];
 
-        foreach ($nodeFinder->find($nodes, self::carriesContract(...)) as $node) {
-            $token = self::token($node);
-            $subject = $token === null ? null : AssertionSubject::of($node, self::calledMethod($token), $assignedValues);
-
-            if ($token === null || $subject === null) {
-                continue;
-            }
-
-            $boundSubject = (string) AssertionSubject::token($subject, withLiteralArguments: true);
+        foreach ($nodeFinder->find($nodes, static fn (Node $node): bool => isset($subjects[spl_object_id($node)])) as $node) {
+            $token = (string) self::token($node);
+            $subject = $subjects[spl_object_id($node)];
+            $boundSubject = (string) AssertionSubject::token($subject, withArguments: true);
             $assertionsBySubject[(string) AssertionSubject::token($subject)][] = [
                 $boundSubject,
                 self::BOUND_PREFIX . 'expect:' . $boundSubject . '/' . $token
-                    . AssertionSubject::literalArguments($node, self::calledMethod($token)),
+                    . AssertionSubject::arguments($node, self::calledMethod($token)),
             ];
         }
 
@@ -361,11 +363,6 @@ final class TokenCollector
             && $propertyFetch->name instanceof Identifier
             && self::isExpectationMethod($propertyFetch->name->toString())
             && AssertionSubject::isExpectationChain($propertyFetch->var);
-    }
-
-    private static function calledMethod(string $callToken): string
-    {
-        return substr($callToken, (int) strrpos($callToken, ':') + 1);
     }
 
     private static function isAssertion(string $method): bool

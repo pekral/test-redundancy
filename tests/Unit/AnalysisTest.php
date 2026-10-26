@@ -468,7 +468,7 @@ it('asks for a review of a test whose covering test expects its result for a nam
         ->and($report->candidates[0]->testCase())->toBe('it does not skip the event for a different pipeline than the one that produced it')
         ->and($report->candidates[0]->differsBy)->toContain(
             'in:call:consumePipelineSkip#pipelineId/value:99',
-            'bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse',
+            'bound:expect:variable:manager/call:consumePipelineSkip#0:variable:event#pipelineId:99/call:toBeFalse',
         )
         ->and($report->candidates[0]->action())->toBe(Action::Review);
 });
@@ -1574,6 +1574,19 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             PHP,
         ['in:function:notify#0/value:false', 'in:expect:function:notify/call:toBe#0/value:true'],
     ],
+    'swapped values the rows pair with the same literal subjects' => [
+        <<<'PHP'
+            <?php
+            it('notifies', function (string $first, int $firstCount, string $second, int $secondCount): void {
+                expect($first)->toBe($firstCount);
+                expect($second)->toBe($secondCount);
+            })->with([
+                'first' => ['5', 5, '6', 6],
+                'second' => ['5', 6, '6', 5],
+            ]);
+            PHP,
+        ['in:expect:value:\'5\'/call:toBe#0/value:5', 'in:expect:value:\'6\'/call:toBe#0/value:6'],
+    ],
     'swapped values the test reads without the parameter name' => [
         <<<'PHP'
             <?php
@@ -1982,7 +1995,7 @@ it('asks for a review of a test whose expected value lacks an element, a key or 
             it('expects the line', fn () => expect(fn () => import('a,b,c'))->toThrow(InvalidArgumentException::class, 'vocatives_cz.csv:2'));
             PHP,
         'it expects the line',
-        'in:call:toThrow#1/value:\'vocatives_cz.csv:2\'',
+        'in:expect:function:import/call:toThrow#1/value:\'vocatives_cz.csv:2\'',
     ],
     'list without an element the covering test expects beside an element both expect with another value' => [
         <<<'PHP'
@@ -5058,6 +5071,165 @@ it('merges, never deletes, a test whose cast arguments, cast subjects or cast ke
             'in:expect:variable:r/call:a/call:toBe#0/cast:int/value:\'1\'',
             'in:expect:variable:r/call:b/call:toBe#0/cast:int/value:\'2\'',
         ],
+    ],
+]);
+
+it('merges, never deletes, a test whose subjects without a token of their own pair the values of its covering test swapped', function (
+    string $candidateBody,
+    string $coveringBody,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+})->with([
+    'closures that return literals as arguments' => [
+        'store(fn () => 1, fn () => 2);',
+        'store(fn () => 2, fn () => 1);',
+        ['in:function:store#0/value:1', 'in:function:store#1/value:2'],
+    ],
+    'closures with a return statement as arguments' => [
+        'store(function () { return 1; }, function () { return 2; });',
+        'store(function () { return 2; }, function () { return 1; });',
+        ['in:function:store#0/value:1', 'in:function:store#1/value:2'],
+    ],
+    'constants as the subjects of expect()' => [
+        'expect(Foo::A)->toBe(1); expect(Foo::B)->toBe(2);',
+        'expect(Foo::A)->toBe(2); expect(Foo::B)->toBe(1);',
+        ['in:expect:const:Foo::A/call:toBe#0/value:1', 'in:expect:const:Foo::B/call:toBe#0/value:2'],
+    ],
+    'element reads as the subjects of expect()' => [
+        'expect($r[\'a\'])->toBe(1); expect($r[\'b\'])->toBe(2);',
+        'expect($r[\'a\'])->toBe(2); expect($r[\'b\'])->toBe(1);',
+        ['in:expect:$r[\'a\']/call:toBe#0/value:1', 'in:expect:$r[\'b\']/call:toBe#0/value:2'],
+    ],
+    'literals as the actual values of assertSame()' => [
+        '$this->assertSame(5, \'5\'); $this->assertSame(6, \'6\');',
+        '$this->assertSame(6, \'5\'); $this->assertSame(5, \'6\');',
+        ['in:expect:value:\'5\'/call:assertSame#0/value:5', 'in:expect:value:\'6\'/call:assertSame#0/value:6'],
+    ],
+    'literals as the subjects of an and() chain' => [
+        'expect(\'5\')->toBe(5)->and(\'6\')->toBe(6);',
+        'expect(\'5\')->toBe(6)->and(\'6\')->toBe(5);',
+        ['in:expect:value:\'5\'/call:toBe#0/value:5', 'in:expect:value:\'6\'/call:toBe#0/value:6'],
+    ],
+    'literals as the subjects of expect()' => [
+        'expect(\'5\')->toBe(5); expect(\'6\')->toBe(6);',
+        'expect(\'5\')->toBe(6); expect(\'6\')->toBe(5);',
+        ['in:expect:value:\'5\'/call:toBe#0/value:5', 'in:expect:value:\'6\'/call:toBe#0/value:6'],
+    ],
+    'literals the test assigns to the subjects of expect()' => [
+        '$a = 5; $b = 6; expect($a)->toBe(5); expect($b)->toBe(6);',
+        '$a = 5; $b = 6; expect($a)->toBe(6); expect($b)->toBe(5);',
+        ['in:expect:value:5/call:toBe#0/value:5', 'in:expect:value:6/call:toBe#0/value:6'],
+    ],
+    'variables as array keys' => [
+        'store([$a => 1, $b => 2]);',
+        'store([$a => 2, $b => 1]);',
+        ['in:function:store#0/variable:a/value:1', 'in:function:store#0/variable:b/value:2'],
+    ],
+    'variables as the actual values of assertSame() next to a message variable' => [
+        '$this->assertSame(1, $a, $message); $this->assertSame(2, $b, $message);',
+        '$this->assertSame(2, $a, $message); $this->assertSame(1, $b, $message);',
+        ['in:expect:variable:a/call:assertSame#0/value:1', 'in:expect:variable:b/call:assertSame#0/value:2'],
+    ],
+    'variables as the subjects of expect()' => [
+        'expect($a)->toBe(1); expect($b)->toBe(2);',
+        'expect($a)->toBe(2); expect($b)->toBe(1);',
+        ['in:expect:variable:a/call:toBe#0/value:1', 'in:expect:variable:b/call:toBe#0/value:2'],
+    ],
+]);
+
+it('pairs literal subjects with their values only in a test that asserts two or more of them', function (
+    string $candidateBody,
+    string $coveringBody,
+    array $differsBy,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'one literal subject against another literal subject' => [
+        'expect(\'7\')->toBe(7);',
+        'expect(\'5\')->toBe(5);',
+        ['in:function:expect#0/value:\'7\'', 'in:call:toBe#0/value:7'],
+        Action::MergeIntoDataset,
+    ],
+    'two literal subjects against two other literal subjects' => [
+        'expect(\'7\')->toBe(7); expect(\'8\')->toBe(8);',
+        'expect(\'5\')->toBe(5); expect(\'6\')->toBe(6);',
+        [
+            'in:function:expect#0/value:\'7\'',
+            'in:expect:value:\'7\'/call:toBe#0/value:7',
+            'in:function:expect#0/value:\'8\'',
+            'in:expect:value:\'8\'/call:toBe#0/value:8',
+        ],
+        Action::Review,
+    ],
+]);
+
+it('reviews, never deletes, a test whose subjects differ only in an argument or a receiver and pair swapped values', function (
+    string $candidateBody,
+    string $coveringBody,
+    array $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    {$candidateBody}\n});\nit('b', function (): void {\n    {$coveringBody}\n});\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toBe($differsBy)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'calls that encode a list with another variable' => [
+        'expect(json_encode([$a]))->toBe(\'x\'); expect(json_encode([$b]))->toBe(\'y\');',
+        'expect(json_encode([$a]))->toBe(\'y\'); expect(json_encode([$b]))->toBe(\'x\');',
+        [
+            'bound:expect:function:json_encode#0:value:list-item/element:variable:a/call:toBe#0:\'x\'',
+            'bound:expect:function:json_encode#0:value:list-item/element:variable:b/call:toBe#0:\'y\'',
+        ],
+    ],
+    'calls that encode another variable' => [
+        'expect(json_encode($a))->toBe(\'x\'); expect(json_encode($b))->toBe(\'y\');',
+        'expect(json_encode($a))->toBe(\'y\'); expect(json_encode($b))->toBe(\'x\');',
+        [
+            'bound:expect:function:json_encode#0:variable:a/call:toBe#0:\'x\'',
+            'bound:expect:function:json_encode#0:variable:b/call:toBe#0:\'y\'',
+        ],
+    ],
+    'calls that encode the result of a call on another variable' => [
+        'expect(json_encode(bar($a)))->toBe(\'x\'); expect(json_encode(bar($b)))->toBe(\'y\');',
+        'expect(json_encode(bar($a)))->toBe(\'y\'); expect(json_encode(bar($b)))->toBe(\'x\');',
+        ['bound:expect:function:json_encode#0:bar($a)/call:toBe#0:\'x\'', 'bound:expect:function:json_encode#0:bar($b)/call:toBe#0:\'y\''],
+    ],
+    'cast literals' => [
+        'expect((int) \'5\')->toBe(5); expect((int) \'6\')->toBe(6);',
+        'expect((int) \'5\')->toBe(6); expect((int) \'6\')->toBe(5);',
+        ['bound:expect:cast:int/value:\'5\'/call:toBe#0:5', 'bound:expect:cast:int/value:\'6\'/call:toBe#0:6'],
+    ],
+    'closures that return calls with other literals' => [
+        'expect(fn () => import(1))->toThrow(A::class); expect(fn () => import(2))->toThrow(B::class);',
+        'expect(fn () => import(2))->toThrow(A::class); expect(fn () => import(1))->toThrow(B::class);',
+        ['bound:expect:function:import#0:1/call:toThrow#0:A::class', 'bound:expect:function:import#0:2/call:toThrow#0:B::class'],
+    ],
+    'methods called on other enum cases' => [
+        'expect(Status::A->label())->toBe(\'a\'); expect(Status::B->label())->toBe(\'b\');',
+        'expect(Status::A->label())->toBe(\'b\'); expect(Status::B->label())->toBe(\'a\');',
+        ['bound:expect:const:Status::A/call:label/call:toBe#0:\'a\'', 'bound:expect:const:Status::B/call:label/call:toBe#0:\'b\''],
     ],
 ]);
 

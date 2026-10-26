@@ -333,7 +333,9 @@ test lacks.
   - The subject of a Pest expectation is the value passed to the nearest `->and()` before the call, or else to
     `expect()`. Every call of the expectation chain carries it, `->and()` and `->each` included.
   - The subject of a PHPUnit `assert*` call is its last argument that is not a literal or a constant:
-    `self::assertSame(3, add(1, 2))` has the token `expect:function:add/call:self::assertSame`.
+    `self::assertSame(3, add(1, 2))` has the token `expect:function:add/call:self::assertSame`. The failure message is
+    never the subject. When every other argument is a literal or a constant, the last of them is the subject, such as
+    `'5'` in `$this->assertSame(5, '5')`.
   - A property carries its name token (see *Argument names*), e.g. `variable:template/property:order`. A call, a
     function call and a `new` expression carry their own token.
   - A method call also carries its receiver before its own token: a variable by its name as `variable:<name>`, also
@@ -346,15 +348,32 @@ test lacks.
     `call:label`.
   - A variable that the test assigns once in its own statements stands for the value assigned to it:
     `$sum = add(1, 2); expect($sum)->toBe(3);` has the same assertion tokens as `expect(add(1, 2))->toBe(3)`.
-  - A literal, a constant, any other variable, a closure and any other expression give no subject. The assertion then
-    keeps its token without the prefix, e.g. `call:toBe`.
-  - A test can assert one subject with two or more different literal argument lists, e.g. `$mapping->get(1)` and
-    `$mapping->get(2)`. Then each of these assertions also has a `bound:` token. The token keeps the literal arguments
-    of the subject and of the assertion as `#<position or name>:<literal>`, so each expected value stays bound to its
-    argument. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
+  - Any other variable carries its name, so `expect($a)->toBe(1)` has the tokens `expect:variable:a/call:toBe` and
+    `in:expect:variable:a/call:toBe#0/value:1`.
+  - A closure or an arrow function stands for the value it returns, so `expect(fn () => import(1))->toThrow(A::class)`
+    has the subject `function:import`. The value a closure returns is the expression of each of its own `return`
+    statements, and not of a `return` statement in a closure or a function nested in it.
+  - A literal, a constant and any other expression that carries no token, such as the element read `$r['a']`, give
+    no prefix to the token of the assertion, which keeps e.g. `call:toBe`. When a test has two or more assertions with
+    different such subjects, each argument of these assertions carries its subject in its path: a literal or a
+    constant by its token, any other expression by its source code. `expect('5')->toBe(5)` next to
+    `expect('6')->toBe(6)` has `in:expect:value:'5'/call:toBe#0/value:5`, and `expect($r['a'])->toBe(1)` next to
+    `expect($r['b'])->toBe(2)` has `in:expect:$r['a']/call:toBe#0/value:1`. So a test that pairs the same subjects
+    with swapped values is `merge-into-dataset`, not `delete`. A test with one such subject keeps
+    `in:call:toBe#0/value:5`. A test with two or more such subjects is `review`, not `merge-into-dataset`, against a
+    covering test that asserts other such subjects, because each subject is a place of its own.
+  - A test can assert one subject with two or more different argument lists, e.g. `$mapping->get(1)` and
+    `$mapping->get(2)`. Then each of these assertions also has a `bound:` token. The token keeps the arguments of the
+    subject and of the assertion as `#<position or name>:<value>`, so each expected value stays bound to its argument.
+    The value is the literal, or else the names the argument holds (see *Argument names*), such as `variable:a` or
+    `value:list-item/element:variable:a`, or else the source code of the argument, such as `bar($a)`. `expect($mapping->get(1))->toBe(Column::VALUE)` has the token
     `bound:expect:variable:mapping/call:get#0:1/call:toBe#0:Column::VALUE`, and
     `expect($manager->consumePipelineSkip($event, pipelineId: 99))->toBeFalse()` has
-    `bound:expect:variable:manager/call:consumePipelineSkip#pipelineId:99/call:toBeFalse`. The failure message of the
+    `bound:expect:variable:manager/call:consumePipelineSkip#0:variable:event#pipelineId:99/call:toBeFalse`. A literal
+    or a constant as the receiver of the subject, or as the value that a cast subject casts, is kept as well, e.g.
+    `bound:expect:const:Status::A/call:label/call:toBe#0:'a'` and `bound:expect:cast:int/value:'5'/call:toBe#0:5`.
+    So `expect(json_encode($a))->toBe('x'); expect(json_encode($b))->toBe('y');` against the same assertions with the
+    values swapped is `review`, not `delete`. The failure message of the
     assertion is left out, such as `'first'` in `toBe(Column::VALUE, 'first')` or in
     `assertSame(Column::VALUE, $mapping->get(1), 'first')`, because it does not change the pairing. A `bound:` token is
     not data, so a candidate that expects the same values for swapped arguments, or another value for the same
@@ -377,7 +396,9 @@ test lacks.
   test reads the array in order, for example in a `foreach` that inserts records. A property as a key takes part by
   its name (see *Argument names*), e.g. `in:function:transfer#0/keys:variable:a/property:id>variable:b/property:id`
   for `transfer([$a->id => 1, $b->id => 1])`, and the name is also the path of the value under it, e.g.
-  `in:function:transfer#0/variable:a/property:id/value:1`. A key that no token names, such as a variable, and an item
+  `in:function:transfer#0/variable:a/property:id/value:1`. A variable as a key takes part by its name the same way,
+  e.g. `in:function:store#0/keys:variable:a>variable:b` and `in:function:store#0/variable:a/value:1` for
+  `store([$a => 1, $b => 2])`. A key that no token or name names, such as an element read `$keys[0]`, and an item
   without a key add nothing. A test whose keys are a part of the keys of its covering test, in the
   same order, has no order token the covering test lacks. An order token of a key that the covering test lacks is not
   listed either, because that key is listed already. The order tokens of the covering test are never listed in
@@ -437,7 +458,12 @@ test lacks.
   `in:function:store#0/const:CouponType::FIXED->value` for `store([CouponType::FIXED->value])`. A value under a key of
   an array passed straight to a call carries the call and the position before the key, e.g.
   `in:function:store#0/value:'enabled'/value:false` for `store(['enabled' => false])`, so the same array at swapped
-  positions is a different token.
+  positions is a different token. A closure or an arrow function passed to a call passes on the value it returns:
+  that value carries the call and the position of the closure, e.g. `in:function:store#0/value:1` for
+  `store(fn () => 1)`. So `store(fn () => 1, fn () => 2)` against `store(fn () => 2, fn () => 1)` is
+  `merge-into-dataset`. The value a closure returns is the expression of each of its own `return` statements (see
+  *Assertion subjects*). A closure that the test assigns to a variable and then passes on carries no such place, so
+  `$f = fn () => 1; $g = fn () => 2; store($f, $g);` against the same test with the values swapped is `delete`.
 - **Non-literal arguments.** An argument of a call that is not an assertion, whose value is not a literal, a constant,
   an enum case, a list or a map, carries the call and the position followed by `non-literal`, such as
   `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, so a
@@ -560,7 +586,8 @@ test lacks.
   An assertion, such as a Pest expectation (`expect`, `toBe`) or a PHPUnit `assert*` or `expect*` call, is left out
   of the path of a value that reaches it through another call: `expect(add(1, 2))` has the token
   `in:function:add#0/value:1`, the same as `$sum = add(1, 2)`. An operand of an operator, a cast or a closure body
-  keeps no call path in its own token: `store(1 + 2)` has the tokens `value:1` and `value:2`. An operator in an
+  keeps no call path in its own token, except for the value that a closure passed to a call returns (see *Call
+  arguments*): `store(1 + 2)` has the tokens `value:1` and `value:2`. An operator in an
   argument adds the place of the argument instead: the operator carries `in:function:store#0/operator:plus`, and each
   literal operand carries its place in the operator, `in:function:store#0/operator:plus#0/value:1` and
   `in:function:store#0/operator:plus#1/value:2` (see *Argument names*). The literal part of an interpolated string

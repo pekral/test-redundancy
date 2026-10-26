@@ -60,17 +60,17 @@ it('collects the Pest negation as part of the call it negates', function (): voi
     expect(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
         'function:expect',
         'in:function:expect#0/variable:value',
-        'not:call:toBeEmpty',
-        'call:toBeArray',
+        'expect:variable:value/not:call:toBeEmpty',
+        'expect:variable:value/call:toBeArray',
     ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->not()->toBeEmpty()->toBeArray();'))))->toEqualCanonicalizing([
         'function:expect',
         'in:function:expect#0/variable:value',
-        'not:call:toBeEmpty',
-        'call:toBeArray',
+        'expect:variable:value/not:call:toBeEmpty',
+        'expect:variable:value/call:toBeArray',
     ])->and(array_keys(TokenCollector::collect($parser->parse('<?php expect($value)->toBeEmpty();'))))->toEqualCanonicalizing([
         'function:expect',
         'in:function:expect#0/variable:value',
-        'call:toBeEmpty',
+        'expect:variable:value/call:toBeEmpty',
     ]);
 });
 
@@ -79,26 +79,34 @@ it('collects a Pest assertion written as a property like its call form', functio
 
     expect(TokenCollector::collect($statements))->toEqual($expected);
 })->with([
-    'assertion' => ['expect($value)->toBeEmpty;', ['in:function:expect#0/variable:value' => 1, 'call:toBeEmpty' => 1, 'function:expect' => 1]],
+    'assertion' => [
+        'expect($value)->toBeEmpty;',
+        ['expect:variable:value/call:toBeEmpty' => 1, 'function:expect' => 1, 'in:function:expect#0/variable:value' => 1],
+    ],
     'assertion after and' => ['\\expect($value)->and($other)->toBeTrue;', [
-        'call:and' => 1,
-        'call:toBeTrue' => 1,
+        'expect:variable:other/call:toBeTrue' => 1,
+        'expect:variable:value/call:and' => 1,
         'function:expect' => 1,
-        'in:call:and#0/variable:other' => 1,
+        'in:expect:variable:value/call:and#0/variable:other' => 1,
         'in:function:expect#0/variable:value' => 1,
     ],
     ],
     'assertion on a higher-order property' => [
         'expect($user)->name->toBeString;',
-        ['in:function:expect#0/variable:user' => 1, 'call:toBeString' => 1, 'function:expect' => 1],
+        ['in:function:expect#0/variable:user' => 1, 'expect:variable:user/call:toBeString' => 1, 'function:expect' => 1],
     ],
     'assertion on each item' => [
         'expect($items)->each->toBeInt;',
-        ['in:function:expect#0/variable:items' => 1, 'call:toBeInt' => 1, 'call:each' => 1, 'function:expect' => 1],
+        [
+            'expect:variable:items/call:each' => 1,
+            'expect:variable:items/call:toBeInt' => 1,
+            'function:expect' => 1,
+            'in:function:expect#0/variable:items' => 1,
+        ],
     ],
     'negated assertion' => [
         'expect($value)->not->toBeEmpty;',
-        ['in:function:expect#0/variable:value' => 1, 'not:call:toBeEmpty' => 1, 'function:expect' => 1],
+        ['in:function:expect#0/variable:value' => 1, 'expect:variable:value/not:call:toBeEmpty' => 1, 'function:expect' => 1],
     ],
 ]);
 
@@ -141,9 +149,9 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     ],
     ],
     'actual argument written twice' => ['$x = 1; $x = bar(); self::assertEquals(new Money(5), $x);', [
-        'call:self::assertEquals' => 1,
+        'expect:variable:x/call:self::assertEquals' => 1,
         'function:bar' => 1,
-        'in:call:self::assertEquals#1/variable:x' => 1,
+        'in:expect:variable:x/call:self::assertEquals#1/variable:x' => 1,
         'in:new:Money#0/value:5' => 1,
         'new:Money' => 1,
         'read:new:Money' => 1,
@@ -202,9 +210,9 @@ it('collects the subject of an assertion in the assertion tokens', function (str
     ],
     ],
     'value passed to and' => ['expect($user)->toBeTrue()->and(load())->not->toBeEmpty();', [
-        'call:and' => 1,
-        'call:toBeTrue' => 1,
         'expect:function:load/not:call:toBeEmpty' => 1,
+        'expect:variable:user/call:and' => 1,
+        'expect:variable:user/call:toBeTrue' => 1,
         'function:expect' => 1,
         'function:load' => 1,
         'in:function:expect#0/variable:user' => 1,
@@ -374,8 +382,9 @@ it('gives each pair of array keys a token, so the order of the keys counts', fun
     ],
     ],
     'keys of an array no call receives' => ['$options = [\'a\' => 1, \'b\' => 2];', ['keys:value:\'a\'>value:\'b\'' => 1]],
-    'keys that no token names' => ['store([\'a\' => 1, $key => 2, 3, \'b\' => 4]);', ['in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1]],
+    'keys that no token names' => ['store([\'a\' => 1, $keys[0] => 2, 3, \'b\' => 4]);', ['in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1]],
     'one key' => ['store([\'a\' => 1]);', []],
+    'one variable among the keys' => ['store([\'a\' => 1, $key => 2]);', ['in:function:store#0/keys:value:\'a\'>variable:key' => 1]],
     'the same array twice' => ['store([\'a\' => 1, \'b\' => 2], [\'a\' => 1, \'b\' => 2]);', [
         'in:function:store#0/keys:value:\'a\'>value:\'b\'' => 1,
         'in:function:store#1/keys:value:\'a\'>value:\'b\'' => 1,
@@ -635,6 +644,18 @@ it('gives a literal passed straight to a call the position of its argument', fun
     ],
     ],
     'named argument' => ['store(enabled: true);', ['function:store' => 1, 'in:function:store#enabled/value:true' => 1]],
+    'values that closures passed to a call return, but not a value a nested closure returns' => [
+        'store(function () { if ($x) { return 1; } $f = function () { return 2; }; return 3; }, fn () => 4);',
+        [
+            'function:store' => 1,
+            'in:function:store#0/non-literal' => 1,
+            'in:function:store#0/value:1' => 1,
+            'in:function:store#0/value:3' => 1,
+            'in:function:store#1/non-literal' => 1,
+            'in:function:store#1/value:4' => 1,
+            'value:2' => 1,
+        ],
+    ],
 ]);
 
 it('carries every enclosing call in the call path of a value', function (string $code, array $expected): void {
@@ -1185,11 +1206,20 @@ it('gives a non-literal argument of a call that is no assertion the token of its
     'new expression' => ['store(new Money());', ['function:store' => 1, 'new:Money' => 1, 'in:function:store#0/non-literal' => 1]],
     'Pest assertion' => [
         'expect($actual)->toBe($expected);',
-        ['function:expect' => 1, 'call:toBe' => 1, 'in:function:expect#0/variable:actual' => 1, 'in:call:toBe#0/variable:expected' => 1],
+        [
+            'expect:variable:actual/call:toBe' => 1,
+            'function:expect' => 1,
+            'in:expect:variable:actual/call:toBe#0/variable:expected' => 1,
+            'in:function:expect#0/variable:actual' => 1,
+        ],
     ],
     'PHPUnit assertion' => [
         '$this->assertSame($expected, $actual);',
-        ['call:assertSame' => 1, 'in:call:assertSame#0/variable:expected' => 1, 'in:call:assertSame#1/variable:actual' => 1],
+        [
+            'expect:variable:actual/call:assertSame' => 1,
+            'in:expect:variable:actual/call:assertSame#0/variable:expected' => 1,
+            'in:expect:variable:actual/call:assertSame#1/variable:actual' => 1,
+        ],
     ],
     'property' => [
         '$campaign->add($campaign->id);',
@@ -1228,10 +1258,10 @@ it('names the variable or the property that an argument of a call or of an asser
     'enum case value in an array passed to a PHPUnit assertion' => [
         '$this->assertSame([Status::Active->value => 1], $result);',
         [
-            'call:assertSame',
-            'in:call:assertSame#0/key:const:Status::Active->value',
-            'in:call:assertSame#0/const:Status::Active->value/value:1',
-            'in:call:assertSame#1/variable:result',
+            'expect:variable:result/call:assertSame',
+            'in:expect:variable:result/call:assertSame#0/key:const:Status::Active->value',
+            'in:expect:variable:result/call:assertSame#0/const:Status::Active->value/value:1',
+            'in:expect:variable:result/call:assertSame#1/variable:result',
         ],
     ],
     'enum case value in an operator passed to the code under test' => [
@@ -1291,11 +1321,11 @@ it('names the variable or the property that an argument of a call or of an asser
     'property joined to a string passed to a PHPUnit assertion' => [
         '$this->assertSame(\'a\' . $x->title, $y);',
         [
-            'call:assertSame',
-            'in:call:assertSame#0/operator:concat',
-            'in:call:assertSame#0/operator:concat#0/value:\'a\'',
-            'in:call:assertSame#0/operator:concat#1/operand:variable:x/property:title',
-            'in:call:assertSame#1/variable:y',
+            'expect:variable:y/call:assertSame',
+            'in:expect:variable:y/call:assertSame#0/operator:concat',
+            'in:expect:variable:y/call:assertSame#0/operator:concat#0/value:\'a\'',
+            'in:expect:variable:y/call:assertSame#0/operator:concat#1/operand:variable:x/property:title',
+            'in:expect:variable:y/call:assertSame#1/variable:y',
             'value:\'a\'',
         ],
     ],
@@ -1358,16 +1388,20 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'variable and property passed to a PHPUnit assertion' => [
         '$this->assertSame($this->redisConnection, $connection);',
-        ['call:assertSame', 'in:call:assertSame#0/variable:this/property:redisConnection', 'in:call:assertSame#1/variable:connection'],
+        [
+            'expect:variable:connection/call:assertSame',
+            'in:expect:variable:connection/call:assertSame#0/variable:this/property:redisConnection',
+            'in:expect:variable:connection/call:assertSame#1/variable:connection',
+        ],
     ],
     'variable in a nested array passed to a PHPUnit assertion' => [
         '$this->assertSame([\'a\' => [\'b\' => $id]], $result);',
         [
-            'call:assertSame',
-            'in:call:assertSame#0/value:\'a\'/value:\'b\'/element:variable:id',
-            'in:call:assertSame#0/key:value:\'a\'',
-            'in:call:assertSame#0/value:\'a\'/key:value:\'b\'',
-            'in:call:assertSame#1/variable:result',
+            'expect:variable:result/call:assertSame',
+            'in:expect:variable:result/call:assertSame#0/value:\'a\'/value:\'b\'/element:variable:id',
+            'in:expect:variable:result/call:assertSame#0/key:value:\'a\'',
+            'in:expect:variable:result/call:assertSame#0/value:\'a\'/key:value:\'b\'',
+            'in:expect:variable:result/call:assertSame#1/variable:result',
         ],
     ],
     'variable inside a short ternary passed to the code under test' => [
