@@ -72,6 +72,15 @@ final readonly class PestFingerprints
     }
 
     /**
+     * @param list<string> $tokens
+     * @return list<string>
+     */
+    public static function expectedExceptionTokens(array $tokens): array
+    {
+        return array_values(array_filter($tokens, self::isExpectedExceptionToken(...)));
+    }
+
+    /**
      * @param array<\PhpParser\Node\Stmt> $statements
      */
     public static function declaresOnlyFingerprintedTests(array $statements): bool
@@ -199,12 +208,20 @@ final readonly class PestFingerprints
         $tokens = ['call:' . $method => 1];
 
         foreach ($call->getArgs() as $position => $argument) {
-            foreach (TokenCollector::collect($argument) as $token => $count) {
+            foreach (TokenCollector::sum(TokenCollector::collect($argument), $this->sourceToken($argument)) as $token => $count) {
                 $tokens['call:' . $method . '#' . ($argument->name?->toString() ?? $position) . '/' . $token] = $count;
             }
         }
 
         return $tokens;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function sourceToken(Arg $argument): array
+    {
+        return TokenCollector::isData($argument->value) ? [] : ['source:' . OrderTokens::sourceOf($argument->value) => 1];
     }
 
     /**

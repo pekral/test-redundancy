@@ -214,7 +214,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringExpectedExceptions(): array
     {
-        return array_values(array_filter($this->coveringTokens(), PestFingerprints::isExpectedExceptionToken(...)));
+        return count($this->coveredBy) === 1 ? PestFingerprints::expectedExceptionTokens($this->coveringTokens()) : [];
     }
 
     /**
