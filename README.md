@@ -308,9 +308,11 @@ test lacks.
   list carries no place, e.g. `in:cast:object/key:value:'code'`. An alias carries the token of its type, so
   `(integer)` carries `cast:int` and `(double)` carries `cast:float`. A test that has a cast its covering test lacks,
   or a cast in another place, is therefore `review`, not `delete` or `merge-into-dataset`, because a row built from
-  `differsBy` would drop the cast and pass another type. A cast that only the covering test has is not in `differsBy`,
-  so `expect(render())->toBe($x)` covered by `expect(render())->toBe((string) $x)` is still `delete`. A cast that is
-  the subject of an assertion or an array key
+  `differsBy` would drop the cast and pass another type. A cast that only the covering test has is not in `differsBy`.
+  Around a variable or a property that an assertion expects, it carries no other token, so
+  `expect(render())->toBe($x)` covered by `expect(render())->toBe((string) $x)` is still `delete`. In an argument of a
+  call that is not an assertion, it is listed in `coveringDiffersBy`, so `store($x)` covered by `store((string) $x)` is
+  `review`. A cast that is the subject of an assertion or an array key
   carries what it casts, e.g. `expect:cast:string/variable:response/call:body/call:toBe` or
   `in:function:store#0/cast:string/const:Foo::A/value:1`. A cast in a list is ordered by its source, like an array or
   a call with arguments.
