@@ -4536,3 +4536,99 @@ it('merges, never deletes, a test whose cast arguments, cast subjects or cast ke
         ],
     ],
 ]);
+
+it('asks to add a row to the dataset of a covering dataset row, not to turn it into a dataset test', function (): void {
+    $dataset = candidate('it works', ['it covers › basic'], ['value:1'])->steps();
+    $plain = candidate('it works', ['it covers'], ['value:1'])->steps();
+
+    expect($dataset[0])->toBe('Add a row with the values in differsBy to the dataset of "it covers".')
+        ->and($dataset[1])->toBe('Delete this test.')
+        ->and($plain[0])->toBe('Turn "it covers" into one test with a dataset and add a row with the values in differsBy.');
+});
+
+it('names the dataset of the covering row in the merge step of an analysed test', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with([
+                'basic domain' => ['example.com'],
+            ]);
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it notifies nobody when empty' => ['src/D.php:5'],
+            'it runs for any shape › basic domain' => ['src/D.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset)
+        ->and($report->candidates[0]->steps()[0])
+        ->toBe('Add a row with the values in differsBy to the dataset of "it runs for any shape".');
+});
+
+it('deletes a test whose values equal a row of the covering dataset and keeps that row', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with([
+                'basic domain' => ['example.com'],
+                'empty domain name' => [''],
+            ]);
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it runs for any shape › empty domain name' => ['src/D.php:5'],
+            'it notifies nobody when empty' => ['src/D.php:5', 'src/D.php:6'],
+            'it runs for any shape › basic domain' => ['src/D.php:5', 'src/D.php:6', 'src/D.php:7'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it notifies nobody when empty')
+        ->and($report->candidates[0]->action())->toBe(Action::Delete)
+        ->and($report->candidates[0]->coveredBy)->toBe(['it runs for any shape › empty domain name'])
+        ->and($report->candidates[0]->steps())->toBe([
+            sprintf(Action::CONFIRM_STEP, '"it runs for any shape › empty domain name"'),
+            'Delete this test.',
+            Action::VERIFY_STEP,
+        ]);
+});
+
+it('keeps the first of two dataset rows that equal a test and covers the other by it', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('runs for any shape', function (string $name): void {
+                expect(run($name))->toBeTrue();
+            })->with([
+                'basic domain' => ['example.com'],
+                'empty domain name' => [''],
+                'blank domain name' => [''],
+            ]);
+            it('notifies nobody when empty', function (): void {
+                expect(run(''))->toBeTrue();
+            });
+            PHP,
+        linesByTest: [
+            'it runs for any shape › empty domain name' => ['src/D.php:5'],
+            'it runs for any shape › blank domain name' => ['src/D.php:5'],
+            'it notifies nobody when empty' => ['src/D.php:5', 'src/D.php:6'],
+            'it runs for any shape › basic domain' => ['src/D.php:5', 'src/D.php:6', 'src/D.php:7'],
+        ],
+    );
+
+    expect(array_map(static fn (Candidate $candidate): string => $candidate->testCase(), $report->candidates))
+        ->toBe(['it runs for any shape › empty domain name', 'it notifies nobody when empty'])
+        ->and($report->candidates[0]->coveredBy)->toBe(['it runs for any shape › blank domain name'])
+        ->and($report->candidates[1]->action())->toBe(Action::Delete)
+        ->and($report->candidates[1]->coveredBy)->toBe(['it runs for any shape › blank domain name']);
+});

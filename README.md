@@ -116,7 +116,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "coveringDiffersBy": [],
           "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:expect:new:Calculator/call:add/call:toBe#0/value:5"],
           "steps": [
-            "Turn \"it adds two numbers › negative numbers\" into one test with a dataset and add a row with the values in differsBy.",
+            "Add a row with the values in differsBy to the dataset of \"it adds two numbers\".",
             "Delete this test.",
             "Run vendor/bin/test-redundancy verify; it must report \"ok\": true."
           ],
@@ -155,7 +155,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
 | `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). The `review` steps name them. Empty for every other candidate. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
-| `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. |
+| `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. A `merge-into-dataset` candidate whose covering test is a row of a dataset test gets the step `Add a row with the values in differsBy to the dataset of "<test>".`, because that test already has a dataset; a plain covering test gets `Turn "<test>" into one test with a dataset and add a row with the values in differsBy.` |
 | `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `failedTests` | The test cases that failed in the coverage run, each as `{"test": …, "message": …}` with the failure message. The analysis leaves them out: a failed test case is never a candidate and never a covering test, and it is not counted in `testCases`. See [Failed tests](#failed-tests). |
@@ -216,6 +216,9 @@ aborts the run. `map` and `verify` still abort when a test case fails.
   test that uses the dataset. Such a row is `review`, not `delete`, and the first step names the dataset and the other
   tests. The same step comes first for every other action of such a row. A named dataset defined in another file is
   not parsed, so its rows are not checked.
+
+A test whose values equal a row of the dataset that covers it is `delete`, covered by that row, and the row is never a
+candidate covered by that test. The row is kept, so the report never proposes to delete the row and to add it back.
 
 `merge-into-dataset` needs a candidate that is not a dataset row, whose `differsBy` holds only data, and that differs
 only in data from one test of the same file. When that test has a call, function or `new` expression that the

@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `merge-into-dataset` candidate whose covering test is a row of a dataset test no longer asks to turn that test into
+  a dataset test again. The first step is now `Add a row with the values in differsBy to the dataset of "<test>".`, with
+  the name of the dataset test without the row. A covering test that is not a dataset row keeps the step `Turn "<test>"
+  into one test with a dataset and add a row with the values in differsBy.`. A test whose values equal a row of the
+  covering dataset is now `delete`, covered by that row, and the row is no longer a candidate covered by that test.
+  Before, a row that runs fewer lines than such a test was `delete` covered by the test, and the test was
+  `merge-into-dataset` into another row, so following both proposals deleted the row and added it back (#118).
 - A test that differs from its covering test only in a cast is no longer `delete` or `merge-into-dataset`. Before, a
   cast carried no token, so `store([(object) ['code' => null]])` and `store([['code' => null]])` had the same tokens,
   and a `merge-into-dataset` row built from `differsBy` dropped the cast and passed an array instead of a `stdClass`.
