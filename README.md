@@ -483,8 +483,14 @@ test lacks.
   `foo(f() . 'a' . 'b')`. The candidate is `review` in each of these cases. Two tests whose literal operands swap
   places, such as `foo(1 - 2)` and `foo(2 - 1)`, differ by the place of each literal, and the candidate is
   `merge-into-dataset`, as for literal arguments that swap places. These operators are the binary operators, the
-  ternary, the interpolated string and the unary `-`, `+`, `!` and `~`. A negative number, such as `-5`, is a literal
-  and not an operator. The following shapes are still `delete`:
+  ternary, the interpolated string, the unary `-`, `+`, `!` and `~`, and the spread `...` of an argument. A negative
+  number, such as `-5`, is a literal and not an operator. A spread argument has the kind `spread` and its value is
+  operand 0, so `foo(...$x)` has `in:function:foo#0/operator:spread` and
+  `in:function:foo#0/operator:spread#0/operand:variable:x`, while `foo($x)` has `in:function:foo#0/variable:x`. A test
+  that spreads a variable or a property and a test that passes it plain, such as `foo(...$x)` and `foo($x)`, differ,
+  and neither is `delete` against the other. A test that spreads a call, a list or a constant, such as
+  `foo(...f())`, `foo(...[1, 2])` or `foo(...Foo::ITEMS)`, covered by the test that passes it plain is `review` too.
+  The following shapes are still `delete`:
   - An operator in no argument of a call or an assertion, such as one that a closure returns or one assigned to a
     variable that the test passes on. It carries no token, so `foo(fn () => $x + 1)` against `foo(fn () => $x - 1)`
     and `$y = $x + 1; foo($y)` against `$y = $x - 1; foo($y)` are `delete`. An operator in an argument of a call
@@ -492,8 +498,11 @@ test lacks.
     `review`.
   - An operator that only the covering test has, around an argument that carries no name, such as `foo(f())` covered
     by `foo(f() . 'a')`. Like a name that only the covering test has, it does not turn the candidate into
-    `review`.
-  - An operator that is not in the list above, such as `instanceof`, because it carries no token.
+    `review`. The same holds for a spread, so `foo(f())`, `foo([1, 2])` and `foo(Foo::ITEMS)` covered by
+    `foo(...f())`, `foo(...[1, 2])` and `foo(...Foo::ITEMS)` are `delete`.
+  - An operator that is not in the list above, such as `instanceof`, because it carries no token. A spread inside a
+    list is not the spread of an argument and carries no token either, so `foo([...$x, ...$y])` against
+    `foo([...$y, ...$x])` is `delete`.
 
   Each variable or property that is a key or a value of an array that a
   call or an assertion receives, at any depth, carries the position of that argument too, and so does the variable
