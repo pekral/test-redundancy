@@ -1294,8 +1294,8 @@ it('gives a cast a token for its type next to the tokens of its expression', fun
             'function:store',
             'in:function:store#0/non-literal',
             'in:function:store#0/cast:object',
-            'in:cast:object/key:value:\'code\'',
-            'in:cast:object/value:\'code\'/value:null',
+            'in:function:store#0/cast:object/key:value:\'code\'',
+            'in:function:store#0/cast:object/value:\'code\'/value:null',
         ],
     ],
     'string cast as the subject of an assertion' => [

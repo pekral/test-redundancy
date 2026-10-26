@@ -295,7 +295,10 @@ test lacks.
   no token.
 - **Casts.** A cast carries a token for its type at its place, e.g. `in:function:store#0/cast:object` for
   `store((object) ['code' => null])` or `in:function:connect#0/cast:int` for `connect((int) $id)`. Each token inside the
-  cast carries the cast in its path, e.g. `in:cast:object/key:value:'code'`. An alias carries the token of its type, so
+  cast carries the cast in its path, and in an argument also the place of the argument, e.g.
+  `in:function:store#0/cast:object/key:value:'code'`, so two tests with swapped literals in cast arguments, such as
+  `store((int) '5', (int) '6')` and `store((int) '6', (int) '5')`, are `merge-into-dataset`. A token inside a cast in a
+  list carries no place, e.g. `in:cast:object/key:value:'code'`. An alias carries the token of its type, so
   `(integer)` carries `cast:int` and `(double)` carries `cast:float`. A test that differs from its covering test only in
   a cast, or in the place of a cast, is therefore `review`, never `delete` or `merge-into-dataset`, because a row built
   from `differsBy` would drop the cast and pass another type. A cast that is the subject of an assertion or an array key

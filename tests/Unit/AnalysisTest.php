@@ -4471,7 +4471,7 @@ it('does not delete or merge a test that differs from its covering test only in 
     ],
 ]);
 
-it('merges, never deletes, a test whose cast subjects or cast keys hold the values of its covering test swapped', function (
+it('merges, never deletes, a test whose cast arguments, cast subjects or cast keys hold the values of its covering test swapped', function (
     string $candidateBody,
     string $coveringBody,
     array $differsBy,
@@ -4506,5 +4506,33 @@ it('merges, never deletes, a test whose cast subjects or cast keys hold the valu
         'store([(string) Foo::A => 1, (string) Foo::B => 2]);',
         'store([(string) Foo::A => 2, (string) Foo::B => 1]);',
         ['in:function:store#0/cast:string/const:Foo::A/value:1', 'in:function:store#0/cast:string/const:Foo::B/value:2'],
+    ],
+    'cast literals as named arguments' => [
+        'store(id: (int) \'5\', n: (int) \'6\');',
+        'store(id: (int) \'6\', n: (int) \'5\');',
+        ['in:function:store#id/cast:int/value:\'5\'', 'in:function:store#n/cast:int/value:\'6\''],
+    ],
+    'cast literals as the arguments of a new expression' => [
+        'new Foo((int) \'5\', (int) \'6\');',
+        'new Foo((int) \'6\', (int) \'5\');',
+        ['in:new:Foo#0/cast:int/value:\'5\'', 'in:new:Foo#1/cast:int/value:\'6\''],
+    ],
+    'cast literals as the arguments of one call' => [
+        'store((int) \'5\', (int) \'6\');',
+        'store((int) \'6\', (int) \'5\');',
+        ['in:function:store#0/cast:int/value:\'5\'', 'in:function:store#1/cast:int/value:\'6\''],
+    ],
+    'cast literals as the arguments of two calls' => [
+        'store((int) \'5\'); update((int) \'6\');',
+        'store((int) \'6\'); update((int) \'5\');',
+        ['in:function:store#0/cast:int/value:\'5\'', 'in:function:update#0/cast:int/value:\'6\''],
+    ],
+    'cast literals as the expected values of assertions' => [
+        'expect($r->a())->toBe((int) \'1\'); expect($r->b())->toBe((int) \'2\');',
+        'expect($r->a())->toBe((int) \'2\'); expect($r->b())->toBe((int) \'1\');',
+        [
+            'in:expect:variable:r/call:a/call:toBe#0/cast:int/value:\'1\'',
+            'in:expect:variable:r/call:b/call:toBe#0/cast:int/value:\'2\'',
+        ],
     ],
 ]);

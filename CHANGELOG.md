@@ -12,8 +12,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   cast carried no token, so `store([(object) ['code' => null]])` and `store([['code' => null]])` had the same tokens,
   and a `merge-into-dataset` row built from `differsBy` dropped the cast and passed an array instead of a `stdClass`.
   Now a cast carries a token for its type at its place, e.g. `in:function:store#0/cast:object`, so a cast that moves to
-  another argument, property or list item also differs. Each token inside the cast carries the cast in its path, e.g.
-  `in:cast:object/key:value:'code'`. An alias carries the token of its type, so `(integer)` carries `cast:int`, and
+  another argument, property or list item also differs. Each token inside the cast carries the cast in its path, and in
+  an argument also the place of the argument, e.g. `in:function:store#0/cast:object/key:value:'code'` for
+  `store((object) ['code' => null])`, so `store((int) '5', (int) '6')` and `store((int) '6', (int) '5')` are
+  `merge-into-dataset`, never `delete`. An alias carries the token of its type, so `(integer)` carries `cast:int`, and
   `(double)` carries `cast:float` and is ordered as `(float)`. The token is listed in `differsBy` or
   `coveringDiffersBy`, and the candidate is `review`. The variable or property inside a cast keeps its name token, so
   `connect((int) $this->enShop)` still carries `in:function:connect#0/property:enShop`. A cast that an assertion
