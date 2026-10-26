@@ -207,7 +207,11 @@ final readonly class PestFingerprints
 
         $tokens = ['call:' . $method => 1];
 
-        foreach ($call->getArgs() as $position => $argument) {
+        foreach ($call->args as $position => $argument) {
+            if (!$argument instanceof Arg) {
+                continue;
+            }
+
             foreach (TokenCollector::sum(TokenCollector::collect($argument), $this->sourceToken($argument)) as $token => $count) {
                 $tokens['call:' . $method . '#' . ($argument->name?->toString() ?? $position) . '/' . $token] = $count;
             }
