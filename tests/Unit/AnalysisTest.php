@@ -2267,6 +2267,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
         ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
         ->and($reports[0]->candidates[0]->action())->toBe($action);
 })->with([
+    'a cleanup run once against twice through an action held in a class constant' => [
+        <<<'PHP'
+            <?php
+            it('clears every mirrored row', function (): void {
+                (self::HANDLER)('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            it('stays idempotent when the cleanup runs twice', function (): void {
+                (self::HANDLER)('acme');
+                (self::HANDLER)('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            PHP,
+        'it clears every mirrored row',
+        'it stays idempotent when the cleanup runs twice',
+        [],
+        Action::Review,
+    ],
     'a cleanup run once against twice through an action held in an array element' => [
         <<<'PHP'
             <?php
@@ -2277,6 +2295,24 @@ it('asks for a review only when a test makes a call or creates an object a diffe
             it('stays idempotent when the cleanup runs twice', function (): void {
                 ($this->actions['cleanUp'])('acme');
                 ($this->actions['cleanUp'])('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            PHP,
+        'it clears every mirrored row',
+        'it stays idempotent when the cleanup runs twice',
+        [],
+        Action::Review,
+    ],
+    'a cleanup run once against twice through an action held in an element of a class constant' => [
+        <<<'PHP'
+            <?php
+            it('clears every mirrored row', function (): void {
+                (Actions::ALL['cleanUp'])('acme');
+                expect(mirroredProductIds())->toBe(['KEEP']);
+            });
+            it('stays idempotent when the cleanup runs twice', function (): void {
+                (Actions::ALL['cleanUp'])('acme');
+                (Actions::ALL['cleanUp'])('acme');
                 expect(mirroredProductIds())->toBe(['KEEP']);
             });
             PHP,
