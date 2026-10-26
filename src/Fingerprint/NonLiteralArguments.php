@@ -134,6 +134,12 @@ final class NonLiteralArguments
         return self::operandsOf($value) !== null;
     }
 
+    public static function isCallArgument(string $token): bool
+    {
+        return self::isToken($token)
+            || (str_ends_with($token, '/' . self::OPERATOR_PREFIX . self::SPREAD) && !TokenCollector::isAssertionToken($token));
+    }
+
     public static function nameOrToken(?Expr $node): ?string
     {
         return match (true) {

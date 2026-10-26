@@ -4381,6 +4381,89 @@ it('asks for a review of a test that spreads an argument its covering test passe
     ],
 ]);
 
+it('asks for a review of a test that passes plain an argument with no name that its covering test spreads', function (string $argument): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('a', function (): void {
+                foo(%1$s);
+                expect(true)->toBeTrue();
+            });
+            it('b', function (): void {
+                foo(...%1$s);
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE, $argument),
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5']],
+    );
+
+    expect(array_map(
+        static fn (Candidate $candidate): array => [
+            $candidate->testCase(),
+            $candidate->action(),
+            $candidate->coveringTokensForReview(),
+            $candidate->steps(),
+        ],
+        $report->candidates,
+    ))->toBe([
+        [
+            'it a',
+            Action::Review,
+            ['in:function:foo#0/operator:spread'],
+            [sprintf(Action::MISSING_ARGUMENT_STEP, '"it b"', 'in:function:foo#0/operator:spread'), Action::VERIFY_STEP],
+        ],
+    ]);
+})->with([
+    'a call' => ['f()'],
+    'a call with a variable argument' => ['f($x)'],
+    'a constant' => ['Foo::ITEMS'],
+    'a list' => ['[1, 2]'],
+    'a method call' => ['$o->m()'],
+    'a nested call' => ['bar(f())'],
+    'a new object' => ['new Foo()'],
+    'a static method call' => ['Foo::m()'],
+]);
+
+it('names a spread that only the covering test has as a missing argument only when it is not an argument of an assertion', function (
+    string $candidateStatement,
+    string $coveringStatement,
+    string $spread,
+    string $firstStep,
+): void {
+    $report = analyzeTokenTest(
+        source: sprintf(<<<'PHP_SOURCE'
+            <?php
+            it('a', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            it('b', function (): void {
+                %s
+                expect(true)->toBeTrue();
+            });
+            PHP_SOURCE, $candidateStatement, $coveringStatement),
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b' => ['src/Store.php:5']],
+    );
+
+    expect(array_map(
+        static fn (Candidate $candidate): array => [$candidate->testCase(), $candidate->coveringTokensForReview(), $candidate->steps()[0]],
+        $report->candidates,
+    ))->toBe([['it a', [$spread], $firstStep]]);
+})->with([
+    'an argument of a call' => [
+        'foo(f(), 1);',
+        'foo(...f(), 2);',
+        'in:function:foo#0/operator:spread',
+        sprintf(Action::MISSING_ARGUMENT_STEP, '"it b"', 'in:function:foo#0/operator:spread'),
+    ],
+    'an argument of an assertion' => [
+        'expect(f())->toBe(1);',
+        'expect(...f())->toBe(2);',
+        'in:function:expect#0/operator:spread',
+        'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+    ],
+]);
+
 it('asks to merge a test whose literal operands its covering test passes at swapped places', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP_SOURCE'

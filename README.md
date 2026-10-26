@@ -488,18 +488,23 @@ test lacks.
   operand 0, so `foo(...$x)` has `in:function:foo#0/operator:spread` and
   `in:function:foo#0/operator:spread#0/operand:variable:x`, while `foo($x)` has `in:function:foo#0/variable:x`. A test
   that spreads a variable or a property and a test that passes it plain, such as `foo(...$x)` and `foo($x)`, differ,
-  and neither is `delete` against the other. A test that spreads a call, a list or a constant, such as
-  `foo(...f())`, `foo(...[1, 2])` or `foo(...Foo::ITEMS)`, covered by the test that passes it plain is `review` too.
-  The following shapes are still `delete`:
+  and neither is `delete` against the other. The same holds for an argument that carries no name, such as a call, a
+  list or a constant, of a call that is not an assertion: `foo(f())` and `foo(...f())`, `foo([1, 2])` and
+  `foo(...[1, 2])`, or `foo(Foo::ITEMS)` and `foo(...Foo::ITEMS)` differ, and neither is `delete` against the other.
+  When only the covering test spreads such an argument, the candidate is `review` and its `coveringDiffersBy` names the
+  spread, such as `in:function:foo#0/operator:spread`. The following shapes are still `delete`:
   - An operator in no argument of a call or an assertion, such as one that a closure returns or one assigned to a
     variable that the test passes on. It carries no token, so `foo(fn () => $x + 1)` against `foo(fn () => $x - 1)`
     and `$y = $x + 1; foo($y)` against `$y = $x - 1; foo($y)` are `delete`. An operator in an argument of a call
     inside a closure carries its token, so `foo(fn () => bar($x + 1))` against `foo(fn () => bar($x - 1))` is
     `review`.
-  - An operator that only the covering test has, around an argument that carries no name, such as `foo(f())` covered
-    by `foo(f() . 'a')`. Like a name that only the covering test has, it does not turn the candidate into
-    `review`. The same holds for a spread, so `foo(f())`, `foo([1, 2])` and `foo(Foo::ITEMS)` covered by
-    `foo(...f())`, `foo(...[1, 2])` and `foo(...Foo::ITEMS)` are `delete`.
+  - An operator other than a spread that only the covering test has, around an argument that carries no name, such
+    as `foo(f())` covered by `foo(f() . 'a')`. Like a name that only the covering test has, it does not turn the
+    candidate into `review`.
+  - A spread that only the covering test has, around an argument of an assertion that carries no name, such as
+    `expect(f())->toBe(1)` covered by `expect(...f())->toBe(1)`, or `$this->assertSame(1, f())` covered by
+    `$this->assertSame(1, ...f())`. The code under test gets the same input in both tests, so the candidate is
+    `delete`.
   - An operator that is not in the list above, such as `instanceof`, because it carries no token. A spread inside a
     list is not the spread of an argument and carries no token either, so `foo([...$x, ...$y])` against
     `foo([...$y, ...$x])` is `delete`.
