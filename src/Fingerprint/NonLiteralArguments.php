@@ -10,11 +10,13 @@ use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrayDimFetch;
+use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Expr\BitwiseNot;
 use PhpParser\Node\Expr\BooleanNot;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Cast;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\NullsafePropertyFetch;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticPropertyFetch;
@@ -40,9 +42,11 @@ final class NonLiteralArguments
 
     private const string SPREAD = 'spread';
 
+    private const string CLOSURE = 'closure';
+
     private const string KIND = '(?:' . self::ELEMENT_PREFIX . '|' . self::OPERAND_PREFIX . ')';
 
-    private const string NAME = '(?:variable|property):[^/]+(?:/property:[^/]+)*';
+    private const string NAME = '(?:(?:variable|property):[^/]+(?:/property:[^/]+)*|' . self::CLOSURE . ')';
 
     private const string PLACES = '(?:(?!' . self::CALL . ')[^/]+/)*';
 
@@ -210,6 +214,7 @@ final class NonLiteralArguments
             $value instanceof Cast => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
             NodeContext::enumCaseReadBy($value) !== null => [],
+            $value instanceof Closure || $value instanceof ArrowFunction => [self::CLOSURE],
             default => array_filter([self::identity($value)], is_string(...)),
         };
     }

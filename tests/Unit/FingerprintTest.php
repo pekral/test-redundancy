@@ -630,6 +630,44 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'in:function:store#0/value:\'limit\'/function:min#0/value:5' => 1,
     ],
     ],
+    'closure as a named argument' => [
+        'store(cb: static function () { return 2; });',
+        [
+            'function:store' => 1,
+            'in:function:store#cb/closure' => 1,
+            'in:function:store#cb/non-literal' => 1,
+            'in:function:store#cb/value:2' => 1,
+        ],
+    ],
+    'closure as an item of a list argument' => [
+        'store([fn () => 4]);',
+        [
+            'function:store' => 1,
+            'in:function:store#0/value:list-item' => 1,
+            'in:function:store#0/value:list-item/element:closure' => 1,
+            'value:4' => 1,
+        ],
+    ],
+    'closure as an operand of an argument' => [
+        'store($a ?? fn () => 5);',
+        [
+            'function:store' => 1,
+            'in:function:store#0/non-literal' => 1,
+            'in:function:store#0/operator:coalesce#0/operand:variable:a' => 1,
+            'in:function:store#0/operator:coalesce#1/operand:closure' => 1,
+            'in:function:store#0/operator:coalesce' => 1,
+            'value:5' => 1,
+        ],
+    ],
+    'closure under a key of an array argument' => [
+        'store([\'k\' => fn () => 3]);',
+        [
+            'function:store' => 1,
+            'in:function:store#0/key:value:\'k\'' => 1,
+            'in:function:store#0/value:\'k\'/element:closure' => 1,
+            'in:function:store#0/value:\'k\'/value:3' => 1,
+        ],
+    ],
     'first-class callable' => ['$trim = trim(...);', ['function:trim' => 1]],
     'literal inside an argument' => ['store([true], 1 + 2);', [
         'function:store' => 1,
@@ -648,9 +686,11 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'store(function () { if ($x) { return 1; } $f = function () { return 2; }; return 3; }, fn () => 4);',
         [
             'function:store' => 1,
+            'in:function:store#0/closure' => 1,
             'in:function:store#0/non-literal' => 1,
             'in:function:store#0/value:1' => 1,
             'in:function:store#0/value:3' => 1,
+            'in:function:store#1/closure' => 1,
             'in:function:store#1/non-literal' => 1,
             'in:function:store#1/value:4' => 1,
             'value:2' => 1,

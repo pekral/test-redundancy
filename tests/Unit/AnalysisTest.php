@@ -4944,6 +4944,55 @@ it('decides on a test by what the covering test passes in the slot that differs'
     ],
 ]);
 
+it('reviews, and does not merge, a test that passes a value where its covering test passes a closure', function (
+    string $candidateBody,
+    string $coveringBody,
+    string $closureToken,
+): void {
+    $report = analyzeTestPair($candidateBody, $coveringBody);
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([$closureToken])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'a closure as an item of a list argument' => [
+        'foo([\'a\']);',
+        'foo([fn () => 1]);',
+        'in:function:foo#0/value:list-item/element:closure',
+    ],
+    'a closure under a key of an array argument' => [
+        'foo([\'k\' => \'a\']);',
+        'foo([\'k\' => fn () => 1]);',
+        'in:function:foo#0/value:\'k\'/element:closure',
+    ],
+    'a closure under a nested key' => [
+        'foo([\'k\' => [\'j\' => \'a\']]);',
+        'foo([\'k\' => [\'j\' => fn () => 1]]);',
+        'in:function:foo#0/value:\'k\'/value:\'j\'/element:closure',
+    ],
+    'an anonymous function as the argument' => ['foo(\'a\');', 'foo(function () { return 1; });', 'in:function:foo#0/closure'],
+    'an arrow function as a named argument' => ['foo(cb: \'a\');', 'foo(cb: fn () => 1);', 'in:function:foo#cb/closure'],
+    'an arrow function as the argument' => ['foo(\'a\');', 'foo(fn () => 1);', 'in:function:foo#0/closure'],
+    'an arrow function as the argument of a method' => ['$x->foo(\'a\');', '$x->foo(fn () => 1);', 'in:call:foo#0/closure'],
+    'an arrow function as the argument of an assertion' => [
+        'expect(f())->toBe(\'a\');',
+        'expect(f())->toBe(fn () => 1);',
+        'in:expect:function:f/call:toBe#0/closure',
+    ],
+    'an arrow function as the argument of a new expression' => ['new Foo(\'a\');', 'new Foo(fn () => 1);', 'in:new:Foo#0/closure'],
+    'an arrow function as the second argument' => ['foo(1, \'a\');', 'foo(1, fn () => 1);', 'in:function:foo#1/closure'],
+]);
+
+it('merges into a dataset a test that passes another value where its covering test passes a closure at another position', function (): void {
+    $report = analyzeTestPair('foo(fn () => 1, \'a\');', 'foo(fn () => 1, \'b\');');
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#1/value:\'a\''])
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
 it('does not delete or merge a test that differs from its covering test only in a cast', function (
     string $candidateBody,
     string $coveringBody,
@@ -5236,6 +5285,14 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         'expect(json_encode(bar($a)))->toBe(\'x\'); expect(json_encode(bar($b)))->toBe(\'y\');',
         'expect(json_encode(bar($a)))->toBe(\'y\'); expect(json_encode(bar($b)))->toBe(\'x\');',
         ['bound:expect:function:json_encode#0:bar($a)/call:toBe#0:\'x\'', 'bound:expect:function:json_encode#0:bar($b)/call:toBe#0:\'y\''],
+    ],
+    'calls that expect closures with other calls' => [
+        'expect(json_encode($a))->toBe(fn () => foo()); expect(json_encode($b))->toBe(fn () => bar());',
+        'expect(json_encode($a))->toBe(fn () => bar()); expect(json_encode($b))->toBe(fn () => foo());',
+        [
+            'bound:expect:function:json_encode#0:variable:a/call:toBe#0:fn() => foo()',
+            'bound:expect:function:json_encode#0:variable:b/call:toBe#0:fn() => bar()',
+        ],
     ],
     'calls that measure other elements' => [
         'expect(strlen($r[\'a\']))->toBe(1); expect(strlen($r[\'b\']))->toBe(2);',

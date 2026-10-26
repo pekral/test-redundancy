@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test that passes a literal where its covering test passes a closure is no longer `merge-into-dataset`. Before, a
+  closure argument carried only the `non-literal` token of its position and the value it returns, so `foo('a')`
+  against `foo(fn () => 1)`, `foo(['k' => 'a'])` against `foo(['k' => fn () => 1])` and `foo(['a'])` against
+  `foo([fn () => 1])` had a `differsBy` with a literal only and nothing in `coveringDiffersBy`. A row built from
+  `differsBy` would pass the literal to a slot that receives a closure in the covering test (#134). Now a closure or an
+  arrow function that is an argument of a call, a `new` expression or an assertion carries the call and the position
+  followed by `closure`, e.g. `in:function:foo#0/closure`, and a closure inside an array carries its place and the
+  prefix `element:`, e.g. `in:function:foo#0/value:'k'/element:closure`, as a variable does (#116). Such a token is not
+  data, so the candidate is `review` and `coveringDiffersBy` lists it. This holds for `function () { return 1; }`,
+  `static fn () => 1`, a named argument, a method call, a `new` expression, a nested key, a list item and an argument
+  of an assertion. Two tests that pass a closure at the same place carry the same token, so `foo(fn () => 'a')`
+  against `foo(fn () => 1)` stays `merge-into-dataset`. A closure that a dataset row passes to a parameter of the test
+  is no closure argument of the body, so the type of the parameter decides as before (#95). A closure that is an
+  argument of an assertion keeps its source code in a `bound:` token, as before.
 - A test that pairs the same subjects with swapped values, where a subject carries no token of its own, is no longer
   `delete`. Before, the pairing of a subject with its value was lost in these shapes, so
   `expect('5')->toBe(5); expect('6')->toBe(6);` and `expect('5')->toBe(6); expect('6')->toBe(5);` had the same tokens,
