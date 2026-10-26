@@ -5262,6 +5262,11 @@ it('reviews, never deletes, a test whose subjects differ only in an argument or 
         'expect((int) \'5\')->toBe(6); expect((int) \'6\')->toBe(5);',
         ['bound:expect:cast:int/value:\'5\'/call:toBe#0:5', 'bound:expect:cast:int/value:\'6\'/call:toBe#0:6'],
     ],
+    'cast results of methods called with other literals' => [
+        'expect((int) $m->get(1))->toBe(1); expect((int) $m->get(2))->toBe(2);',
+        'expect((int) $m->get(1))->toBe(2); expect((int) $m->get(2))->toBe(1);',
+        ['bound:expect:cast:int/variable:m/call:get#0:1/call:toBe#0:1', 'bound:expect:cast:int/variable:m/call:get#0:2/call:toBe#0:2'],
+    ],
     'closures that return calls with other literals' => [
         'expect(fn () => import(1))->toThrow(A::class); expect(fn () => import(2))->toThrow(B::class);',
         'expect(fn () => import(2))->toThrow(A::class); expect(fn () => import(1))->toThrow(B::class);',
