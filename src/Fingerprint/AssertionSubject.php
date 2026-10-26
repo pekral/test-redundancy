@@ -154,12 +154,11 @@ final class AssertionSubject
     private static function partToken(Expr $part, bool $withLiteralArguments): ?string
     {
         $token = match (true) {
-            $part instanceof PropertyFetch => NonLiteralArguments::identity($part),
             $part instanceof Cast => CastToken::of(
                 $part,
                 NonLiteralArguments::identity($part->expr) ?? self::token($part->expr, $withLiteralArguments),
             ),
-            default => TokenCollector::token($part),
+            default => NonLiteralArguments::nameOrToken($part),
         };
 
         return match (true) {

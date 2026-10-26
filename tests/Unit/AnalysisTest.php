@@ -4761,6 +4761,12 @@ it('does not delete a test that passes the same properties of other or swapped o
         $report->candidates,
     ))->toBe([['it a', $differsBy, $action]]);
 })->with([
+    'an assertion on a nullsafe property of another object the test assigns once' => [
+        '$x = $a?->id; expect($x)->toBe(1);',
+        '$x = $b?->id; expect($x)->toBe(1);',
+        ['expect:variable:a/property:id/call:toBe', 'in:expect:variable:a/property:id/call:toBe#0/value:1'],
+        Action::Review,
+    ],
     'an assertion on a property of another object' => [
         'expect($a->id)->toBe(1);',
         'expect($b->id)->toBe(1);',
@@ -4769,6 +4775,12 @@ it('does not delete a test that passes the same properties of other or swapped o
             'expect:variable:a/property:id/call:toBe',
             'in:expect:variable:a/property:id/call:toBe#0/value:1',
         ],
+        Action::Review,
+    ],
+    'an assertion on a static property of another class the test assigns once' => [
+        '$x = A::$id; expect($x)->toBe(1);',
+        '$x = B::$id; expect($x)->toBe(1);',
+        ['expect:property:A::id/call:toBe', 'in:expect:property:A::id/call:toBe#0/value:1'],
         Action::Review,
     ],
     'a property of another object passed to the code under test' => [
