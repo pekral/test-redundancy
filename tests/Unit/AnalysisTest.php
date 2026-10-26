@@ -2331,6 +2331,32 @@ it('still merges a test whose throws() argument differs from the one of its cove
     'a comment in an otherwise empty closure' => ['function () { /* never */ }', 'function () { }'],
 ]);
 
+it('names no test-level throws() when the covering test calls a method of that name in its body', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('rejects one input', function (): void {
+                $stub = new Stub();
+                validate('');
+            });
+            it('rejects another input', function (): void {
+                $stub = new Stub();
+                $stub->throws(EmailNotFound::class);
+                validate('');
+            });
+            PHP,
+        linesByTest: ['it rejects one input' => ['src/Validator.php:5'], 'it rejects another input' => ['src/Validator.php:5', 'src/Validator.php:6']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['call:throws', 'in:call:throws#0/const:EmailNotFound::class'])
+        ->and(valueAt($json, 'steps'))->not->toContain(
+            sprintf(Action::EXPECTED_EXCEPTION_STEP, '"it rejects another input"', 'call:throws'),
+        )
+        ->and(valueAt($json, 'steps'))->toHaveCount(3);
+});
+
 it('asks to merge a test whose expected value replaces the value under which its covering test expects a key', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'

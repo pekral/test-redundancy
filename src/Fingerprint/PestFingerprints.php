@@ -77,7 +77,14 @@ final readonly class PestFingerprints
      */
     public static function expectedExceptionTokens(array $tokens): array
     {
-        return array_values(array_filter($tokens, self::isExpectedExceptionToken(...)));
+        $expected = array_values(array_filter($tokens, self::isExpectedExceptionToken(...)));
+        $arguments = array_filter($expected, static fn (string $token): bool => str_contains($token, '#'));
+
+        return array_values(array_filter(
+            $expected,
+            static fn (string $token): bool => str_contains($token, '#')
+                || array_any($arguments, static fn (string $argument): bool => str_starts_with($argument, $token . '#')),
+        ));
     }
 
     /**

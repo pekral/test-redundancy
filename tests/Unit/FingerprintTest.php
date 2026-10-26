@@ -5,6 +5,7 @@ declare(strict_types = 1);
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
 use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
+use Pekral\TestRedundancy\Fingerprint\PestFingerprints;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use PhpParser\ParserFactory;
@@ -983,6 +984,23 @@ it('fingerprints a first-class-callable throws() as the bare call', function ():
 
     expect($fingerprints['rejects'])->toBe(['function:fail' => 1, 'call:throws' => 1]);
 });
+
+it('keeps a bare throws call as an expected exception only when an argument of the same call follows it', function (
+    array $expected,
+    string ...$tokens,
+): void {
+    expect(PestFingerprints::expectedExceptionTokens(array_values($tokens)))->toBe($expected);
+})->with([
+    'a call of a body and its argument' => [[], 'call:throws', 'in:call:throws#0/const:E::class', 'function:validate'],
+    'a call of another kind than the argument' => [['call:throwsIf#0/source:$a'], 'call:throws', 'call:throwsIf#0/source:$a'],
+    'a call without an argument' => [[], 'call:throws', 'function:validate'],
+    'a test-level call and its argument' => [
+        ['call:throws', 'call:throws#0/const:E::class'],
+        'call:throws',
+        'call:throws#0/const:E::class',
+        'function:validate',
+    ],
+]);
 
 it('fingerprints PHPUnit tests and their data providers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
