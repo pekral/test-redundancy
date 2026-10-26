@@ -25,12 +25,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   value the closure returns, under an array key or in an assertion argument, such as `foo(['k' => 1])` against
   `foo(['k' => fn () => 1])` or `toBe(1)` against `toBe(fn () => 1)`, is still `delete`. A closure in a `match` arm
   carries no token, so a literal there, such as `foo(match ($x) { 1 => 'a' })` against
-  `foo(match ($x) { 1 => fn () => 1 })`, is still `merge-into-dataset`.
-- A candidate that passes a closure where its covering test passes a literal is no longer `delete` under an array key
-  or in an assertion argument. Before, `foo(['k' => fn () => 1])` against `foo(['k' => 1])` and
+  `foo(match ($x) { 1 => fn () => 1 })`, is still `merge-into-dataset`. The same holds for a candidate whose `match` arm
+  holds the closure (see the next entry).
+- A candidate that passes a closure where its covering test passes a literal is no longer `delete` or
+  `merge-into-dataset` under an array key or in an assertion argument, and no longer `merge-into-dataset` as an
+  operand of an operator. Before, `foo(['k' => fn () => 1])` against `foo(['k' => 1])` and
   `expect(f())->toBe(fn () => 1)` against `expect(f())->toBe(1)` had the same tokens, and the candidate was `delete`.
-  Now the closure carries its own token, e.g. `in:function:foo#0/value:'k'/element:closure`, and the candidate is
-  `review`.
+  The candidate `foo(['k' => fn () => 2])` against `foo(['k' => 1])`, `expect(f())->toBe(fn () => 2)` against
+  `expect(f())->toBe(1)` and `foo($a ?? fn () => 2)` against `foo($a ?? 1)` was `merge-into-dataset`. Now the closure
+  carries its own token, e.g. `in:function:foo#0/value:'k'/element:closure`, and the candidate is `review`. A closure
+  in a `match` arm carries no token, so such a candidate keeps its verdict:
+  `expect(f())->toBe(match ($x) { 1 => fn () => 1 })` against `expect(f())->toBe(match ($x) { 1 => 1 })` is still
+  `delete`, and with `fn () => 2` it is still `merge-into-dataset`.
 - A test with an assertion argument that holds a closure inside an operand, such as `$c ?? fn () => foo()`, is no
   longer `delete` when two subjects swap such arguments. Before, an argument that held a name next to a closure was
   reduced to its names, so `expect(g($a))->toBe($c ?? fn () => foo()); expect(g($b))->toBe($c ?? fn () => bar());`

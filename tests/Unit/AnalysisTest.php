@@ -4973,6 +4973,11 @@ it('reviews, and does not merge, a test that passes a value where its covering t
     ],
     'an anonymous function as the argument' => ['foo(\'a\');', 'foo(function () { return 1; });', 'in:function:foo#0/closure'],
     'an arrow function as a named argument' => ['foo(cb: \'a\');', 'foo(cb: fn () => 1);', 'in:function:foo#cb/closure'],
+    'an arrow function as an operand of an operator' => [
+        'foo($a ?? \'a\');',
+        'foo($a ?? fn () => 1);',
+        'in:function:foo#0/operator:coalesce#1/operand:closure',
+    ],
     'an arrow function as the argument' => ['foo(\'a\');', 'foo(fn () => 1);', 'in:function:foo#0/closure'],
     'an arrow function as the argument of a method' => ['$x->foo(\'a\');', '$x->foo(fn () => 1);', 'in:call:foo#0/closure'],
     'an arrow function as the argument of an assertion' => [
@@ -5012,6 +5017,35 @@ it('reviews, never deletes, a test that passes a closure where its covering test
     ],
     'a closure under a key of an array argument' => [
         'foo([\'k\' => fn () => 1]);',
+        'foo([\'k\' => 1]);',
+        'in:function:foo#0/value:\'k\'/element:closure',
+    ],
+]);
+
+it('reviews, and does not merge, a test that passes a closure where its covering test passes another value', function (
+    string $candidateBody,
+    string $coveringBody,
+    string $closureToken,
+): void {
+    $report = analyzeTestPair($candidateBody, $coveringBody);
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->differsBy)->toContain($closureToken)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+})->with([
+    'a closure as an operand of an operator' => [
+        'foo($a ?? fn () => 2);',
+        'foo($a ?? 1);',
+        'in:function:foo#0/operator:coalesce#1/operand:closure',
+    ],
+    'a closure as the argument of an assertion' => [
+        'expect(f())->toBe(fn () => 2);',
+        'expect(f())->toBe(1);',
+        'in:expect:function:f/call:toBe#0/closure',
+    ],
+    'a closure under a key of an array argument' => [
+        'foo([\'k\' => fn () => 2]);',
         'foo([\'k\' => 1]);',
         'in:function:foo#0/value:\'k\'/element:closure',
     ],
