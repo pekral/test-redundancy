@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A test whose interpolated string has another literal text than its covering test is no longer `delete`. Before,
+  the literal parts of an interpolated string carried no token, so `toBe("Hello {$this->user->name}")` and
+  `toBe("Hi {$this->user->name}")` had the same tokens, and the candidate was `delete` with an empty `differsBy`. Now
+  each literal part carries a `value:` token, like a string joined with `.`: `"Hello {$this->user->name}"` has
+  `value:'Hello '`. The two tests differ in `differsBy`, and the candidate is `review` (#110).
 - A test that calls the code under test once is no longer `delete` or `merge-into-dataset` against a test that calls
   it twice through a callable held in a property. Before, a call such as `($this->cleanUp)($this->account)` or
   `(self::$resolve)('campaign_{name}', $campaign)` carried no token, so two identical calls gave the same tokens as

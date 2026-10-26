@@ -1107,7 +1107,7 @@ it('names the variable or the property that an argument of a call or of an asser
     ],
     'property interpolated in a string passed to the code under test' => [
         'store("tag_{$campaign->name}");',
-        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/property:name'],
+        ['function:store', 'in:function:store#0/non-literal', 'in:function:store#0/property:name', 'value:\'tag_\''],
     ],
     'property joined to a string passed to a PHPUnit assertion' => [
         '$this->assertSame(\'a\' . $x->title, $y);',

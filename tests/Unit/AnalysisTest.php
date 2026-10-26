@@ -4009,7 +4009,7 @@ it('asks for a review of a test that asserts on another variable or property tha
                 expect(resolveUtm($campaign))->toBe("tag_{$campaign->name}");
             });
             PHP_SOURCE,
-        ['in:expect:function:resolveUtm/call:toBe#0/property:title'],
+        ['in:expect:function:resolveUtm/call:toBe#0/property:title', 'value:\'no_segment_tag_\''],
     ],
     'another property joined to a string as the expected value' => [
         <<<'PHP_SOURCE'
@@ -4040,6 +4040,27 @@ it('asks for a review of a test that asserts on another variable or property tha
         ['in:expect:function:linksOf/call:toContain#0/variable:canvaUserId'],
     ],
 ]);
+
+it('asks for a review of a test whose interpolated string has another literal text than its covering test', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP_SOURCE'
+            <?php
+            it('greets the user', function (): void {
+                expect(greet($this->user))->toBe("Hello {$this->user->name}");
+            });
+            it('greets the user briefly', function (): void {
+                expect(greet($this->user))->toBe("Hi {$this->user->name}");
+                expect(other())->toBeTrue();
+            });
+            PHP_SOURCE,
+        linesByTest: ['it greets the user' => ['src/Greeting.php:5'], 'it greets the user briefly' => ['src/Greeting.php:5', 'src/Greeting.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it greets the user')
+        ->and($report->candidates[0]->differsBy)->toBe(['value:\'Hello \''])
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
 
 it('asks for a review of a test that passes optional arguments its covering test omits and relies on their defaults', function (
     string $source,
