@@ -8,4 +8,4 @@ return RectorConfig::configure()
     ->withPaths([__DIR__ . '/src', __DIR__ . '/tests'])
     ->withSkip([__DIR__ . '/tests/Fixtures'])
     ->withSets([__DIR__ . '/vendor/pekral/rector-rules/rector.php'])
-    ->withParallel();
+    ->withParallel(timeoutSeconds: 180, maxNumberOfProcess: 6, jobSize: 60);
