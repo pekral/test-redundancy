@@ -33,9 +33,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `->after(fn () => cleanup('mail'))` has the token `call:after#0/in:function:cleanup#0/value:'mail'` in
   `PestFingerprints::of()`, `PestFingerprints::analyse()`, `differsBy` and `coveringDiffersBy`, not
   `in:function:cleanup#0/value:'mail'`. A PHP caller or a script that looks for the plain token of a call inside the
-  closure must look for the prefixed token, or use `PestFingerprints::isTestModifierToken()`. The closure carries no
-  `source:` token, because its tokens already describe it. A literal that differs inside the closure is no longer row
-  data: the candidate is `review`, not `merge-into-dataset` (#156). An `expect()` or an `assert*()` call inside the
+  closure must look for the prefixed token, or use `PestFingerprints::isTestModifierToken()`. That method returns false
+  for a `read:` token, so strip the leading `read:` prefix first, for example with `TokenCollector::withoutRead()`. The
+  closure carries no `source:` token, because its tokens already describe it. A literal that differs inside the closure
+  is no longer row data: the candidate is `review`, not `merge-into-dataset` (#156). An `expect()` or an `assert*()` call inside the
   closure counts as an assertion of the test, because Pest runs the closure after the test; the new
   `PestFingerprints::isAssertionInAfterClosure()` tells such a token.
 
