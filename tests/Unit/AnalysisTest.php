@@ -4991,6 +4991,22 @@ it('asks for a review of a test that passes optional arguments its covering test
             ...Action::Review->steps('"it covers the default case"', []),
         ]);
 })->with([
+    'argument of a body call that the covering test makes without it besides the test-level call of that name' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                $s = new Stub();
+                $s->throws(E::class);
+                validate('');
+            })->throws(E::class);
+            it('covers the default case', function (): void {
+                $s = new Stub();
+                $s->throws();
+                validate('');
+            })->throws(E::class);
+            PHP_SOURCE,
+        'in:call:throws#0/const:E::class',
+    ],
     'named arguments of a constructor' => [
         <<<'PHP_SOURCE'
             <?php
@@ -5075,6 +5091,20 @@ it('does not name an argument of a call that the covering test never makes as om
             it('covers the other case', function (): void {
                 expect(store('a', 2))->toBe(1);
             });
+            PHP_SOURCE,
+    ],
+    'call that the covering test makes only on the whole test' => [
+        <<<'PHP_SOURCE'
+            <?php
+            it('covers the full case', function (): void {
+                $s = new Stub();
+                $s->throws(E::class);
+                validate('');
+            });
+            it('covers the other case', function (): void {
+                $s = new Stub();
+                validate('');
+            })->throws(E::class);
             PHP_SOURCE,
     ],
     'variable that holds another callable in the covering test' => [
