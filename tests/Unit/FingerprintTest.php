@@ -840,7 +840,7 @@ it('counts a token of a dataset row together with the same token of the test bod
 
     $row = $fingerprints['it adds › one'];
 
-    expect([$row['in:function:add#0/value:1'], $row['call:group'], $row['value:\'math\'']])->toBe([2, 2, 2]);
+    expect([$row['in:function:add#0/value:1'], $row['call:group'], $row['call:group#0/value:\'math\'']])->toBe([2, 2, 2]);
 });
 
 it('gives a map of literals a dataset row passes the argument position of the call it reaches', function (): void {
@@ -984,7 +984,7 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
                 'function:add',
                 'read:function:add',
                 'call:group',
-                'value:\'math\'',
+                'call:group#0/value:\'math\'',
                 'in:expect:function:add/call:toBe#0/value:3',
             ],
         )

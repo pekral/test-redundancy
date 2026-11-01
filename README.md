@@ -299,6 +299,18 @@ the class or the message to it, so such a candidate can still be `merge-into-dat
 code of an argument, never its value at run time. Two tests whose arguments have the same source code are not told
 apart, such as `->throws($exception)` in both tests while the variable holds another class in each.
 
+The arguments of the other Pest modifiers chained on the whole test are never data either, because a dataset cannot
+vary them per row. The modifiers covered are `->assignee()`, `->covers()`, `->coversClass()`, `->coversFunction()`,
+`->coversTrait()`, `->depends()`, `->done()`, `->fails()`, `->flaky()`, `->group()`, `->issue()`, `->note()`, `->pr()`,
+`->references()`, `->repeat()`, `->see()`, `->skip()`, `->skipOnPhp()`, `->ticket()`, `->todo()` and `->wip()`. Each
+argument of such a call carries the token `call:<method>#<position>/` before its value, in the same way as an argument
+of `->throws()`. For example, `->group('slow')` carries `call:group#0/value:'slow'`, and `->wip(note: 'Check it.')`
+carries `call:wip#note/value:'Check it.'`. When an argument of such a call in the candidate differs from the covering
+test, such as `->group('a')` against `->group('b')`, the candidate is `review`, not `merge-into-dataset`: a merged
+test would keep one value for every row, so the modifier of the candidate would be lost. A modifier without an argument,
+such as `->only()` or `->skipOnWindows()`, carries only its call, such as `call:only`, which is never data. The closure
+of `->after()` is not covered: its tokens are collected in the same way as the tokens of the test body.
+
 ### How `differsBy` names a difference
 
 `differsBy` lists the literals, constants, functions, calls and `new` expressions the candidate has and the covering

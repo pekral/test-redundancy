@@ -39,6 +39,11 @@ final readonly class PestFingerprints
 
     private const array EXPECTED_EXCEPTION_METHODS = ['throws', 'throwsIf', 'throwsUnless'];
 
+    private const array TEST_MODIFIER_METHODS = [
+        'assignee', 'covers', 'coversClass', 'coversFunction', 'coversTrait', 'depends', 'done', 'fails', 'flaky', 'group',
+        'issue', 'note', 'pr', 'references', 'repeat', 'see', 'skip', 'skipOnPhp', 'ticket', 'todo', 'wip',
+    ];
+
     /**
      * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
      */
@@ -208,7 +213,7 @@ final readonly class PestFingerprints
      */
     private function modifierTokens(string $method, MethodCall $call): array
     {
-        if (!in_array($method, self::EXPECTED_EXCEPTION_METHODS, strict: true)) {
+        if (!in_array($method, [...self::EXPECTED_EXCEPTION_METHODS, ...self::TEST_MODIFIER_METHODS], strict: true)) {
             return TokenCollector::sum(TokenCollector::collect($call->args), ['call:' . $method => 1]);
         }
 
