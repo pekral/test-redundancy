@@ -2220,6 +2220,7 @@ it('reviews, and does not merge, a test that expects another exception than the 
 it('reviews, and does not merge, a test that differs from its covering test only in a test-level modifier a dataset cannot vary', function (
     string $source,
     string $differsBy,
+    string $modifier,
 ): void {
     $report = analyzeTokenTest(
         source: $source,
@@ -2230,7 +2231,13 @@ it('reviews, and does not merge, a test that differs from its covering test only
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it a')
         ->and(valueAt($json, 'action'))->toBe('review')
-        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy]);
+        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy])
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(Action::TEST_MODIFIER_STEP, '"it b"', $modifier),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
 })->with([
     'another group in group()' => [
         <<<'PHP'
@@ -2246,6 +2253,7 @@ it('reviews, and does not merge, a test that differs from its covering test only
             })->group('b');
             PHP,
         'call:group#0/value:\'a\'',
+        'group()',
     ],
     'another issue number in issue()' => [
         <<<'PHP'
@@ -2254,6 +2262,7 @@ it('reviews, and does not merge, a test that differs from its covering test only
             it('b', fn () => expect(validate(''))->toBeTrue())->issue(13);
             PHP,
         'call:issue#0/value:12',
+        'issue()',
     ],
     'another note as a named argument of wip()' => [
         <<<'PHP'
@@ -2262,8 +2271,44 @@ it('reviews, and does not merge, a test that differs from its covering test only
             it('b', fn () => expect(validate(''))->toBeTrue())->wip(note: 'Check the queue.');
             PHP,
         'call:wip#note/value:\'Check the mailer.\'',
+        'wip()',
     ],
 ]);
+
+it('names every test-level modifier that the candidate has with another argument, once, before the generic steps', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('a', fn () => expect(validate(''))->toBeTrue())->group('a')->issue(12)->issue(13);
+            it('b', fn () => expect(validate(''))->toBeTrue())->group('b')->issue(14);
+            PHP,
+        linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->steps())->toBe([
+            sprintf(Action::TEST_MODIFIER_STEP, '"it b"', 'issue(), group()'),
+            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
+            'Delete this test only when it does not; otherwise keep it.',
+            Action::VERIFY_STEP,
+        ]);
+});
+
+it('names the test-level modifier of a candidate whose covering test has none, besides the data that differs', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('a', fn () => expect(validate(''))->toBeTrue())->group('a');
+            it('b', fn () => expect(validate('x'))->toBeTrue());
+            PHP,
+        linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->steps()[0])->toBe(sprintf(Action::TEST_MODIFIER_STEP, '"it b"', 'group()'));
+});
 
 it('reads an argument of a test-level modifier as no assertion, so a test without an assertion keeps its no-assertion step', function (): void {
     $report = analyzeTokenTest(

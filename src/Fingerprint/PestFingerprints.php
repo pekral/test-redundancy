@@ -105,6 +105,18 @@ final readonly class PestFingerprints
     }
 
     /**
+     * @param list<string> $tokens
+     * @return list<string>
+     */
+    public static function testModifierNames(array $tokens): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (string $token): string => explode('#', substr($token, strlen('call:')), 2)[0],
+            array_filter($tokens, static fn (string $token): bool => str_contains($token, '#') && self::isTestModifierToken($token)),
+        )));
+    }
+
+    /**
      * @param array<\PhpParser\Node\Stmt> $statements
      */
     public static function declaresOnlyFingerprintedTests(array $statements): bool

@@ -60,6 +60,14 @@ enum Action: string
         . 'To merge this test, move the expectation of both tests into their bodies as expect(fn () => …)->toThrow(), '
         . 'with the exception class and the message as row values; otherwise keep this test.';
 
+    public const string TEST_MODIFIER_STEP = 'The covering test %s and this test differ in the test-level modifiers %s, '
+        . 'which are chained on the whole test. '
+        . 'A dataset cannot vary such a modifier per row, so a row with the values in differsBy would keep the modifier '
+        . 'of the covering test, and the modifier of this test would be lost. '
+        . 'Check whether the modifier of this test still has a purpose of its own, '
+        . 'for example a group that a CI job selects, a ticket it references or a condition under which it skips; '
+        . 'keep this test when it does, and delete it only when it does not.';
+
     public const string OMITTED_ARGUMENT_STEP = 'The covering test %s omits the arguments (%s) that this test passes '
         . 'and relies on their defaults. A dataset row passes every argument, so a merged row would pass them explicitly '
         . 'and the case "the argument is omitted, the default applies" would be lost. '

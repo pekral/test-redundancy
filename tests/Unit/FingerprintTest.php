@@ -1042,6 +1042,16 @@ it('keeps a bare throws call as an expected exception only when an argument of t
     ],
 ]);
 
+it('names a test-level modifier once, from the tokens of its arguments only', function (array $expected, string ...$tokens): void {
+    expect(PestFingerprints::testModifierNames(array_values($tokens)))->toBe($expected);
+})->with([
+    'two arguments of one modifier' => [['issue'], 'call:issue#0/value:12', 'call:issue#1/value:13'],
+    'a named argument' => [['wip'], 'call:wip#note/value:\'Check it.\''],
+    'two modifiers' => [['group', 'issue'], 'call:group#0/value:\'a\'', 'in:function:validate#0/value:\'\'', 'call:issue#0/value:12'],
+    'a call of a modifier name in a body' => [[], 'call:group', 'in:call:group#0/value:\'a\''],
+    'a test-level call of no modifier' => [[], 'call:throws#0/const:E::class', 'function:validate'],
+]);
+
 it('fingerprints PHPUnit tests and their data providers', function (): void {
     $fingerprints = fingerprintsOf(<<<'PHP'
         <?php

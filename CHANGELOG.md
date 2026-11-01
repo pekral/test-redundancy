@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A `review` candidate whose `differsBy` holds an argument of a Pest test-level modifier, such as `->group('a')`
+  against `->group('b')`, now gets a dedicated step that names the modifier, such as `group()`, instead of only the
+  generic `review` steps. The new `PestFingerprints::testModifierNames()` returns the modifier names from a list of
+  tokens (#155).
+
 ## [0.1.8] - 2026-10-26
 
 ### Changed
