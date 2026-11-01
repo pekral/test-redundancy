@@ -114,7 +114,10 @@ final class FingerprintCache
 
     public function assertsNothing(string $testKey): bool
     {
-        return array_filter(array_keys($this->of($testKey) ?? []), TokenCollector::isAssertionToken(...)) === [];
+        $tokens = array_keys($this->of($testKey) ?? []);
+
+        return PestFingerprints::expectedExceptionTokens($tokens) === []
+            && array_filter($tokens, TokenCollector::isAssertionToken(...)) === [];
     }
 
     /**

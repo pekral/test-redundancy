@@ -522,6 +522,20 @@ it('reads no call of a callable held in a class constant named like an assertion
     expect(new FingerprintCache($project)->assertsNothing('tests/ArrangeTest.php :: it arranges'))->toBeTrue();
 });
 
+it('reads a test-level throws call with an exception argument as an assertion', function (string $test, bool $assertsNothing): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/ThrowsTest.php', "<?php\n" . $test);
+
+    expect(new FingerprintCache($project)->assertsNothing('tests/ThrowsTest.php :: it rejects'))->toBe($assertsNothing);
+})->with([
+    'throws as a first-class callable' => ['it(\'rejects\', fn () => validate(\'\'))->throws(...);', true],
+    'throws called in the body' => ['it(\'rejects\', fn () => $stub->throws(InvalidArgumentException::class));', true],
+    'throwsIf with an exception class' => ['it(\'rejects\', fn () => validate(\'\'))->throwsIf(true, InvalidArgumentException::class);', false],
+    'throwsUnless with an exception class' => ['it(\'rejects\', fn () => validate(\'\'))->throwsUnless(false, InvalidArgumentException::class);', false],
+    'throws with an exception class' => ['it(\'rejects\', fn () => validate(\'\'))->throws(InvalidArgumentException::class);', false],
+]);
+
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 
