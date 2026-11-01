@@ -2265,6 +2265,31 @@ it('reviews, and does not merge, a test that differs from its covering test only
     ],
 ]);
 
+it('reads an argument of a test-level modifier as no assertion, so a test without an assertion keeps its no-assertion step', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('a', function (): void {
+                validate('');
+            })->note('see:expectations');
+
+            it('b', function (): void {
+                validate('');
+                validate('x');
+            })->note('see:expectations');
+            PHP,
+        linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5', 'src/Validator.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a')
+        ->and($report->candidates[0]->steps())->toBe([
+            sprintf(Action::MISSING_ARGUMENT_STEP, '"it b"', 'in:function:validate#0/value:\'x\''),
+            sprintf(Action::NO_ASSERTION_STEP, '"it b"', 'function:validate'),
+            Action::VERIFY_STEP,
+        ]);
+});
+
 it('asks for a review of a test whose covering test runs the same code and expects more of an exception through its test-level throws()', function (
     string $source,
     string ...$coveringDiffersBy,
