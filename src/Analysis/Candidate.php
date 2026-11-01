@@ -138,7 +138,7 @@ final readonly class Candidate implements JsonSerializable
             ...$this->missingArgumentSteps(),
             ...$this->coveringTokenSteps(Action::MISSING_EXPECTATION_STEP, $this->coveringExpectations()),
             ...$this->coveringTokenSteps(Action::EXPECTED_EXCEPTION_STEP, $this->coveringExpectedExceptions()),
-            ...$this->testModifierSteps(),
+            ...$this->coveringTokenSteps(Action::TEST_MODIFIER_STEP, PestFingerprints::testModifierCalls($this->differsBy ?? [])),
             ...$this->coveringTokenSteps(Action::OMITTED_ARGUMENT_STEP, $this->omittedByCovering),
             ...$sharedSteps,
             ...$this->action()->steps(
@@ -149,9 +149,7 @@ final readonly class Candidate implements JsonSerializable
             ),
         ];
 
-        return $this->differsBy === null
-            ? ['This test or its dataset row could not be parsed; compare it with coveredBy by hand.', ...$steps]
-            : $steps;
+        return $this->differsBy === null ? [Action::UNPARSED_STEP, ...$steps] : $steps;
     }
 
     private function deleteOrReviewSharedRow(): Action
@@ -216,21 +214,6 @@ final readonly class Candidate implements JsonSerializable
     private function coveringExpectedExceptions(): array
     {
         return count($this->coveredBy) === 1 ? PestFingerprints::expectedExceptionTokens($this->coveringTokens()) : [];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function testModifierSteps(): array
-    {
-        $modifiers = PestFingerprints::testModifierNames($this->differsBy ?? []);
-
-        return $modifiers === [] ? [] : [
-            sprintf(Action::TEST_MODIFIER_STEP, Action::quoted($this->coveredBy), implode(', ', array_map(
-                static fn (string $modifier): string => $modifier . '()',
-                $modifiers,
-            ))),
-        ];
     }
 
     /**
