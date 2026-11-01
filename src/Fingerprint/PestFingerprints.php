@@ -39,9 +39,11 @@ final readonly class PestFingerprints
 
     private const array EXPECTED_EXCEPTION_METHODS = ['throws', 'throwsIf', 'throwsUnless'];
 
+    private const string AFTER_METHOD = 'after';
+
     private const array TEST_MODIFIER_METHODS = [
-        'assignee', 'covers', 'coversClass', 'coversFunction', 'coversTrait', 'depends', 'done', 'fails', 'flaky', 'group',
-        'issue', 'note', 'pr', 'references', 'repeat', 'see', 'skip', 'skipOnPhp', 'ticket', 'todo', 'wip',
+        self::AFTER_METHOD, 'assignee', 'covers', 'coversClass', 'coversFunction', 'coversTrait', 'depends', 'done', 'fails',
+        'flaky', 'group', 'issue', 'note', 'pr', 'references', 'repeat', 'see', 'skip', 'skipOnPhp', 'ticket', 'todo', 'wip',
     ];
 
     /**
@@ -78,6 +80,12 @@ final readonly class PestFingerprints
     public static function isTestModifierToken(string $token): bool
     {
         return self::isArgumentTokenOf($token, self::TEST_MODIFIER_METHODS);
+    }
+
+    public static function isAssertionInAfterClosure(string $token): bool
+    {
+        return preg_match('~^call:' . self::AFTER_METHOD . '#\w+/(.+)$~s', $token, $matches) === 1
+            && TokenCollector::isAssertionToken($matches[1]);
     }
 
     /**
@@ -221,27 +229,7 @@ final readonly class PestFingerprints
             return TokenCollector::sum(TokenCollector::collect($call->args), ['call:' . $method => 1]);
         }
 
-        $tokens = ['call:' . $method => 1];
-
-        foreach ($call->args as $position => $argument) {
-            if (!$argument instanceof Arg) {
-                continue;
-            }
-
-            foreach (TokenCollector::sum(TokenCollector::collect($argument), $this->sourceToken($argument)) as $token => $count) {
-                $tokens['call:' . $method . '#' . ($argument->name?->toString() ?? $position) . '/' . $token] = $count;
-            }
-        }
-
-        return $tokens;
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function sourceToken(Arg $argument): array
-    {
-        return TokenCollector::isData($argument->value) ? [] : ['source:' . OrderTokens::sourceOf($argument->value) => 1];
+        return TestLevelArgumentTokens::of($method, $call, withSource: $method !== self::AFTER_METHOD);
     }
 
     /**

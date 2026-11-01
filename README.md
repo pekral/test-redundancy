@@ -308,8 +308,17 @@ of `->throws()`. For example, `->group('slow')` carries `call:group#0/value:'slo
 carries `call:wip#note/value:'Check it.'`. When an argument of such a call in the candidate differs from the covering
 test, such as `->group('a')` against `->group('b')`, the candidate is `review`, not `merge-into-dataset`: a merged
 test would keep one value for every row, so the modifier of the candidate would be lost. A modifier without an argument,
-such as `->only()` or `->skipOnWindows()`, carries only its call, such as `call:only`, which is never data. The closure
-of `->after()` is not covered: its tokens are collected in the same way as the tokens of the test body.
+such as `->only()` or `->skipOnWindows()`, carries only its call, such as `call:only`, which is never data.
+
+The closure of `->after()` is never data either, because a dataset cannot vary it per row. Its tokens are collected in
+the same way as the tokens of the test body, and each one carries the token `call:after#<position>/` before it. For
+example, `->after(fn () => cleanup('mail'))` carries `call:after#0/in:function:cleanup#0/value:'mail'`. A `read:` token
+keeps its prefix in front, such as `read:call:after#0/call:Mailer::sent`. When the closure of the candidate differs
+from the covering test, the candidate is `review`, not `merge-into-dataset`. Unlike the arguments of the other
+modifiers, the closure carries no `source:` token, because its tokens already describe it. An `expect()` or an
+`assert*()` call inside the closure counts as an assertion of the test, because Pest runs the closure after the test
+and a failure in it fails the test. A test whose only expectation is in its `->after()` closure therefore does not get
+the step that says the test asserts nothing.
 
 ### How `differsBy` names a difference
 
