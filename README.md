@@ -309,7 +309,7 @@ carries `call:wip#note/value:'Check it.'`. When an argument of such a call in th
 test, such as `->group('a')` against `->group('b')`, the candidate is `review`, not `merge-into-dataset`: a merged
 test would keep one value for every row, so the modifier of the candidate would be lost. A modifier without an argument,
 such as `->only()` or `->skipOnWindows()`, carries only its call, such as `call:only`, which is never data.
-The steps of such a `review` candidate start with a step that names each modifier with an argument in `differsBy`, such as
+The steps of such a `review` candidate include a step that names each modifier with an argument in `differsBy`, such as
 `group()`, and says that a dataset cannot vary it per row. The step says to keep the test when the modifier still has a
 purpose of its own, such as a group a CI job selects, and to delete the test only when it does not.
 

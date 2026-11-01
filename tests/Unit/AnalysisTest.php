@@ -2348,7 +2348,8 @@ it('reviews, and does not merge, a test that differs from its covering test only
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it a')
         ->and(valueAt($json, 'action'))->toBe('review')
-        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy]);
+        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy])
+        ->and($report->candidates[0]->steps()[0])->toBe(sprintf(Action::TEST_MODIFIER_STEP, '"it b"', 'after()'));
 })->with([
     'another expected value in an expectation of the closure' => [
         <<<'PHP'
