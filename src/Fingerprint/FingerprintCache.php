@@ -84,7 +84,7 @@ final class FingerprintCache
     public function omittedArguments(string $testKey, array $coveringTestKeys): array
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
-        $covering = array_keys(TokenCollector::sum(...array_map(self::withoutTestLevelCalls(...), $tokens['covering'] ?? [])));
+        $covering = array_keys(TokenCollector::sum(...array_map($this->withoutTestLevelCalls(...), $tokens['covering'] ?? [])));
         $isOmitted = static fn (?string $position): bool => $position !== null
             && NonLiteralArguments::isCallOfPositionMadeBy($position, $covering)
             && !NonLiteralArguments::isPositionFilledBy($position, $covering);
@@ -221,7 +221,7 @@ final class FingerprintCache
      * @param array<string, int> $tokens
      * @return array<string, int>
      */
-    private static function withoutTestLevelCalls(array $tokens): array
+    private function withoutTestLevelCalls(array $tokens): array
     {
         $arguments = array_filter(
             array_keys($tokens),
