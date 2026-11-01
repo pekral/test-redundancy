@@ -210,7 +210,8 @@ aborts the run. `map` and `verify` still abort when a test case fails.
   action is `review`, and the steps ask whether the empty or missing input is a case of its own. This holds for a value
   that is not an argument too, such as a literal the covering test echoes. An assertion and a value or key passed only
   to an assertion do not count, so a covering test that only asserts more about the same input still leaves the
-  candidate `delete`.
+  candidate `delete`. A Pest `->throws()`, `->throwsIf()` or `->throwsUnless()` with an argument chained on the test
+  counts as an assertion, so a test whose only expectation is such a call is not a candidate without an assertion.
 - **No other test uses the dataset.** A row of a named Pest dataset, `dataset('name', …)`, that another test of the
   same file also uses with `->with('name')` cannot be deleted for one test: deleting the row removes it from every
   test that uses the dataset. Such a row is `review`, not `delete`, and the first step names the dataset and the other
@@ -298,6 +299,10 @@ body, such as `expect(fn () => …)->toThrow(EmailNotFound::class)` or PHPUnit's
 the class or the message to it, so such a candidate can still be `merge-into-dataset`. The analysis compares the source
 code of an argument, never its value at run time. Two tests whose arguments have the same source code are not told
 apart, such as `->throws($exception)` in both tests while the variable holds another class in each.
+The step for an argument that the covering test omits does not read a call of this kind as a call in the body of the
+covering test. A method named `throws()` that the candidate calls in its body, such as `$stub->throws(E::class)`, and
+the `->throws(E::class)` that the covering test chains on the whole test therefore do not make that step name the
+arguments of `->throws()` as omitted.
 
 The arguments of the other Pest modifiers chained on the whole test are never data either, because a dataset cannot
 vary them per row. The modifiers covered are `->assignee()`, `->covers()`, `->coversClass()`, `->coversFunction()`,

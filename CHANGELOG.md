@@ -6,12 +6,52 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-01
+
 ### Changed
 
+- Each argument of a Pest test-level modifier other than `->throws()` now carries the token
+  `call:<method>#<position>/` before its value, and a named argument carries its name instead of its position, in the
+  same way as an argument of `->throws()` (#145). The modifiers are `->assignee()`, `->covers()`, `->coversClass()`,
+  `->coversFunction()`, `->coversTrait()`, `->depends()`, `->done()`, `->fails()`, `->flaky()`, `->group()`,
+  `->issue()`, `->note()`, `->pr()`, `->references()`, `->repeat()`, `->see()`, `->skip()`, `->skipOnPhp()`,
+  `->ticket()`, `->todo()` and `->wip()`. For example, `->group('slow')` has the token `call:group#0/value:'slow'` in
+  `PestFingerprints::of()`, `PestFingerprints::analyse()`, `differsBy` and `coveringDiffersBy`, not `value:'slow'`. A
+  PHP caller or a script that looks for the plain `value:` or `const:` token of such an argument must look for the
+  prefixed token, or use the new `PestFingerprints::isTestModifierToken()`. An argument that is not a literal or a
+  constant also carries the token `call:<method>#<position>/source:<source code>`. Such an argument is no longer row
+  data: a candidate whose modifier argument differs from the covering test, such as `->group('a')` against
+  `->group('b')`, is `review`, not `merge-into-dataset` (#149). A dataset cannot vary a modifier that is chained on the
+  whole test, so a merged test kept one value for every row and the modifier of the candidate was lost. A modifier
+  without an argument, such as `->only()`, carries only its call, which is never data.
 - A `review` candidate whose `differsBy` holds an argument of a Pest test-level modifier, such as `->group('a')`
   against `->group('b')`, now gets a dedicated step that names the modifier, such as `group()`, instead of only the
   generic `review` steps. The new `PestFingerprints::testModifierCalls()` returns the modifier calls, such as `group()`, from a list
   of tokens (#155).
+- The closure of a Pest `->after()` now carries the token `call:after#<position>/` before each of its tokens, and a
+  `read:` token keeps its prefix in front, such as `read:call:after#0/call:Mailer::sent`. For example,
+  `->after(fn () => cleanup('mail'))` has the token `call:after#0/in:function:cleanup#0/value:'mail'` in
+  `PestFingerprints::of()`, `PestFingerprints::analyse()`, `differsBy` and `coveringDiffersBy`, not
+  `in:function:cleanup#0/value:'mail'`. A PHP caller or a script that looks for the plain token of a call inside the
+  closure must look for the prefixed token, or use `PestFingerprints::isTestModifierToken()`. The closure carries no
+  `source:` token, because its tokens already describe it. A literal that differs inside the closure is no longer row
+  data: the candidate is `review`, not `merge-into-dataset` (#156). An `expect()` or an `assert*()` call inside the
+  closure counts as an assertion of the test, because Pest runs the closure after the test; the new
+  `PestFingerprints::isAssertionInAfterClosure()` tells such a token.
+
+### Fixed
+
+- A Pest test whose only expectation is a test-level `->throws()`, `->throwsIf()` or `->throwsUnless()` with an
+  argument no longer counts as a test that asserts nothing (`Candidate::$assertsNothing` is `false`). Before, the
+  no-assertion step told the reader that the test "asserts only that the code under test throws no exception for its
+  input", which is the opposite of what the test checks (#148).
+- The omitted-argument step no longer names the arguments of a test-level call as arguments that the covering test
+  omits. A method named `throws()` that the candidate calls in its body, such as `$stub->throws(E::class)`, and the
+  `->throws(E::class)` that the covering test chains on the whole test share the token `call:throws`. The step read
+  the test-level call of the covering test as a body call and said that the covering test omits the arguments
+  `in:call:throws#0/const:E::class`, although the covering test never calls `$stub->throws()`. Now a call with an argument
+  that is chained on the whole test, `->throws()`, `->throwsIf()`, `->throwsUnless()` or one of the modifiers above, is
+  not counted as a call that the covering test makes in its body (#150).
 
 ## [0.1.8] - 2026-10-26
 
@@ -698,7 +738,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.8...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.9...HEAD
+[0.1.9]: https://github.com/pekral/test-redundancy/compare/0.1.8...0.1.9
 [0.1.8]: https://github.com/pekral/test-redundancy/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/pekral/test-redundancy/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/pekral/test-redundancy/compare/0.1.5...0.1.6
