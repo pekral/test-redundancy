@@ -84,7 +84,7 @@ final class FingerprintCache
     public function omittedArguments(string $testKey, array $coveringTestKeys): array
     {
         $tokens = $this->tokens($testKey, $coveringTestKeys);
-        $covering = array_keys(TokenCollector::sum(...$tokens['covering'] ?? []));
+        $covering = array_keys(TokenCollector::sum(...array_map(self::withoutTestLevelCalls(...), $tokens['covering'] ?? [])));
         $isOmitted = static fn (?string $position): bool => $position !== null
             && NonLiteralArguments::isCallOfPositionMadeBy($position, $covering)
             && !NonLiteralArguments::isPositionFilledBy($position, $covering);
@@ -215,6 +215,25 @@ final class FingerprintCache
         }
 
         return $this->byFile[$file] ??= ContractFingerprints::analyse($path);
+    }
+
+    /**
+     * @param array<string, int> $tokens
+     * @return array<string, int>
+     */
+    private static function withoutTestLevelCalls(array $tokens): array
+    {
+        $arguments = array_filter(
+            array_keys($tokens),
+            static fn (string $token): bool => str_contains($token, '#')
+                && (PestFingerprints::isExpectedExceptionToken($token) || PestFingerprints::isTestModifierToken($token)),
+        );
+
+        foreach (array_unique(array_map(static fn (string $argument): string => explode('#', $argument, 2)[0], $arguments)) as $call) {
+            $tokens[$call] = ($tokens[$call] ?? 0) - 1;
+        }
+
+        return array_filter(array_diff_key($tokens, array_flip($arguments)), static fn (int $count): bool => $count > 0);
     }
 
 }
