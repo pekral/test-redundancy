@@ -16,6 +16,8 @@ enum Action: string
 
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
+    public const string UNPARSED_STEP = 'This test or its dataset row could not be parsed; compare it with coveredBy by hand.';
+
     public const string ADD_ROW_STEP = 'Add a row with the values in differsBy to the dataset of "%s".';
 
     public const string ADD_SHARED_ROW_STEP = 'Add a row with the values in differsBy to the named dataset "%s", '
