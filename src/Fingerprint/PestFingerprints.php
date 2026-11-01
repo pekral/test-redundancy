@@ -72,8 +72,12 @@ final readonly class PestFingerprints
 
     public static function isExpectedExceptionToken(string $token): bool
     {
-        return preg_match('~^call:(\w+)(?:#\w+/|$)~', $token, $matches) === 1
-            && in_array($matches[1], self::EXPECTED_EXCEPTION_METHODS, strict: true);
+        return self::isArgumentTokenOf($token, self::EXPECTED_EXCEPTION_METHODS);
+    }
+
+    public static function isTestModifierToken(string $token): bool
+    {
+        return self::isArgumentTokenOf($token, self::TEST_MODIFIER_METHODS);
     }
 
     /**
@@ -398,6 +402,14 @@ final readonly class PestFingerprints
         }
 
         return $root instanceof FuncCall && self::isCallOf($root, [...self::TEST_FUNCTIONS, 'describe']);
+    }
+
+    /**
+     * @param list<string> $methods
+     */
+    private static function isArgumentTokenOf(string $token, array $methods): bool
+    {
+        return preg_match('~^call:(\w+)(?:#\w+/|$)~', $token, $matches) === 1 && in_array($matches[1], $methods, strict: true);
     }
 
     /**
