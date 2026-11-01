@@ -536,6 +536,32 @@ it('reads a test-level throws call with an exception argument as an assertion', 
     'throws with an exception class' => ['it(\'rejects\', fn () => validate(\'\'))->throws(InvalidArgumentException::class);', false],
 ]);
 
+it('reads an expectation inside a test-level after() closure as an assertion', function (string $test, bool $assertsNothing): void {
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    file_put_contents($project . '/tests/AfterTest.php', "<?php\n" . $test);
+
+    expect(new FingerprintCache($project)->assertsNothing('tests/AfterTest.php :: it sends'))->toBe($assertsNothing);
+})->with([
+    'a call without an expectation in the closure' => ['it(\'sends\', fn () => send())->after(fn () => cleanup(\'mail\'));', true],
+    'an assert method in the closure' => ['it(\'sends\', fn () => send())->after(fn () => $this->assertDatabaseCount(\'mails\', 0));', false],
+    'an expectation in the closure' => ['it(\'sends\', fn () => send())->after(fn () => expect($this->sent)->toBe(1));', false],
+]);
+
+it('fingerprints a test-level after() closure under its position, with the read prefix in front and no source token', function (): void {
+    $fingerprints = fingerprintsOf('<?php it(\'sends\', fn () => send())->after(fn () => expect(Mailer::sent())->toBe(1));');
+
+    expect($fingerprints['it sends'])->toEqual([
+        'call:after' => 1,
+        'call:after#0/call:Mailer::sent' => 1,
+        'call:after#0/expect:call:Mailer::sent/call:toBe' => 1,
+        'call:after#0/function:expect' => 1,
+        'call:after#0/in:expect:call:Mailer::sent/call:toBe#0/value:1' => 1,
+        'function:send' => 1,
+        'read:call:after#0/call:Mailer::sent' => 1,
+    ]);
+});
+
 it('gives a literal passed straight to a call the position of its argument', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 

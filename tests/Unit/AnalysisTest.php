@@ -2290,6 +2290,48 @@ it('reads an argument of a test-level modifier as no assertion, so a test withou
         ]);
 });
 
+it('reviews, and does not merge, a test that differs from its covering test only inside its after() closure', function (
+    string $source,
+    string $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it a')
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy]);
+})->with([
+    'another expected value in an expectation of the closure' => [
+        <<<'PHP'
+            <?php
+            it('a', fn () => expect(validate(''))->toBeTrue())->after(fn () => expect(Mailer::sent())->toBe(1));
+            it('b', fn () => expect(validate(''))->toBeTrue())->after(fn () => expect(Mailer::sent())->toBe(2));
+            PHP,
+        'call:after#0/in:expect:call:Mailer::sent/call:toBe#0/value:1',
+    ],
+    'another literal in a call of the closure' => [
+        <<<'PHP'
+            <?php
+            it('a', function (): void {
+                expect(validate(''))->toBeTrue();
+            })->after(function (): void {
+                cleanup('a');
+            });
+
+            it('b', function (): void {
+                expect(validate(''))->toBeTrue();
+            })->after(function (): void {
+                cleanup('b');
+            });
+            PHP,
+        'call:after#0/in:function:cleanup#0/value:\'a\'',
+    ],
+]);
+
 it('asks for a review of a test whose covering test runs the same code and expects more of an exception through its test-level throws()', function (
     string $source,
     string ...$coveringDiffersBy,
