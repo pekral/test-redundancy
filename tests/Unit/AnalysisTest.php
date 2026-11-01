@@ -2371,11 +2371,10 @@ it('does not report a test whose only expectation is a test-level throws() as as
             PHP,
         linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5', 'src/Validator.php:6']],
     );
-    $json = decodedJson((string) json_encode($report->candidates[0]));
 
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->assertsNothing)->toBeFalse()
-        ->and(implode(' ', valueAt($json, 'steps')))->not->toContain('throws no exception');
+        ->and(implode(' ', $report->candidates[0]->steps()))->not->toContain('throws no exception');
 });
 
 it('asks to merge a test whose expected value replaces the value under which its covering test expects a key', function (): void {
