@@ -2217,6 +2217,54 @@ it('reviews, and does not merge, a test that expects another exception than the 
     ],
 ]);
 
+it('reviews, and does not merge, a test that differs from its covering test only in a test-level modifier a dataset cannot vary', function (
+    string $source,
+    string $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it a' => ['src/Validator.php:5'], 'it b' => ['src/Validator.php:5']],
+    );
+    $json = decodedJson((string) json_encode($report->candidates[0]));
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and(valueAt($json, 'test'))->toBe('it a')
+        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'differsBy'))->toBe([$differsBy]);
+})->with([
+    'another group in group()' => [
+        <<<'PHP'
+            <?php
+            it('a', function (): void {
+                validate('');
+                expect(true)->toBeTrue();
+            })->group('a');
+
+            it('b', function (): void {
+                validate('');
+                expect(true)->toBeTrue();
+            })->group('b');
+            PHP,
+        'call:group#0/value:\'a\'',
+    ],
+    'another issue number in issue()' => [
+        <<<'PHP'
+            <?php
+            it('a', fn () => expect(validate(''))->toBeTrue())->issue(12);
+            it('b', fn () => expect(validate(''))->toBeTrue())->issue(13);
+            PHP,
+        'call:issue#0/value:12',
+    ],
+    'another note as a named argument of wip()' => [
+        <<<'PHP'
+            <?php
+            it('a', fn () => expect(validate(''))->toBeTrue())->wip(note: 'Check the mailer.');
+            it('b', fn () => expect(validate(''))->toBeTrue())->wip(note: 'Check the queue.');
+            PHP,
+        'call:wip#note/value:\'Check the mailer.\'',
+    ],
+]);
+
 it('asks for a review of a test whose covering test runs the same code and expects more of an exception through its test-level throws()', function (
     string $source,
     string ...$coveringDiffersBy,
