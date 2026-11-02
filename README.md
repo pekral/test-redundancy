@@ -91,8 +91,8 @@ several paths, are split into up to `processes` groups that run concurrently, ea
 is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
 `phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing, and a
 `*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method or a
-trait, and runs no other statement, is left out of the run. A class with a parent class counts only when no class the
-file declares extends `PHPUnit\Framework\TestCase`: a child process loads the file through the runner's
+trait, and runs no other statement, is left out of the run. A file whose classes have a parent class is left out only
+when none of them extends `PHPUnit\Framework\TestCase`: a child process loads the file through the runner's
 `vendor/autoload.php` to find that out, and a file that cannot be loaded stays in the run.
 Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the

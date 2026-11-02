@@ -18,7 +18,6 @@ final readonly class CoverageRun
 
     private const string TEST_CASE = 'PHPUnit\\Framework\\TestCase';
 
-    // Exit code 0 only when PHPUnit loads, the file loads, and none of the classes it declares is a test case.
     private const string DECLARES_NO_TEST_CASE = 'require $argv[1]; $before = get_declared_classes(); require $argv[2];'
         . ' exit(class_exists($argv[3]) && !array_any(array_diff(get_declared_classes(), $before),'
         . ' static fn (string $class): bool => is_subclass_of($class, $argv[3])) ? 0 : 1);';
@@ -69,10 +68,6 @@ final readonly class CoverageRun
         );
     }
 
-    /**
-     * Loads the file through the project's autoloader in a child process, so the project's own classes decide whether
-     * a parent class is a test case. Any failure to load keeps the file in the run.
-     */
     private function extendsNoTestCase(string $testFile): bool
     {
         $process = new Process(
@@ -86,6 +81,7 @@ final readonly class CoverageRun
             ],
             $this->configuration->projectRoot,
             $this->configuration->environment,
+            timeout: null,
         );
 
         return $process->run() === 0;
