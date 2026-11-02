@@ -165,6 +165,7 @@ function testFilesWithoutTestCase(): array
         'tests/Support/HelpersTest.php' => 0,
         'tests/Support/PlainValueTest.php' => 0,
         'tests/Support/PureEnumTest.php' => 0,
+        'tests/Support/RecordingListTest.php' => 0,
         'tests/Support/SharedSetUpTest.php' => 0,
     ];
 }
@@ -184,6 +185,18 @@ it('maps a folder whose test files declare no test case', function (string $runn
 })->with([
     'a file without a test case beside a Pest test file' => ['pest', 2, 'tests/Support/PureEnumTest.php', 'tests/PestGreeterTest.php'],
     'a file without a test case beside a PHPUnit test file' => ['phpunit', 2, 'tests/Support/PureEnumTest.php', 'tests/GreeterTest.php'],
+    'a helper class with a non-test parent beside a class that inherits a test method for Pest' => [
+        'pest',
+        1,
+        'tests/Support/RecordingListTest.php',
+        'tests/InheritedNameTest.php',
+    ],
+    'a helper class with a non-test parent beside a class that inherits a test method for PHPUnit' => [
+        'phpunit',
+        1,
+        'tests/Support/RecordingListTest.php',
+        'tests/InheritedNameTest.php',
+    ],
     'only files without a test case for Pest' => ['pest', 0, 'tests/Support'],
     'only files without a test case for PHPUnit' => ['phpunit', 0, 'tests/Support'],
 ]);

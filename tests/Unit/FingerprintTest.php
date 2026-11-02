@@ -1345,6 +1345,43 @@ it('keeps a file in the coverage run when it may declare a test case', function 
     'a PHPUnit test method' => ['<?php class ProbeTest { public function testWorks(): void {} }'],
 ]);
 
+it('asks whether the parent class is a test case only for a file that declares nothing else', function (
+    string $code,
+    bool $isTestCase,
+    bool $declaresNoTestCase,
+    bool $asked,
+): void {
+    $project = temporaryDirectory();
+    file_put_contents($project . '/ProbeTest.php', $code);
+    $files = new ArrayObject();
+
+    $result = ContractFingerprints::declaresNoTestCase($project . '/ProbeTest.php', function (string $file) use ($files, $isTestCase): bool {
+        $files->append($file);
+
+        return !$isTestCase;
+    });
+
+    expect($result)->toBe($declaresNoTestCase)
+        ->and($files->getArrayCopy())->toBe($asked ? [$project . '/ProbeTest.php'] : []);
+})->with([
+    'a class whose parent is a test case' => ['<?php final class ProbeTest extends BaseTest {}', true, false, true],
+    'a class whose parent is no test case' => ['<?php final class ProbeTest extends ArrayObject {}', false, true, true],
+    'a class with a parent beside a call' => ['<?php registerTests(); final class ProbeTest extends ArrayObject {}', false, false, false],
+    'a class with a parent that has a test method' => [
+        '<?php final class ProbeTest extends ArrayObject { public function testA(): void {} }',
+        false,
+        false,
+        false,
+    ],
+    'a class with a parent that uses a trait' => [
+        '<?php final class ProbeTest extends ArrayObject { use SharedTests; }',
+        false,
+        false,
+        false,
+    ],
+    'a class without a parent' => ['<?php final class ProbeTest {}', false, true, false],
+]);
+
 it('keeps a file that does not exist in the coverage run as one that may declare a test case', function (): void {
     expect(ContractFingerprints::declaresNoTestCase(temporaryDirectory() . '/MissingTest.php'))->toBeFalse();
 });

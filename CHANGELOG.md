@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `map` and `analyse` no longer abort under PHPUnit when a `*Test.php` file holds a helper class whose parent class is
+  not a test case, such as `final class RecordingListTest extends \ArrayObject` (#168). 0.1.10 kept every class with
+  a parent class in the run, because the parent can be an abstract test case that supplies the test methods, and
+  PHPUnit refused the file with `does not extend PHPUnit\Framework\TestCase`. Now a child process loads such a file
+  through the runner's `vendor/autoload.php`, and the file is left out of the run when none of the classes it declares
+  extends `PHPUnit\Framework\TestCase`. A class that inherits its test methods from an abstract test case stays in the
+  run, and so does a file that cannot be loaded that way.
+
 ## [0.1.10] - 2026-11-02
 
 ### Changed

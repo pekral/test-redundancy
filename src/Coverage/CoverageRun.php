@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Coverage;
 use Pekral\TestRedundancy\Configuration;
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Support\TestFiles;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
@@ -14,6 +15,13 @@ final readonly class CoverageRun
 {
 
     private const int TIMEOUT_SECONDS = 7_200;
+
+    private const string TEST_CASE = 'PHPUnit\\Framework\\TestCase';
+
+    // Exit code 0 only when PHPUnit loads, the file loads, and none of the classes it declares is a test case.
+    private const string DECLARES_NO_TEST_CASE = 'require $argv[1]; $before = get_declared_classes(); require $argv[2];'
+        . ' exit(class_exists($argv[3]) && !array_any(array_diff(get_declared_classes(), $before),'
+        . ' static fn (string $class): bool => is_subclass_of($class, $argv[3])) ? 0 : 1);';
 
     private const array INHERITED_PARALLEL_ENVIRONMENT = ['PARATEST' => false, 'TEST_TOKEN' => false, 'UNIQUE_TEST_TOKEN' => false];
 
@@ -48,6 +56,7 @@ final readonly class CoverageRun
             TestFiles::expand($paths, $this->configuration->projectRoot),
             fn (string $testFile): bool => !ContractFingerprints::declaresNoTestCase(
                 $this->configuration->projectRoot . DIRECTORY_SEPARATOR . $testFile,
+                $this->extendsNoTestCase(...),
             ),
         ));
         $groups = TestDurations::load($this->configuration->absoluteDurationsPath())
@@ -58,6 +67,28 @@ final readonly class CoverageRun
             $groups,
             array_keys($groups),
         );
+    }
+
+    /**
+     * Loads the file through the project's autoloader in a child process, so the project's own classes decide whether
+     * a parent class is a test case. Any failure to load keeps the file in the run.
+     */
+    private function extendsNoTestCase(string $testFile): bool
+    {
+        $process = new Process(
+            [
+                PHP_BINARY,
+                '-r',
+                self::DECLARES_NO_TEST_CASE,
+                Path::join($this->runner->rootDirectory(), 'vendor', 'autoload.php'),
+                $testFile,
+                self::TEST_CASE,
+            ],
+            $this->configuration->projectRoot,
+            $this->configuration->environment,
+        );
+
+        return $process->run() === 0;
     }
 
     /**
