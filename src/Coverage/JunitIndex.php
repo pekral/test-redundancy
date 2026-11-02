@@ -111,7 +111,7 @@ final readonly class JunitIndex
 
     public function descriptionOf(string $class, string $method): string
     {
-        return $this->descriptionByEvaluable[$class . '::' . $method] ?? $method;
+        return $this->descriptionByEvaluable[$class . '::' . PestName::identifier(mb_scrub($method, 'UTF-8'))] ?? $method;
     }
 
     /**

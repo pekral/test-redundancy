@@ -53,15 +53,13 @@ final readonly class TestRedundancy
 
     /**
      * @param list<string> $testFiles
-     * @param list<string> $requestedPaths
      * @return list<\Pekral\TestRedundancy\Analysis\FileReport>
      */
-    public function analyse(array $testFiles, array $requestedPaths): array
+    public function analyse(array $testFiles): array
     {
         $skipped = array_filter($testFiles, $this->declaresSingleTestCase(...));
         $analysed = array_values(array_diff($testFiles, $skipped));
-        $runPaths = $skipped === [] && count($requestedPaths) === 1 ? $requestedPaths : $analysed;
-        $run = $analysed === [] ? new CoverageResult([], []) : $this->coverageRun->run($runPaths);
+        $run = $analysed === [] ? new CoverageResult([], []) : $this->coverageRun->run($analysed);
         $testsByFile = $this->testsByFile($analysed, $run->linesByTest);
         $this->saveBaseline([...array_fill_keys($testFiles, []), ...$testsByFile], across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));

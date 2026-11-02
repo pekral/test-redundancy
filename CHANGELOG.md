@@ -13,12 +13,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   single path ran the runner in its own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`), and ParaTest
   merged the JUnit logs of its workers with `SimpleXMLElement`, which rejects the byte. Now a folder is expanded to its
   test files, and every run, one path or several, splits the files into the same non-parallel groups, each with its
-  own `TEST_TOKEN`. `vendor/bin/paratest` is no longer needed next to `phpunit`. A folder without test files runs no
-  test and gives an empty map. Two further failures hid behind the first one. `JunitIndex` dropped every test case of
+  own `TEST_TOKEN` and `LARAVEL_PARALLEL_TESTING=1`, so a Laravel project keeps one test database per group, as it did
+  in the runner's parallel mode; `env` in `test-redundancy.json` can still override it. The runner's parallel mode is
+  removed, so `TestRunner::command()` no longer takes `$parallel` and `$processes`, `TestRedundancy::analyse()` takes
+  only the test files, and `vendor/bin/paratest` is no longer needed next to `phpunit`. A folder without test files
+  runs no test and gives an empty map. Two further failures hid behind the first one. `JunitIndex` dropped every test case of
   a JUnit log with an invalid byte without a message, so a test file with such a test showed 0 test cases. `map`
   stopped with `Malformed UTF-8 characters, possibly incorrectly encoded` when it saved the key of such a test. The log
   is now read with each invalid byte replaced by `?`, and `TestKey::make()` replaces it the same way, so the key of
-  such a test has a `?` where the byte was.
+  such a test has a `?` where the byte was. The same holds when the byte is in the description of a test, not in a
+  dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so such a test
+  keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
 
 ## [0.1.9] - 2026-11-01
 
