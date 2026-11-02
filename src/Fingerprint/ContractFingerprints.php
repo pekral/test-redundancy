@@ -34,39 +34,35 @@ final class ContractFingerprints
 
     public static function declaresSingleTestCase(string $testFile): bool
     {
-        if (!is_file($testFile)) {
-            return false;
-        }
+        $statements = self::parsedStatements($testFile);
 
-        try {
-            $statements = self::statements($testFile);
-        } catch (Error) {
-            return false;
-        }
-
-        return count(self::fingerprintsOf($statements)) === 1
+        return $statements !== null
+            && count(self::fingerprintsOf($statements)) === 1
             && PestFingerprints::declaresOnlyFingerprintedTests($statements)
             && !PhpUnitFingerprints::declaresDataset($statements);
     }
 
-    /**
-     * A file that only declares an enum, an interface, a trait, a function or a class that has no test method, neither
-     * its own nor an inherited one. The test runner finds no test in it, and PHPUnit stops on it. A file that runs any
-     * other statement, such as a Pest `it()` or a call that registers tests, may declare a test case.
-     */
     public static function declaresNoTestCase(string $testFile): bool
     {
+        $statements = self::parsedStatements($testFile);
+
+        return $statements !== null && self::fingerprintsOf($statements) === [] && self::onlyDeclares($statements);
+    }
+
+    /**
+     * @return array<\PhpParser\Node\Stmt>|null
+     */
+    private static function parsedStatements(string $testFile): ?array
+    {
         if (!is_file($testFile)) {
-            return false;
+            return null;
         }
 
         try {
-            $statements = self::statements($testFile);
+            return self::statements($testFile);
         } catch (Error) {
-            return false;
+            return null;
         }
-
-        return self::fingerprintsOf($statements) === [] && self::onlyDeclares($statements);
     }
 
     /**
