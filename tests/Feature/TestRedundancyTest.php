@@ -213,7 +213,9 @@ it('leaves a helper class with a non-test parent out of the run when the runner 
     ]));
     $chunks = new ArrayObject();
 
-    $map = TestRedundancy::forProject($project, processes: null)->buildMap(['tests/Support/RecordingListTest.php'], function (array $chunk) use ($chunks): void {
+    $testRedundancy = TestRedundancy::forProject($project, processes: null);
+
+    $map = $testRedundancy->buildMap(['tests/Support/RecordingListTest.php'], function (array $chunk) use ($chunks): void {
         $chunks->append($chunk);
     });
 
