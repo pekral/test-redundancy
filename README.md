@@ -89,7 +89,9 @@ The tests always run in parallel, on the test tokens 1…`processes`, so never s
 same suite. A folder is expanded to its test files first. The files of every run, whether you name a folder, one file or
 several paths, are split into up to `processes` groups that run concurrently, each with its own `TEST_TOKEN`. Each group
 is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
-`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing.
+`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing, and a
+`*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method is
+left out of the run.
 Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
 group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
@@ -822,7 +824,7 @@ PHPCS, PHPStan and Rector use [pekral/phpcs-rules](https://github.com/pekral/php
 
 Pull requests and pushes to `master` run `composer check` on PHP 8.4 and 8.5, then the tool on its own tests. A matrix
 runs the tests on PHP 8.4 and 8.5 with the lowest and the highest dependencies, and a second matrix runs the tool on
-the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.4 with `paratest` and no Pest, on PHP 8.4. A security audit runs every
+the PHPUnit fixture with PHPUnit 10.5, 11.5, 12.5 and 13.4 without Pest and `paratest`, on PHP 8.4. A security audit runs every
 Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---
