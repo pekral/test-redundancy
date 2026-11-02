@@ -6337,3 +6337,35 @@ it('reports a dataset row covered by a kept standalone test that runs a line of 
         ->and($report->candidates[0]->action())->toBe(Action::Delete)
         ->and($report->candidates[0]->coveredBy)->toBe(['it notifies nobody when empty']);
 });
+
+it('does not delete a test that calls an invokable without the argument the covering test passes (#170)', function (): void {
+    $report = analyzeTestPair(
+        candidateBody: '$this->createAccount(); $result = $this->app->make(Action::class)(); expect($result)->toBeNull();',
+        coveringBody: '$account = $this->createAccount()->account; $result = $this->app->make(Action::class)($account); expect($result)->toBeNull();',
+    );
+
+    expect($report->candidates[0]->action())->not->toBe(Action::Delete)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe(['in:function:call%3Amake()#0/non-literal']);
+});
+
+it('reports the argument that only the covering test passes to a callable returned by a call', function (
+    string $candidateCall,
+    string $coveringCall,
+    string $omittedArgument,
+): void {
+    $report = analyzeTestPair(
+        candidateBody: "\$result = {$candidateCall}; expect(\$result)->toBeNull();",
+        coveringBody: "\$result = {$coveringCall}; expect(\$result)->toBeNull();",
+    );
+
+    expect($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->coveringTokensForReview())->toBe([$omittedArgument]);
+})->with([
+    'callable returned by a called variable' => ['$factory()()', '$factory()($account)', 'in:function:function%3A$factory()#0/non-literal'],
+    'callable returned by a call with a slash and a hash in a string argument' => [
+        'app("services/store#main")()',
+        'app("services/store#main")($account)',
+        'in:function:function%3Aapp()#0/non-literal',
+    ],
+    'callable returned by a function' => ['app(Action::class)()', 'app(Action::class)($account)', 'in:function:function%3Aapp()#0/non-literal'],
+]);
