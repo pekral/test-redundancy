@@ -10,11 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The runner's own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`) is removed (#164). Every run,
-  one path or several, uses the tool's non-parallel groups, so `vendor/bin/paratest` is no longer needed next to
-  `phpunit`. A PHP caller must update two signatures: `TestRunner::command()` no longer takes `$parallel` and
-  `$processes`, and `TestRedundancy::analyse()` takes only the test files, so a call that passes `requestedPaths:` must
-  drop that argument.
+- The runner's own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`) is removed (#164). Every run, one
+  path or several, uses the tool's non-parallel groups, so `vendor/bin/paratest` is no longer needed next to `phpunit`.
+  A PHP caller must update two signatures: `TestRunner::command()` no longer takes `$parallel` and `$processes`, so a
+  positional call must drop its second and third argument, and `TestRedundancy::analyse()` takes only the test files,
+  so a call that passes `requestedPaths:` must drop that argument.
 
 ### Fixed
 
@@ -28,10 +28,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   without test files runs no test and gives an empty map. Two further failures hid behind the first one. `JunitIndex`
   dropped every test case of a JUnit log with an invalid byte without a message, so a test file with such a test showed
   0 test cases. `map` stopped with `Malformed UTF-8 characters, possibly incorrectly encoded` when it saved the key of
-  such a test. The log is now read with each invalid byte replaced by `?`, and `TestKey::make()` replaces it the same
-  way, so the key of such a test has a `?` where the byte was. The same holds when the byte is in the description of a
-  test, not in a dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so
-  such a test keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
+  such a test. The log is now read with each invalid byte replaced by PHP's substitute character
+  (`mbstring.substitute_character`, `?` by default), and `TestKey::make()` replaces it the same way, so the key of such
+  a test has that character where the byte was. The same holds when the byte is in the description of a test, not in a
+  dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so such a test
+  keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
 - `map` and `analyse` no longer abort when a `*Test.php` file declares no test case, such as an enum named
   `PureEnumTest` in a support folder (#163). With PHPUnit as the runner, the file stopped the run with an error that
   the class does not extend `PHPUnit\Framework\TestCase`, and `map` stopped on the first failed run, so no map was

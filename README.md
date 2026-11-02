@@ -90,8 +90,8 @@ same suite. A folder is expanded to its test files first. The files of every run
 several paths, are split into up to `processes` groups that run concurrently, each with its own `TEST_TOKEN`. Each group
 is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
 `phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing, and a
-`*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method is
-left out of the run.
+`*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method, a
+parent class or a trait, and runs no other statement, is left out of the run.
 Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
 group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
