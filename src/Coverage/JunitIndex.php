@@ -120,7 +120,7 @@ final readonly class JunitIndex
     private static function testCasesOf(string $junitFile): array
     {
         $previousErrorHandling = libxml_use_internal_errors(use_errors: true);
-        $report = is_file($junitFile) ? simplexml_load_string((string) file_get_contents($junitFile)) : false;
+        $report = is_file($junitFile) ? simplexml_load_string(mb_scrub((string) file_get_contents($junitFile), 'UTF-8')) : false;
         libxml_clear_errors();
         libxml_use_internal_errors($previousErrorHandling);
         $testCases = $report === false ? null : $report->xpath('//testcase');

@@ -37,7 +37,20 @@ it('analyses a Pest test folder', function (): void {
     ]);
 });
 
-it('analyses a single PHPUnit test file in parallel', function (): void {
+it('reads every test case of a run whose test name is not valid UTF-8', function (array $testCases, string ...$paths): void {
+    $testRedundancy = TestRedundancy::forProject(fixturePath('invalid-utf8'), processes: null);
+    $requestedPaths = array_values($paths);
+
+    $reports = $testRedundancy->analyse($testRedundancy->testFiles($requestedPaths, baseRef: null), $requestedPaths);
+
+    expect(array_column(array_map(fn (FileReport $report): array => [$report->testFile, $report->testCases], $reports), 1, 0))->toBe($testCases);
+})->with([
+    'a file' => [['tests/PhoneTest.php' => 3], 'tests/PhoneTest.php'],
+    'a folder' => [['tests/OtherPhoneTest.php' => 2, 'tests/PhoneTest.php' => 3], 'tests'],
+    'several files' => [['tests/PhoneTest.php' => 3, 'tests/OtherPhoneTest.php' => 2], 'tests/PhoneTest.php', 'tests/OtherPhoneTest.php'],
+]);
+
+it('analyses a single PHPUnit test file', function (): void {
     $testRedundancy = TestRedundancy::forProject(fixturePath('phpunit'), processes: null);
 
     $reports = $testRedundancy->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
@@ -48,7 +61,7 @@ it('analyses a single PHPUnit test file in parallel', function (): void {
     ]);
 });
 
-it('runs in parallel from a project path with an apostrophe', function (): void {
+it('runs from a project path with an apostrophe', function (): void {
     $project = temporaryDirectory() . '/o\'brien';
     new Filesystem()->mirror(fixturePath('phpunit'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
@@ -96,6 +109,53 @@ it('compares test files with each other through the coverage map', function (): 
     removeDirectory($project);
 });
 
+it('saves a coverage map of a folder with a test whose name is not valid UTF-8', function (): void {
+    $project = gitRepository();
+    new Filesystem()->mirror(fixturePath('invalid-utf8'), $project, options: ['override' => true]);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'map' => 'build/coverage-map.json.gz',
+    ]));
+    runIn($project, ['git', 'add', '.']);
+    runIn($project, ['git', 'commit', '--quiet', '-m', 'fixture']);
+    $testRedundancy = TestRedundancy::forProject($project, processes: null);
+    $chunks = new ArrayObject();
+
+    $testRedundancy->buildMap(['tests'], function (array $chunk) use ($chunks): void {
+        $chunks->append($chunk);
+    });
+
+    $mappedTests = array_keys($testRedundancy->loadMap()->testsOfFile('tests/PhoneTest.php'));
+
+    expect($chunks->getArrayCopy())->toBe([['tests']])
+        ->and($mappedTests)->toContain('tests/PhoneTest.php :: it normalizes a phone number › (\'733?382412\', \'733382412\')');
+
+    removeDirectory($project);
+});
+
+it('maps a folder without test files as an empty map', function (): void {
+    $project = gitRepository();
+    new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
+    mkdir($project . '/tests/empty');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'map' => 'build/coverage-map.json.gz',
+    ]));
+
+    $chunks = new ArrayObject();
+
+    $map = TestRedundancy::forProject($project, processes: null)->buildMap(['tests/empty'], function (array $chunk) use ($chunks): void {
+        $chunks->append($chunk);
+    });
+
+    expect($chunks->getArrayCopy())->toBe([['tests/empty']])
+        ->and($map->testCount())->toBe(0);
+
+    removeDirectory($project);
+});
+
 it('takes the changed test files from git', function (): void {
     $project = gitRepository();
     mkdir($project . '/tests');
@@ -134,7 +194,7 @@ it('ignores lines outside the configured source paths', function (): void {
     removeDirectory($project);
 });
 
-it('runs several test files as concurrent groups and one path in the runner\'s parallel mode', function (): void {
+it('runs several test files and a folder as the same concurrent groups', function (): void {
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('pest'), $project);
     file_put_contents($project . '/test-redundancy.json', (string) json_encode([
@@ -151,9 +211,9 @@ it('runs several test files as concurrent groups and one path in the runner\'s p
         PHP, FILE_APPEND);
 
     $concurrent = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
-    $parallel = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
+    $folder = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
 
-    expect(candidatesOf($concurrent))->toBe(candidatesOf($parallel))
+    expect(candidatesOf($concurrent))->toBe(candidatesOf($folder))
         ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 2]);
 
     removeDirectory($project);
@@ -370,7 +430,7 @@ it('still fails the coverage map when a test case fails', function (): void {
         ->toThrow(ProcessFailedException::class);
 });
 
-it('records the lines of every existing source directory when pcov is narrowed to them', function (bool $runnerParallel): void {
+it('records the lines of every existing source directory when pcov is narrowed to them', function (bool $folder): void {
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('pest'), $project);
     new Filesystem()->remove($project . '/tests');
@@ -439,7 +499,7 @@ it('records the lines of every existing source directory when pcov is narrowed t
 
     TestRedundancy::forProject($project, processes: 2)->analyse(
         ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
-        $runnerParallel ? ['tests'] : ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
+        $folder ? ['tests'] : ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
     );
 
     $baseline = CoverageBaseline::load($project . '/.test-redundancy/baseline.json');
@@ -449,8 +509,8 @@ it('records the lines of every existing source directory when pcov is narrowed t
 
     removeDirectory($project);
 })->with([
-    'concurrent groups' => [false],
-    'the runner\'s parallel mode' => [true],
+    'a folder' => [true],
+    'files' => [false],
 ]);
 
 /**

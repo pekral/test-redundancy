@@ -13,7 +13,7 @@ final class TestKey
 
     public static function make(string $testFile, string $testCase): string
     {
-        return $testFile . self::FILE_SEPARATOR . $testCase;
+        return mb_scrub($testFile . self::FILE_SEPARATOR . $testCase, 'UTF-8');
     }
 
     public static function file(string $testKey): string
