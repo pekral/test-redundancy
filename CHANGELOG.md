@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `ContractFingerprints::declaresNoTestCase()` takes a second, optional parameter `?Closure $extendsNoTestCase` (#168).
+  A PHP caller that passes only the file gets the same result as before and needs no change. A caller that wants a
+  file of classes with a parent class left out of the run passes a closure that receives the file path and returns
+  `true` when no class in the file is a test case.
+
 ### Fixed
 
 - `map` and `analyse` no longer abort under PHPUnit when a `*Test.php` file holds a helper class whose parent class is

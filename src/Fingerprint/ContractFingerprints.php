@@ -44,10 +44,6 @@ final class ContractFingerprints
     }
 
     /**
-     * The parser sees only the name of a parent class, so a class with a parent may inherit test methods. A file
-     * declaring only such classes stays in the run, unless $extendsNoTestCase says for this file that the classes
-     * it declares are no test case. The closure is called only for a file that declares nothing else.
-     *
      * @param \Closure(string): bool|null $extendsNoTestCase
      */
     public static function declaresNoTestCase(string $testFile, ?Closure $extendsNoTestCase = null): bool

@@ -4,9 +4,7 @@ declare(strict_types = 1);
 
 namespace Fixture\NoTestCase\Tests;
 
-require_once __DIR__ . '/Support/AbstractNameCase.php';
-
-use Fixture\NoTestCase\Tests\Support\AbstractNameCase;
+use Pekral\TestRedundancy\Tests\Fixtures\NoTestCaseSupport\AbstractNameCase;
 
 final class InheritedNameTest extends AbstractNameCase
 {
