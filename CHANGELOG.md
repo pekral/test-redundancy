@@ -24,6 +24,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   such a test has a `?` where the byte was. The same holds when the byte is in the description of a test, not in a
   dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so such a test
   keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
+- `map` and `analyse` no longer abort when a `*Test.php` file declares no test case, such as an enum named
+  `PureEnumTest` in a support folder (#163). With PHPUnit as the runner, the file stopped the run with an error that
+  the class does not extend `PHPUnit\Framework\TestCase`, and `map` stopped on the first failed run, so no map was
+  written. A file that only
+  declares an enum, an interface, a trait, a function or a class that has no test method, and runs no other statement,
+  is now left out of the coverage run and contributes no lines. `ContractFingerprints::declaresNoTestCase()` decides
+  it, with the same parser as the test case count. A file that may declare a test case still runs: a Pest `it()`,
+  `test()` or `arch()`, any call or `require`, a class that extends another class or uses a trait, and a file that
+  does not parse.
 
 ## [0.1.9] - 2026-11-01
 
