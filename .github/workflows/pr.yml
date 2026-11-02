@@ -127,12 +127,12 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: pcov
 
-      - name: Install PHPUnit ${{ matrix.phpunit }} and paratest without Pest
+      - name: Install PHPUnit ${{ matrix.phpunit }} without Pest and paratest
         run: |
           composer remove --dev --no-update --no-interaction \
             ergebnis/composer-normalize laravel/pint pekral/ai-olympus pekral/phpcs-rules pekral/phpstan-rules pekral/rector-rules \
             pestphp/pest phpstan/phpstan-deprecation-rules phpstan/phpstan-phpunit
-          composer require --dev --no-update --no-interaction "phpunit/phpunit:${{ matrix.phpunit }}" "brianium/paratest:^7.3"
+          composer require --dev --no-update --no-interaction "phpunit/phpunit:${{ matrix.phpunit }}"
           composer update --prefer-dist --no-progress --no-interaction
           composer show phpunit/php-code-coverage | grep -E '^versions'
 

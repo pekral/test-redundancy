@@ -6,33 +6,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-02
+
+### Changed
+
+- The runner's own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`) is removed (#164). Every run,
+  one path or several, uses the tool's non-parallel groups, so `vendor/bin/paratest` is no longer needed next to
+  `phpunit`. A PHP caller must update two signatures: `TestRunner::command()` no longer takes `$parallel` and
+  `$processes`, and `TestRedundancy::analyse()` takes only the test files, so a call that passes `requestedPaths:` must
+  drop that argument.
+
 ### Fixed
 
 - A run over a single folder or file no longer aborts when a test name is not valid UTF-8, such as a dataset row with a
   raw `"\xA0"` byte, and `map` over such a folder no longer stops with `String could not be parsed as XML` (#164). A
-  single path ran the runner in its own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`), and ParaTest
-  merged the JUnit logs of its workers with `SimpleXMLElement`, which rejects the byte. Now a folder is expanded to its
-  test files, and every run, one path or several, splits the files into the same non-parallel groups, each with its
-  own `TEST_TOKEN` and `LARAVEL_PARALLEL_TESTING=1`, so a Laravel project keeps one test database per group, as it did
-  in the runner's parallel mode; `env` in `test-redundancy.json` can still override it. The runner's parallel mode is
-  removed, so `TestRunner::command()` no longer takes `$parallel` and `$processes`, `TestRedundancy::analyse()` takes
-  only the test files, and `vendor/bin/paratest` is no longer needed next to `phpunit`. A folder without test files
-  runs no test and gives an empty map. Two further failures hid behind the first one. `JunitIndex` dropped every test case of
-  a JUnit log with an invalid byte without a message, so a test file with such a test showed 0 test cases. `map`
-  stopped with `Malformed UTF-8 characters, possibly incorrectly encoded` when it saved the key of such a test. The log
-  is now read with each invalid byte replaced by `?`, and `TestKey::make()` replaces it the same way, so the key of
-  such a test has a `?` where the byte was. The same holds when the byte is in the description of a test, not in a
-  dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so such a test
-  keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
+  single path ran the runner in its own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`), and
+  ParaTest merged the JUnit logs of its workers with `SimpleXMLElement`, which rejects the byte. Now a folder is
+  expanded to its test files, and every run, one path or several, splits the files into the same non-parallel groups,
+  each with its own `TEST_TOKEN` and `LARAVEL_PARALLEL_TESTING=1`, so a Laravel project keeps one test database per
+  group, as it did in the runner's parallel mode; `env` in `test-redundancy.json` can still override it. A folder
+  without test files runs no test and gives an empty map. Two further failures hid behind the first one. `JunitIndex`
+  dropped every test case of a JUnit log with an invalid byte without a message, so a test file with such a test showed
+  0 test cases. `map` stopped with `Malformed UTF-8 characters, possibly incorrectly encoded` when it saved the key of
+  such a test. The log is now read with each invalid byte replaced by `?`, and `TestKey::make()` replaces it the same
+  way, so the key of such a test has a `?` where the byte was. The same holds when the byte is in the description of a
+  test, not in a dataset row: `JunitIndex` looks the test up by its method name with the byte replaced the same way, so
+  such a test keeps one key and one test case instead of two keys and a phantom `__pest_evaluable_` candidate.
 - `map` and `analyse` no longer abort when a `*Test.php` file declares no test case, such as an enum named
   `PureEnumTest` in a support folder (#163). With PHPUnit as the runner, the file stopped the run with an error that
   the class does not extend `PHPUnit\Framework\TestCase`, and `map` stopped on the first failed run, so no map was
-  written. A file that only
-  declares an enum, an interface, a trait, a function or a class that has no test method, and runs no other statement,
-  is now left out of the coverage run and contributes no lines. `ContractFingerprints::declaresNoTestCase()` decides
-  it, with the same parser as the test case count. A file that may declare a test case still runs: a Pest `it()`,
-  `test()` or `arch()`, any call or `require`, a class that extends another class or uses a trait, and a file that
-  does not parse.
+  written. A file that only declares an enum, an interface, a trait, a function or a class that has no test method, and
+  runs no other statement, is now left out of the coverage run and contributes no lines.
+  `ContractFingerprints::declaresNoTestCase()` decides it, with the same parser as the test case count. A file that may
+  declare a test case still runs: a Pest `it()`, `test()` or `arch()`, any call or `require`, a class that extends
+  another class or uses a trait, and a file that does not parse.
 
 ## [0.1.9] - 2026-11-01
 
@@ -767,7 +774,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.9...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.10...HEAD
+[0.1.10]: https://github.com/pekral/test-redundancy/compare/0.1.9...0.1.10
 [0.1.9]: https://github.com/pekral/test-redundancy/compare/0.1.8...0.1.9
 [0.1.8]: https://github.com/pekral/test-redundancy/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/pekral/test-redundancy/compare/0.1.6...0.1.7
