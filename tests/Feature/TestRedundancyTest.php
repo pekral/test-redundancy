@@ -201,6 +201,28 @@ it('maps a folder whose test files declare no test case', function (string $runn
     'only files without a test case for PHPUnit' => ['phpunit', 0, 'tests/Support'],
 ]);
 
+it('leaves a helper class with a non-test parent out of the run when the runner autoloader has no PHPUnit', function (): void {
+    $project = projectWithoutTestCases('phpunit');
+    mkdir($project . '/tools/vendor/bin', recursive: true);
+    touch($project . '/tools/vendor/bin/phpunit');
+    file_put_contents($project . '/tools/vendor/autoload.php', '<?php');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'map' => 'build/coverage-map.json.gz',
+        'runner' => $project . '/tools/vendor/bin/phpunit',
+        'source' => ['src'],
+    ]));
+    $chunks = new ArrayObject();
+
+    $map = TestRedundancy::forProject($project, processes: null)->buildMap(['tests/Support/RecordingListTest.php'], function (array $chunk) use ($chunks): void {
+        $chunks->append($chunk);
+    });
+
+    expect($chunks->getArrayCopy())->toBe([['tests/Support/RecordingListTest.php']])
+        ->and($map->testCount())->toBe(0);
+
+    removeDirectory($project);
+});
+
 it('analyses test files that declare no test case', function (string $runner, array $testCases, string ...$paths): void {
     $project = projectWithoutTestCases($runner);
     $testRedundancy = TestRedundancy::forProject($project, processes: 2);

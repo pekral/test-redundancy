@@ -19,7 +19,7 @@ final readonly class CoverageRun
     private const string TEST_CASE = 'PHPUnit\\Framework\\TestCase';
 
     private const string DECLARES_NO_TEST_CASE = 'require $argv[1]; $before = get_declared_classes(); require $argv[2];'
-        . ' exit(class_exists($argv[3]) && !array_any(array_diff(get_declared_classes(), $before),'
+        . ' exit(!array_any(array_diff(get_declared_classes(), $before),'
         . ' static fn (string $class): bool => is_subclass_of($class, $argv[3])) ? 0 : 1);';
 
     private const array INHERITED_PARALLEL_ENVIRONMENT = ['PARATEST' => false, 'TEST_TOKEN' => false, 'UNIQUE_TEST_TOKEN' => false];
