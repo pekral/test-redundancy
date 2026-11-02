@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Coverage;
 
 use Pekral\TestRedundancy\Configuration;
+use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Support\TestFiles;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -43,7 +44,12 @@ final readonly class CoverageRun
      */
     private function groups(array $paths): array
     {
-        $testFiles = TestFiles::expand($paths, $this->configuration->projectRoot);
+        $testFiles = array_values(array_filter(
+            TestFiles::expand($paths, $this->configuration->projectRoot),
+            fn (string $testFile): bool => !ContractFingerprints::declaresNoTestCase(
+                $this->configuration->projectRoot . DIRECTORY_SEPARATOR . $testFile,
+            ),
+        ));
         $groups = TestDurations::load($this->configuration->absoluteDurationsPath())
             ->split($testFiles, min(count($testFiles), $this->configuration->processes));
 

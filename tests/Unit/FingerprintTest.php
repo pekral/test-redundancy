@@ -1307,6 +1307,48 @@ it('keeps a file that does not exist in the coverage run', function (): void {
     expect(ContractFingerprints::declaresSingleTestCase(temporaryDirectory() . '/MissingTest.php'))->toBeFalse();
 });
 
+function declaresNoTestCase(string $code): bool
+{
+    $project = temporaryDirectory();
+    file_put_contents($project . '/ProbeTest.php', $code);
+
+    return ContractFingerprints::declaresNoTestCase($project . '/ProbeTest.php');
+}
+
+it('recognises a file that declares no test case', function (string $code): void {
+    expect(declaresNoTestCase($code))->toBeTrue();
+})->with([
+    'a class that extends nothing and has no test method' => ['<?php use App\\Name; final class ProbeTest { public function name(): string {} }'],
+    'a declaration in a braced namespace' => ['<?php namespace App { enum ProbeTest { case One; } }'],
+    'a declaration in a declare block' => ['<?php declare(ticks = 1) { enum ProbeTest { case One; } }'],
+    'a function' => ['<?php namespace App; const NAME = \'Jane\'; function name(): string { return NAME; }'],
+    'an empty file' => ['<?php'],
+    'an enum' => ['<?php declare(strict_types = 1); namespace App; enum ProbeTest: string { case One = \'one\'; }'],
+    'an interface' => ['<?php interface ProbeTest { public function name(): string; }'],
+    'a trait' => ['<?php trait ProbeTest { public function testName(): void {} }'],
+]);
+
+it('keeps a file in the coverage run when it may declare a test case', function (string $code): void {
+    expect(declaresNoTestCase($code))->toBeFalse();
+})->with([
+    'a call in a declare block' => ['<?php declare(ticks = 1) { registerTests(); }'],
+    'a call in a namespace' => ['<?php namespace App { registerTests(); }'],
+    'a call that may register tests' => ['<?php registerTests();'],
+    'a class that may inherit test methods' => ['<?php class ProbeTest extends BaseTest {}'],
+    'a class that may use test methods of a trait' => ['<?php class ProbeTest { use SharedTests; }'],
+    'a file that does not parse' => ['<?php it('],
+    'a file that includes a file with tests' => ['<?php require __DIR__ . \'/shared.php\';'],
+    'a Pest architecture test' => ['<?php arch(\'no debug\')->expect(\'App\')->not->toUse([\'dd\']);'],
+    'a Pest it' => ['<?php it(\'works\', fn () => null);'],
+    'a Pest test generated in a loop' => ['<?php foreach ([1, 2] as $value) { it(\'a\' . $value, fn () => null); }'],
+    'a PHPUnit method with the Test attribute' => ['<?php class ProbeTest { #[Test] public function works(): void {} }'],
+    'a PHPUnit test method' => ['<?php class ProbeTest { public function testWorks(): void {} }'],
+]);
+
+it('keeps a file that does not exist in the coverage run as one that may declare a test case', function (): void {
+    expect(ContractFingerprints::declaresNoTestCase(temporaryDirectory() . '/MissingTest.php'))->toBeFalse();
+});
+
 it('gives a non-literal argument of a call that is no assertion the token of its position', function (string $code, array $expected): void {
     $statements = new ParserFactory()->createForHostVersion()->parse('<?php ' . $code);
 

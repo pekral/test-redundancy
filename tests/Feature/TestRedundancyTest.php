@@ -140,6 +140,81 @@ it('saves a coverage map of a folder with a test whose name is not valid UTF-8',
     removeDirectory($project);
 });
 
+function projectWithoutTestCases(string $runner): string
+{
+    $project = gitRepository();
+    new Filesystem()->mirror(fixturePath('no-test-case'), $project, options: ['override' => true]);
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'map' => 'build/coverage-map.json.gz',
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/' . $runner,
+        'source' => ['src'],
+    ]));
+    runIn($project, ['git', 'add', '.']);
+    runIn($project, ['git', 'commit', '--quiet', '-m', 'fixture']);
+
+    return $project;
+}
+
+/**
+ * @return array<string, int>
+ */
+function testFilesWithoutTestCase(): array
+{
+    return [
+        'tests/Support/ContractTest.php' => 0,
+        'tests/Support/HelpersTest.php' => 0,
+        'tests/Support/PlainValueTest.php' => 0,
+        'tests/Support/PureEnumTest.php' => 0,
+        'tests/Support/SharedSetUpTest.php' => 0,
+    ];
+}
+
+it('maps a folder whose test files declare no test case', function (string $runner, int $testCount, string ...$paths): void {
+    $project = projectWithoutTestCases($runner);
+    $chunks = new ArrayObject();
+
+    $map = TestRedundancy::forProject($project, processes: null)->buildMap(array_values($paths), function (array $chunk) use ($chunks): void {
+        $chunks->append($chunk);
+    });
+
+    expect($chunks->getArrayCopy())->toBe([array_values($paths)])
+        ->and($map->testCount())->toBe($testCount);
+
+    removeDirectory($project);
+})->with([
+    'a file without a test case beside a Pest test file' => ['pest', 2, 'tests/Support/PureEnumTest.php', 'tests/PestGreeterTest.php'],
+    'a file without a test case beside a PHPUnit test file' => ['phpunit', 2, 'tests/Support/PureEnumTest.php', 'tests/GreeterTest.php'],
+    'only files without a test case for Pest' => ['pest', 0, 'tests/Support'],
+    'only files without a test case for PHPUnit' => ['phpunit', 0, 'tests/Support'],
+]);
+
+it('analyses test files that declare no test case', function (string $runner, array $testCases, string ...$paths): void {
+    $project = projectWithoutTestCases($runner);
+    $testRedundancy = TestRedundancy::forProject($project, processes: 2);
+
+    $reports = $testRedundancy->analyse($testRedundancy->testFiles(array_values($paths), baseRef: null));
+
+    expect(array_column(array_map(fn (FileReport $report): array => [$report->testFile, $report->testCases], $reports), 1, 0))->toBe($testCases)
+        ->and(array_filter($reports, static fn (FileReport $report): bool => $report->failedTests !== []))->toBe([]);
+
+    removeDirectory($project);
+})->with([
+    'a file without a test case beside a Pest test file' => [
+        'pest',
+        ['tests/Support/PureEnumTest.php' => 0, 'tests/PestGreeterTest.php' => 2],
+        'tests/Support/PureEnumTest.php',
+        'tests/PestGreeterTest.php',
+    ],
+    'a file without a test case beside a PHPUnit test file' => [
+        'phpunit',
+        ['tests/Support/PureEnumTest.php' => 0, 'tests/GreeterTest.php' => 2],
+        'tests/Support/PureEnumTest.php',
+        'tests/GreeterTest.php',
+    ],
+    'only files without a test case for Pest' => ['pest', testFilesWithoutTestCase(), 'tests/Support'],
+    'only files without a test case for PHPUnit' => ['phpunit', testFilesWithoutTestCase(), 'tests/Support'],
+]);
+
 it('maps a folder without test files as an empty map', function (): void {
     $project = gitRepository();
     new Filesystem()->mirror(fixturePath('pest'), $project, options: ['override' => true]);
