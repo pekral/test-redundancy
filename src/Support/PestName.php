@@ -11,8 +11,11 @@ final class PestName
 
     public static function evaluable(string $description): string
     {
-        $code = self::EVALUABLE_PREFIX . str_replace(' ', '_', str_replace('_', '__', $description));
+        return self::identifier(self::EVALUABLE_PREFIX . str_replace(' ', '_', str_replace('_', '__', $description)));
+    }
 
+    public static function identifier(string $code): string
+    {
         return (string) preg_replace('/[^a-zA-Z0-9_\x80-\xff]/', '_', $code);
     }
 

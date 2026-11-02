@@ -55,7 +55,7 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 | --- | --- | --- |
 | `source` | `["src", "app"]` | Directories whose lines count. |
 | `ignore` | none | A regex of source paths to leave out, e.g. code every test boots. |
-| `env` | `{}` | Environment variables for every test run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do. |
+| `env` | `{}` | Environment variables for every test run. Concurrent groups also get `TEST_TOKEN` 1…N, as `paratest` workers do, and `LARAVEL_PARALLEL_TESTING=1`, so a Laravel project gives each group its own test database; set it in `env` to change it. |
 | `processes` | `2` | Parallel processes, at least `2`; `--processes` overrides it. The tool never runs the tests sequentially. |
 | `map` | `.test-redundancy/coverage-map.json.gz` | Where the `map` command stores the coverage map. |
 | `runner` | auto | Path to `pest` or `phpunit`, relative to the project root or absolute. |

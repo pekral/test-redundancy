@@ -28,7 +28,7 @@ function candidatesOf(array $reports): array
 it('analyses a Pest test folder', function (): void {
     $testRedundancy = TestRedundancy::forProject(fixturePath('pest'), processes: null);
 
-    $reports = $testRedundancy->analyse($testRedundancy->testFiles(['tests'], baseRef: null), ['tests']);
+    $reports = $testRedundancy->analyse($testRedundancy->testFiles(['tests'], baseRef: null));
 
     expect(candidatesOf($reports))->toBe([
         'tests/CalculatorTest.php :: it adds one and two' => 'delete',
@@ -39,21 +39,21 @@ it('analyses a Pest test folder', function (): void {
 
 it('reads every test case of a run whose test name is not valid UTF-8', function (array $testCases, string ...$paths): void {
     $testRedundancy = TestRedundancy::forProject(fixturePath('invalid-utf8'), processes: null);
-    $requestedPaths = array_values($paths);
 
-    $reports = $testRedundancy->analyse($testRedundancy->testFiles($requestedPaths, baseRef: null), $requestedPaths);
+    $reports = $testRedundancy->analyse($testRedundancy->testFiles(array_values($paths), baseRef: null));
 
     expect(array_column(array_map(fn (FileReport $report): array => [$report->testFile, $report->testCases], $reports), 1, 0))->toBe($testCases);
 })->with([
     'a file' => [['tests/PhoneTest.php' => 3], 'tests/PhoneTest.php'],
-    'a folder' => [['tests/OtherPhoneTest.php' => 2, 'tests/PhoneTest.php' => 3], 'tests'],
+    'a folder' => [['tests/DescribedPhoneTest.php' => 2, 'tests/OtherPhoneTest.php' => 2, 'tests/PhoneTest.php' => 3], 'tests'],
+    'a test whose description is not valid UTF-8' => [['tests/DescribedPhoneTest.php' => 2], 'tests/DescribedPhoneTest.php'],
     'several files' => [['tests/PhoneTest.php' => 3, 'tests/OtherPhoneTest.php' => 2], 'tests/PhoneTest.php', 'tests/OtherPhoneTest.php'],
 ]);
 
 it('analyses a single PHPUnit test file', function (): void {
     $testRedundancy = TestRedundancy::forProject(fixturePath('phpunit'), processes: null);
 
-    $reports = $testRedundancy->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
+    $reports = $testRedundancy->analyse(['tests/GreeterTest.php']);
 
     expect(candidatesOf($reports))->toBe([
         'tests/GreeterTest.php :: testGreetsJane' => 'delete',
@@ -69,7 +69,7 @@ it('runs from a project path with an apostrophe', function (): void {
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/phpunit',
     ]));
 
-    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests']);
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php']);
 
     expect(candidatesOf($reports))->toHaveCount(2);
 });
@@ -127,9 +127,15 @@ it('saves a coverage map of a folder with a test whose name is not valid UTF-8',
     });
 
     $mappedTests = array_keys($testRedundancy->loadMap()->testsOfFile('tests/PhoneTest.php'));
+    $describedTests = array_keys($testRedundancy->loadMap()->testsOfFile('tests/DescribedPhoneTest.php'));
+    sort($describedTests);
 
     expect($chunks->getArrayCopy())->toBe([['tests']])
-        ->and($mappedTests)->toContain('tests/PhoneTest.php :: it normalizes a phone number › (\'733?382412\', \'733382412\')');
+        ->and($mappedTests)->toContain('tests/PhoneTest.php :: it normalizes a phone number › (\'733?382412\', \'733382412\')')
+        ->and($describedTests)->toBe([
+            'tests/DescribedPhoneTest.php :: it keeps an empty phone number',
+            'tests/DescribedPhoneTest.php :: it normalizes 733?382412',
+        ]);
 
     removeDirectory($project);
 });
@@ -178,7 +184,7 @@ it('ignores lines outside the configured source paths', function (): void {
         'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
     ]));
 
-    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/CalculatorTest.php'], ['tests/CalculatorTest.php']);
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/CalculatorTest.php']);
 
     expect($reports[0]->testCases)->toBe(5)
         ->and($reports[0]->coveredLines)->toBe(0)
@@ -210,8 +216,10 @@ it('runs several test files and a folder as the same concurrent groups', functio
         });
         PHP, FILE_APPEND);
 
-    $concurrent = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
-    $folder = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
+    $testRedundancy = TestRedundancy::forProject($project, processes: 2);
+
+    $concurrent = $testRedundancy->analyse($testFiles);
+    $folder = $testRedundancy->analyse($testRedundancy->testFiles(['tests'], baseRef: null));
 
     expect(candidatesOf($concurrent))->toBe(candidatesOf($folder))
         ->and(array_map(fn (FileReport $report): int => $report->testCases, $concurrent))->toBe([6, 2]);
@@ -233,6 +241,43 @@ function takeWorkerTokens(string $project): array
 
     return $tokens;
 }
+
+it('starts every concurrent group with the Laravel testing flag unless the project sets it', function (array $environment, string $expected): void {
+    $project = temporaryDirectory();
+    new Filesystem()->mirror(fixturePath('pest'), $project);
+    new Filesystem()->remove($project . '/tests');
+    mkdir($project . '/tests');
+    mkdir($project . '/tokens');
+    file_put_contents($project . '/test-redundancy.json', (string) json_encode([
+        'source' => ['src'],
+        'runner' => dirname(__DIR__, 2) . '/vendor/bin/pest',
+        'env' => $environment,
+    ]));
+    file_put_contents($project . '/tests/WorkerTest.php', <<<'PHP'
+        <?php
+
+        declare(strict_types = 1);
+
+        test('reads the worker environment', function (): void {
+            file_put_contents(__DIR__ . '/../tokens/worker', getenv('LARAVEL_PARALLEL_TESTING') . ':' . getenv('TEST_TOKEN'));
+
+            expect(true)->toBeTrue();
+        });
+
+        test('runs a second test in the same file', function (): void {
+            expect(true)->toBeTrue();
+        });
+        PHP);
+
+    TestRedundancy::forProject($project, processes: 2)->analyse(['tests/WorkerTest.php']);
+
+    expect(file_get_contents($project . '/tokens/worker'))->toBe($expected);
+
+    removeDirectory($project);
+})->with([
+    'the default' => [[], '1:1'],
+    'the project overrides it' => [['LARAVEL_PARALLEL_TESTING' => '0'], '0:1'],
+]);
 
 it('balances the concurrent groups by the durations of the last run without changing the result', function (): void {
     $project = temporaryDirectory();
@@ -269,7 +314,7 @@ it('balances the concurrent groups by the durations of the last run without chan
             PHP);
     }
 
-    $roundRobin = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $roundRobin = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles);
     $roundRobinTokens = takeWorkerTokens($project);
     $roundRobinBaseline = (string) file_get_contents($project . '/.test-redundancy/baseline.json');
     $recorded = json_decode((string) file_get_contents($project . '/.test-redundancy/durations.json'), associative: true);
@@ -279,7 +324,7 @@ it('balances the concurrent groups by the durations of the last run without chan
         $testFiles[2] => 5.0,
     ]));
 
-    $balanced = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $balanced = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles);
     $balancedTokens = takeWorkerTokens($project);
 
     expect(array_keys(is_array($recorded) ? $recorded : []))->toEqualCanonicalizing($testFiles)
@@ -311,7 +356,7 @@ function phpunitProjectWith(array $source): string
 it('leaves a failing test case out of the analysis and lists it with the failure message', function (): void {
     $project = phpunitProjectWith(['assertSame(\'Hello, Jane!\', (new Greeter())' => 'assertSame(\'Hello, nobody!\', (new Greeter())']);
 
-    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php']);
 
     expect(candidatesOf($reports))->toBe(['tests/GreeterTest.php :: testGreetsByName › jane' => 'review-dataset-row'])
         ->and($reports[0]->testCases)->toBe(3)
@@ -329,7 +374,7 @@ it('leaves a failing row of a dataset with integer keys out of the analysis', fu
         'yield \'john\' => [\'John\', \'Hello, John!\']' => 'yield [\'John\', \'Hello, nobody!\']',
     ]);
 
-    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php'], ['tests/GreeterTest.php']);
+    $reports = TestRedundancy::forProject($project, processes: null)->analyse(['tests/GreeterTest.php']);
 
     expect(array_keys($reports[0]->failedTests))->toBe(['testGreetsByName › 1'])
         ->and($reports[0]->testCases)->toBe(3)
@@ -369,7 +414,7 @@ it('keeps the coverage of every worker group and records every duration when a t
             PHP);
     }
 
-    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, $testFiles);
+    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles);
 
     expect(array_map(static fn (FileReport $report): int => $report->testCases, $reports))->toBe([2, 1])
         ->and(array_map(static fn (FileReport $report): array => array_keys($report->failedTests), $reports))
@@ -400,10 +445,7 @@ it('aborts the run when a worker ends without a JUnit log', function (): void {
         PHP);
 
     expect(
-        fn (): array => TestRedundancy::forProject($project, processes: null)->analyse(
-            ['tests/OtherCalculatorTest.php'],
-            ['tests/OtherCalculatorTest.php'],
-        ),
+        fn (): array => TestRedundancy::forProject($project, processes: null)->analyse(['tests/OtherCalculatorTest.php']),
     )
         ->toThrow(ProcessFailedException::class);
 });
@@ -430,7 +472,7 @@ it('still fails the coverage map when a test case fails', function (): void {
         ->toThrow(ProcessFailedException::class);
 });
 
-it('records the lines of every existing source directory when pcov is narrowed to them', function (bool $folder): void {
+it('records the lines of every existing source directory when pcov is narrowed to them', function (): void {
     $project = temporaryDirectory();
     new Filesystem()->mirror(fixturePath('pest'), $project);
     new Filesystem()->remove($project . '/tests');
@@ -497,10 +539,7 @@ it('records the lines of every existing source directory when pcov is narrowed t
         });
         PHP);
 
-    TestRedundancy::forProject($project, processes: 2)->analyse(
-        ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
-        $folder ? ['tests'] : ['tests/MixedTest.php', 'tests/OtherMixedTest.php'],
-    );
+    TestRedundancy::forProject($project, processes: 2)->analyse(['tests/MixedTest.php', 'tests/OtherMixedTest.php']);
 
     $baseline = CoverageBaseline::load($project . '/.test-redundancy/baseline.json');
 
@@ -508,10 +547,7 @@ it('records the lines of every existing source directory when pcov is narrowed t
         ->and($baseline->files['tests/OtherMixedTest.php']['lines'])->toBe(['app/Pricing.php:7']);
 
     removeDirectory($project);
-})->with([
-    'a folder' => [true],
-    'files' => [false],
-]);
+});
 
 /**
  * @return array<string, string>
@@ -582,10 +618,10 @@ it('skips a test file with a single test case from the coverage run without chan
     $project = singleTestProject();
     $testFiles = ['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php'];
     $withoutSingle = TestRedundancy::forProject($project, processes: 2)
-        ->analyse(['tests/DatasetTest.php', 'tests/PairTest.php'], ['tests/DatasetTest.php', 'tests/PairTest.php']);
+        ->analyse(['tests/DatasetTest.php', 'tests/PairTest.php']);
     unlink($project . '/markers/dataset');
 
-    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles, ['tests']);
+    $reports = TestRedundancy::forProject($project, processes: 2)->analyse($testFiles);
 
     expect(is_file($project . '/markers/single'))->toBeFalse()
         ->and(is_file($project . '/markers/dataset'))->toBeTrue()
@@ -604,7 +640,7 @@ it('skips a test file with a single test case from the coverage run without chan
 it('keeps verify working for every file that had candidates when a single-test file is skipped', function (): void {
     $project = singleTestProject();
     $testRedundancy = TestRedundancy::forProject($project, processes: 2);
-    $testRedundancy->analyse(['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php'], ['tests']);
+    $testRedundancy->analyse(['tests/DatasetTest.php', 'tests/PairTest.php', 'tests/SingleTest.php']);
     $pair = (string) file_get_contents($project . '/tests/PairTest.php');
     $withoutDivides = (string) preg_replace("/\n\nit\\('divides'.*?\\}\\);\$/s", '', $pair);
     $withoutAddsAgain = (string) preg_replace("/it\\('adds again'.*?\\}\\);\n\n/s", '', $pair);
@@ -638,7 +674,7 @@ it('runs a skipped test file in verify and stores it without lines when every te
     $project = singleTestProject();
     $testRedundancy = TestRedundancy::forProject($project, processes: 2);
 
-    $reports = $testRedundancy->analyse(['tests/SingleTest.php'], ['tests/SingleTest.php']);
+    $reports = $testRedundancy->analyse(['tests/SingleTest.php']);
     $markerAfterAnalyse = is_file($project . '/markers/single');
     $verification = $testRedundancy->verify();
 

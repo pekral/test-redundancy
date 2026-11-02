@@ -59,7 +59,12 @@ final readonly class CoverageRun
      */
     private function workerEnvironment(int $token): array
     {
-        return [...$this->configuration->environment, 'TEST_TOKEN' => (string) $token, 'UNIQUE_TEST_TOKEN' => uniqid($token . '_')];
+        return [
+            'LARAVEL_PARALLEL_TESTING' => '1',
+            ...$this->configuration->environment,
+            'TEST_TOKEN' => (string) $token,
+            'UNIQUE_TEST_TOKEN' => uniqid($token . '_'),
+        ];
     }
 
     /**
@@ -117,8 +122,6 @@ final readonly class CoverageRun
         $process = new Process(
             $this->runner->command(
                 $paths,
-                parallel: false,
-                processes: $this->configuration->processes,
                 coverageFile: $coverageFile,
                 junitFile: $junitFile,
             ),

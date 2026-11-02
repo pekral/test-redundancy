@@ -57,7 +57,7 @@ final class AnalyseCommand extends Command
         $reports = match (true) {
             $testFiles === [] => [],
             $map !== null => $testRedundancy->analyseAcross($testFiles, $map),
-            default => $testRedundancy->analyse($testFiles, $paths),
+            default => $testRedundancy->analyse($testFiles),
         };
         $this->warnAboutFilesWithoutSourceLines($reports, $io);
         $printer = new ReportPrinter($io);

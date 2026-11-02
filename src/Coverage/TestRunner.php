@@ -15,8 +15,6 @@ final readonly class TestRunner
 
     private const string PHPUNIT = 'vendor/bin/phpunit';
 
-    private const string PARATEST = 'paratest';
-
     private const string CACHE_DIRECTORY = '.test-redundancy/cache';
 
     private const array CONFIGURATION_FILES = ['phpunit.xml', 'phpunit.xml.dist'];
@@ -24,7 +22,7 @@ final readonly class TestRunner
     /**
      * @param list<string> $sourcePaths
      */
-    private function __construct(private string $projectRoot, private array $sourcePaths, private string $binary, private bool $isPest)
+    private function __construct(private string $projectRoot, private array $sourcePaths, private string $binary)
     {
     }
 
@@ -36,7 +34,7 @@ final readonly class TestRunner
             throw new RuntimeException(sprintf('No test runner found at %s. Install Pest or PHPUnit, or set "runner".', $binary));
         }
 
-        return new self($configuration->projectRoot, $configuration->sourcePaths, $binary, str_ends_with($binary, 'pest'));
+        return new self($configuration->projectRoot, $configuration->sourcePaths, $binary);
     }
 
     public function rootDirectory(): string
@@ -53,25 +51,15 @@ final readonly class TestRunner
      * @param list<string> $paths
      * @return list<string>
      */
-    public function command(array $paths, bool $parallel, int $processes, string $coverageFile, string $junitFile): array
+    public function command(array $paths, string $coverageFile, string $junitFile): array
     {
-        $binary = $parallel && !$this->isPest ? $this->paratest() : $this->binary;
-        $iniArguments = CoverageDriver::iniArguments($this->projectRoot, $this->sourcePaths);
-        $workerArguments = ['--processes=' . $processes, '--passthru-php=' . $this->quoted($iniArguments)];
-        $parallelArguments = match (true) {
-            !$parallel => [],
-            $this->isPest => ['--parallel', ...$workerArguments],
-            default => $workerArguments,
-        };
-
         return [
             PHP_BINARY,
             '-d', 'memory_limit=-1',
-            ...$iniArguments,
-            $binary,
+            ...CoverageDriver::iniArguments($this->projectRoot, $this->sourcePaths),
+            $this->binary,
             ...$paths,
             ...$this->configurationArguments(),
-            ...$parallelArguments,
             '--coverage-php=' . $coverageFile,
             '--log-junit=' . $junitFile,
             '--cache-directory=' . $this->cacheDirectory(),
@@ -90,27 +78,6 @@ final readonly class TestRunner
         }
 
         return [];
-    }
-
-    /**
-     * @param list<string> $arguments
-     */
-    private function quoted(array $arguments): string
-    {
-        return implode(' ', array_map(escapeshellarg(...), $arguments));
-    }
-
-    private function paratest(): string
-    {
-        $paratest = dirname($this->binary) . '/' . self::PARATEST;
-
-        if (!is_file(Path::makeAbsolute($paratest, $this->projectRoot))) {
-            throw new RuntimeException(
-                sprintf('No paratest found next to %s. The tool runs PHPUnit only in parallel; install brianium/paratest.', $this->binary),
-            );
-        }
-
-        return $paratest;
     }
 
 }
