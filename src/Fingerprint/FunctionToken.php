@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ArrayDimFetch;
+use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\NullsafePropertyFetch;
@@ -37,8 +38,16 @@ final class FunctionToken
                 : null,
             $callable instanceof ClassConstFetch => self::dataName($callable),
             $callable instanceof ArrayDimFetch => self::elementName($callable),
+            $callable instanceof CallLike => self::returnedName($callable),
             default => null,
         };
+    }
+
+    private static function returnedName(CallLike $call): ?string
+    {
+        $token = TokenCollector::token($call);
+
+        return $token === null ? null : strtr($token, self::KEY_ESCAPES) . '()';
     }
 
     private static function elementName(ArrayDimFetch $element): ?string
