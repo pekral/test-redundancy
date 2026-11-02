@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use Closure;
 use PhpParser\Error;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
@@ -42,11 +43,21 @@ final class ContractFingerprints
             && !PhpUnitFingerprints::declaresDataset($statements);
     }
 
-    public static function declaresNoTestCase(string $testFile): bool
+    /**
+     * The parser sees only the name of a parent class, so a class with a parent may inherit test methods. A file
+     * declaring only such classes stays in the run, unless $extendsNoTestCase says for this file that the classes
+     * it declares are no test case. The closure is called only for a file that declares nothing else.
+     *
+     * @param \Closure(string): bool|null $extendsNoTestCase
+     */
+    public static function declaresNoTestCase(string $testFile, ?Closure $extendsNoTestCase = null): bool
     {
         $statements = self::parsedStatements($testFile);
 
-        return $statements !== null && self::fingerprintsOf($statements) === [] && self::onlyDeclares($statements);
+        return $statements !== null
+            && self::fingerprintsOf($statements) === []
+            && (self::onlyDeclares($statements, parentsAllowed: false)
+                || ($extendsNoTestCase !== null && self::onlyDeclares($statements, parentsAllowed: true) && $extendsNoTestCase($testFile)));
     }
 
     /**
@@ -68,12 +79,12 @@ final class ContractFingerprints
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
      */
-    private static function onlyDeclares(array $statements): bool
+    private static function onlyDeclares(array $statements, bool $parentsAllowed): bool
     {
         return array_all($statements, static fn (Stmt $statement): bool => match (true) {
-            $statement instanceof Namespace_ => self::onlyDeclares($statement->stmts),
-            $statement instanceof Declare_ => self::onlyDeclares($statement->stmts ?? []),
-            $statement instanceof Class_ => $statement->extends === null && $statement->getTraitUses() === [],
+            $statement instanceof Namespace_ => self::onlyDeclares($statement->stmts, $parentsAllowed),
+            $statement instanceof Declare_ => self::onlyDeclares($statement->stmts ?? [], $parentsAllowed),
+            $statement instanceof Class_ => ($parentsAllowed || $statement->extends === null) && $statement->getTraitUses() === [],
             default => array_any(self::DECLARATIONS, static fn (string $declaration): bool => $statement instanceof $declaration),
         });
     }
