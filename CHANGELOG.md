@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A run over a single folder or file no longer aborts when a test name is not valid UTF-8, such as a dataset row with a
+  raw `"\xA0"` byte, and `map` over such a folder no longer stops with `String could not be parsed as XML` (#164). A
+  single path ran the runner in its own parallel mode (`pest --parallel`, or `paratest` next to `phpunit`), and ParaTest
+  merged the JUnit logs of its workers with `SimpleXMLElement`, which rejects the byte. Now a folder is expanded to its
+  test files, and every run, one path or several, splits the files into the same non-parallel groups, each with its
+  own `TEST_TOKEN`. `vendor/bin/paratest` is no longer needed next to `phpunit`. A folder without test files runs no
+  test and gives an empty map. Two further failures hid behind the first one. `JunitIndex` dropped every test case of
+  a JUnit log with an invalid byte without a message, so a test file with such a test showed 0 test cases. `map`
+  stopped with `Malformed UTF-8 characters, possibly incorrectly encoded` when it saved the key of such a test. The log
+  is now read with each invalid byte replaced by `?`, and `TestKey::make()` replaces it the same way, so the key of
+  such a test has a `?` where the byte was.
+
 ## [0.1.9] - 2026-11-01
 
 ### Changed

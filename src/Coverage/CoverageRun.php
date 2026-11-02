@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Coverage;
 
 use Pekral\TestRedundancy\Configuration;
+use Pekral\TestRedundancy\Support\TestFiles;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
@@ -38,19 +39,16 @@ final readonly class CoverageRun
 
     /**
      * @param list<string> $paths
-     * @return list<array{0: list<string>, 1: bool, 2: array<string, string>}>
+     * @return list<array{0: list<string>, 1: array<string, string>}>
      */
     private function groups(array $paths): array
     {
-        if (count($paths) === 1) {
-            return [[$paths, true, $this->configuration->environment]];
-        }
-
+        $testFiles = TestFiles::expand($paths, $this->configuration->projectRoot);
         $groups = TestDurations::load($this->configuration->absoluteDurationsPath())
-            ->split($paths, min(count($paths), $this->configuration->processes));
+            ->split($testFiles, min(count($testFiles), $this->configuration->processes));
 
         return array_map(
-            fn (array $group, int $token): array => [$group, false, $this->workerEnvironment($token + 1)],
+            fn (array $group, int $token): array => [$group, $this->workerEnvironment($token + 1)],
             $groups,
             array_keys($groups),
         );
@@ -65,15 +63,15 @@ final readonly class CoverageRun
     }
 
     /**
-     * @param list<array{0: list<string>, 1: bool, 2: array<string, string>}> $groups
+     * @param list<array{0: list<string>, 1: array<string, string>}> $groups
      */
     private function runGroups(array $groups, bool $tolerateFailedTests): CoverageResult
     {
         $runs = [];
 
         try {
-            foreach ($groups as [$paths, $parallel, $environment]) {
-                $runs[] = $this->start($paths, $parallel, $environment);
+            foreach ($groups as [$paths, $environment]) {
+                $runs[] = $this->start($paths, $environment);
             }
 
             $reader = new CoverageReader($this->configuration);
@@ -112,12 +110,18 @@ final readonly class CoverageRun
      * @param array<string, string> $environment
      * @return array{0: \Symfony\Component\Process\Process, 1: string, 2: string}
      */
-    private function start(array $paths, bool $parallel, array $environment): array
+    private function start(array $paths, array $environment): array
     {
         $coverageFile = (string) tempnam(sys_get_temp_dir(), 'test-redundancy-coverage-');
         $junitFile = (string) tempnam(sys_get_temp_dir(), 'test-redundancy-junit-');
         $process = new Process(
-            $this->runner->command($paths, $parallel, $this->configuration->processes, $coverageFile, $junitFile),
+            $this->runner->command(
+                $paths,
+                parallel: false,
+                processes: $this->configuration->processes,
+                coverageFile: $coverageFile,
+                junitFile: $junitFile,
+            ),
             $this->configuration->projectRoot,
             [...self::INHERITED_PARALLEL_ENVIRONMENT, ...CoverageDriver::environment(), ...$environment],
             timeout: self::TIMEOUT_SECONDS,

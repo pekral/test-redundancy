@@ -1,0 +1,7 @@
+{
+    "source": [
+        "src"
+    ],
+    "map": "build/coverage-map.json.gz",
+    "runner": "../../../vendor/bin/pest"
+}

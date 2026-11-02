@@ -21,7 +21,7 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | PHP | `^8.4` |
 | `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
 | Coverage driver | `pcov` (the tool limits `pcov.directory` to the `source` directories) or `xdebug` |
-| Test runner | `vendor/bin/pest`, or `vendor/bin/phpunit` with `vendor/bin/paratest` — the tool runs the tests only in parallel, so PHPUnit 13 needs 13.4+, the oldest version `paratest` supports |
+| Test runner | `vendor/bin/pest` or `vendor/bin/phpunit` |
 
 Contributing to this repository needs PHP 8.4+ with `pcov`.
 
@@ -86,12 +86,10 @@ vendor/bin/test-redundancy verify
 The JSON is compact; `--pretty` indents it.
 
 The tests always run in parallel, on the test tokens 1…`processes`, so never start the tool next to another run of the
-same suite. One folder or file runs in the runner's own parallel mode — `pest --parallel`, or `paratest` next to
-`phpunit` — with the coverage settings passed to every worker through `--passthru-php` and the project's
-`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`.
-Several paths, such as the files a branch changes, are split into up to `processes` groups that run concurrently,
-each with its own `TEST_TOKEN`. When a single folder holds test files that
-[`analyse` skips](#test-files-with-a-single-test-case), the remaining files run as such groups too.
+same suite. A folder is expanded to its test files first. The files of every run, whether you name a folder, one file or
+several paths, are split into up to `processes` groups that run concurrently, each with its own `TEST_TOKEN`. Each group
+is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
+`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing.
 Every run stores the time of each test file from its JUnit log in
 `.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
 group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
