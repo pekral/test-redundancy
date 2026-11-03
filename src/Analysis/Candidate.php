@@ -34,6 +34,7 @@ final readonly class Candidate implements JsonSerializable
         public ?DatasetParameters $coveringDatasetParameters = null,
         public array $omittedByCovering = [],
         public ?SharedDataset $coveringSharedDataset = null,
+        public bool $hasUnresolvedDatasetRow = false,
     ) {
     }
 
@@ -149,7 +150,7 @@ final readonly class Candidate implements JsonSerializable
             ),
         ];
 
-        return $this->differsBy === null ? [Action::UNPARSED_STEP, ...$steps] : $steps;
+        return $this->differsBy === null ? [Action::unparsedStep($this->hasUnresolvedDatasetRow), ...$steps] : $steps;
     }
 
     private function deleteOrReviewSharedRow(): Action

@@ -47,10 +47,6 @@ final class DatasetRows
      */
     public static function fingerprints(string $testCase, array $body, array $parameters, array $rows, ?callable $nameByValue = null): array
     {
-        if ($rows === []) {
-            return [$testCase => self::bodyTokens($body, $parameters)];
-        }
-
         $fingerprints = [];
 
         foreach ($rows as $row) {
@@ -63,7 +59,7 @@ final class DatasetRows
             $fingerprints[$testCase . TestKey::DATASET_SEPARATOR . $name] = self::rowTokens($body, $parameters, $row->value);
         }
 
-        return $fingerprints;
+        return $fingerprints === [] ? [$testCase => self::bodyTokens($body, $parameters)] : $fingerprints;
     }
 
     /**

@@ -1026,11 +1026,11 @@ it('names a dataset row without a key the way Pest names it', function (string $
 })->with([
     'array with keys and more than three items' => ['[[\'k\' => 1, 2, 3, 4, 5]]', ['it adds › ([1, 2, 3, …])']],
     'boolean' => ['TRUE', ['it adds › (true)']],
-    'constant' => ['PHP_INT_MAX', []],
-    'empty object' => ['(object) []', []],
+    'constant' => ['PHP_INT_MAX', ['it adds']],
+    'empty object' => ['(object) []', ['it adds']],
     'float' => ['345.67', ['it adds › (345.67)']],
     'integer' => ['12', ['it adds › (12)']],
-    'negated constant' => ['-PHP_INT_MAX', []],
+    'negated constant' => ['-PHP_INT_MAX', ['it adds']],
     'negative number' => ['-3', ['it adds › (-3)']],
     'null' => ['null', ['it adds › (null)']],
     'row of several values' => ['[\'vip\', \'12\', \'345.67\']', ['it adds › (\'vip\', \'12\', \'345.67\')']],
@@ -1038,10 +1038,10 @@ it('names a dataset row without a key the way Pest names it', function (string $
         '\'a very long string that is longer than forty characters for sure\'',
         ['it adds › (\'a very long string that is lo…r sure\')'],
     ],
-    'string with a line break' => ['"line\nbreak"', []],
+    'string with a line break' => ['"line\nbreak"', ['it adds']],
     'string with a quote' => ['"it\'s"', ['it adds › (\'it\'s\')']],
-    'unpacked values' => ['[...$values]', []],
-    'value of a call' => ['value()', []],
+    'unpacked values' => ['[...$values]', ['it adds']],
+    'value of a call' => ['value()', ['it adds']],
 ]);
 
 it('fingerprints a first-class-callable throws() as the bare call', function (): void {

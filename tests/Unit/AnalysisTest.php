@@ -6411,3 +6411,122 @@ it('computes differsBy for a plain test covered by a row of an unnamed dataset',
 
     expect($report->candidates[0]->differsBy)->toBe([]);
 });
+
+it('computes differsBy for a row of a named dataset (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\ndataset('numbers', ['one' => [1], 'two' => [2]]);\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('numbers');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('numbers');\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->jsonSerialize()['differsBy'])->not->toBeNull();
+});
+
+it('computes differsBy for a row of a dataset returned by a function (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nfunction numbers(): array\n{\n    return ['one' => [1], 'two' => [2]];\n}\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with(numbers());\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(numbers());\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->jsonSerialize()['differsBy'])->not->toBeNull();
+});
+
+it('computes differsBy for a row of a generator dataset (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with(function (): Generator {\n    yield 'one' => [1];\n});\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(function (): Generator {\n    yield 'one' => [1];\n});\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->jsonSerialize()['differsBy'])->not->toBeNull();
+});
+
+it('computes differsBy for a row of a named dataset keyed by a value the test file declares (#172)', function (
+    string $declaration,
+    string $key,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n{$declaration}\ndataset('numbers', [{$key} => [1]]);\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('numbers');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('numbers');\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toContain('in:function:f#0/value:1');
+})->with([
+    'backed enum value' => ["enum Number: string\n{\n    case One = 'one';\n}", 'Number::One->value'],
+    'class constant' => ["final class Number\n{\n    public const string ONE = 'one';\n}", 'Number::ONE'],
+]);
+
+it('names why a row of a dataset the analysis cannot resolve has no differsBy (#172)', function (
+    string $declarations,
+    string $dataset,
+    string $row,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n{$declarations}\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with({$dataset});\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with({$dataset});\n",
+        linesByTest: ["it a › {$row}" => ['src/Store.php:5'], "it b › {$row}" => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toBeNull()
+        ->and($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
+})->with([
+    'enum declared in another file' => [
+        'dataset(\'types\', [AccountIntegrationType::UPGATES->value => [1], AccountIntegrationType::SHOPER->value => [2]]);',
+        '\'types\'',
+        'upgates',
+    ],
+    'enum value with a control character' => [
+        "enum Type: string\n{\n    case One = \"one\\n\";\n}\ndataset('types', [Type::One->value => [1]]);",
+        '\'types\'',
+        'one',
+    ],
+    'function that returns its own call' => ["function numbers(): array\n{\n    return numbers();\n}", 'numbers()', 'one'],
+    'function with more than a return of a literal array' => [
+        "function numbers(): array\n{\n    \$rows = ['one' => [1]];\n\n    return \$rows;\n}",
+        'numbers()',
+        'one',
+    ],
+    'generator with a condition' => ['', "function (): Generator {\n    if (true) {\n        yield 'one' => [1];\n    }\n}", 'one'],
+    'generator with a loop' => ['', "function (): Generator {\n    foreach (['one'] as \$key) {\n        yield \$key => [1];\n    }\n}", 'one'],
+    'generator with yield from' => ['', "function (): Generator {\n    yield from ['one' => [1]];\n}", 'one'],
+    'one row keyed by an enum declared in another file' => [
+        'dataset(\'types\', [\'one\' => [1], Type::TWO->value => [2]]);',
+        '\'types\'',
+        'two',
+    ],
+    'variable' => ['$rows = [\'one\' => [1]];', '$rows', 'one'],
+]);
+
+it('names why a test covered by a row of a dataset the analysis cannot resolve has no differsBy (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n\$rows = ['one' => [1]];\nit('a', function (): void {\n    expect(f(1))->toBe(1);\n});\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(\$rows);\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
+});
+
+it('resolves an enum key of a dataset without loading the enum class (#172)', function (): void {
+    $requestedClasses = new ArrayObject();
+    $autoloader = static function (string $class) use ($requestedClasses): void {
+        $requestedClasses->append($class);
+    };
+    spl_autoload_register($autoloader);
+
+    analyzeTokenTest(
+        source: "<?php\ndataset('types', [UnloadedIntegrationType::UPGATES->value => [1]]);\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('types');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('types');\n",
+        linesByTest: ['it a › upgates' => ['src/Store.php:5'], 'it b › upgates' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+    spl_autoload_unregister($autoloader);
+
+    expect($requestedClasses->getArrayCopy())->not->toContain('UnloadedIntegrationType');
+});
