@@ -114,7 +114,7 @@ final class PhpUnitFingerprints
      */
     private static function providerRows(?ClassMethod $provider): array
     {
-        if ($provider === null) {
+        if (!$provider instanceof ClassMethod) {
             return [];
         }
 

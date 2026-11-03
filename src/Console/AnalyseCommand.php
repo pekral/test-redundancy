@@ -48,7 +48,7 @@ final class AnalyseCommand extends Command
         $base = $input->getOption('base');
         $testFiles = $testRedundancy->testFiles($paths, is_string($base) ? $base : null);
         $map = $input->getOption('across') === true ? $testRedundancy->loadMap() : null;
-        $staleMap = $map === null ? null : $this->staleMap($testRedundancy, $map, $io);
+        $staleMap = !$map instanceof CoverageMap ? null : $this->staleMap($testRedundancy, $map, $io);
 
         if ($testFiles === []) {
             $io->getErrorStyle()->note('No test file to analyse.');
@@ -56,7 +56,7 @@ final class AnalyseCommand extends Command
 
         $reports = match (true) {
             $testFiles === [] => [],
-            $map !== null => $testRedundancy->analyseAcross($testFiles, $map),
+            $map instanceof CoverageMap => $testRedundancy->analyseAcross($testFiles, $map),
             default => $testRedundancy->analyse($testFiles),
         };
         $this->warnAboutFilesWithoutSourceLines($reports, $io);

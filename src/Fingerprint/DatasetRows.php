@@ -84,9 +84,9 @@ final class DatasetRows
     private static function rowName(null|ArrayItem|Yield_ $row, ?callable $nameByValue): ?string
     {
         return match (true) {
-            $row?->value === null => null,
+            !$row?->value instanceof Expr => null,
             $row->key instanceof String_ => $row->key->value,
-            $row->key === null && $nameByValue !== null => $nameByValue($row->value),
+            !$row->key instanceof Expr && $nameByValue !== null => $nameByValue($row->value),
             default => null,
         };
     }
@@ -167,9 +167,9 @@ final class DatasetRows
 
         foreach (self::testStatements($body) as $statement) {
             $assignment = self::assignment($statement);
-            $name = $assignment === null ? null : self::variableName($assignment->var);
+            $name = !$assignment instanceof Assign ? null : self::variableName($assignment->var);
 
-            if ($assignment !== null && $name !== null && $writes[$name] === 1) {
+            if ($assignment instanceof Assign && $name !== null && $writes[$name] === 1) {
                 $assignments[$name] = $assignment;
             }
         }
@@ -270,9 +270,9 @@ final class DatasetRows
 
     private static function parameterName(ArrayItem $item, ?Param $parameter): ?string
     {
-        $isUnbindable = $item->key !== null
+        $isUnbindable = $item->key instanceof Expr
             || $item->unpack
-            || $parameter === null
+            || !$parameter instanceof Param
             || $parameter->variadic
             || !self::isBindable($item->value);
 
@@ -287,12 +287,15 @@ final class DatasetRows
 
     private static function isDataList(Array_ $value): bool
     {
-        return array_all($value->items, static fn (ArrayItem $item): bool => $item->key === null && self::isBindable($item->value));
+        return array_all(
+            $value->items,
+            static fn (ArrayItem $item): bool => !$item->key instanceof Expr && self::isBindable($item->value),
+        );
     }
 
     private static function isDataMap(Array_ $value): bool
     {
-        return array_all($value->items, static fn (ArrayItem $item): bool => $item->key !== null
+        return array_all($value->items, static fn (ArrayItem $item): bool => $item->key instanceof Expr
             && TokenCollector::isData($item->key)
             && self::isBindable($item->value));
     }

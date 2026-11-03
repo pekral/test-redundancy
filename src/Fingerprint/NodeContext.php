@@ -57,7 +57,7 @@ final class NodeContext
         foreach ($nodeFinder->findInstanceOf($nodes, PropertyFetch::class) as $propertyFetch) {
             $enumCase = self::enumCaseReadBy($propertyFetch);
 
-            if ($enumCase !== null && $propertyFetch->name instanceof Identifier) {
+            if ($enumCase instanceof ClassConstFetch && $propertyFetch->name instanceof Identifier) {
                 $readProperties[spl_object_id($enumCase)] = '->' . $propertyFetch->name->toString();
             }
         }
@@ -159,7 +159,7 @@ final class NodeContext
         $passedItems = match (true) {
             $value instanceof Array_ => array_filter(
                 $value->items,
-                static fn (ArrayItem $item): bool => $item->key !== null || $isArgument,
+                static fn (ArrayItem $item): bool => $item->key instanceof Expr || $isArgument,
             ),
             $value instanceof CallLike && !$isAssertion => array_filter(
                 $value->getRawArgs(),
@@ -171,7 +171,7 @@ final class NodeContext
         return array_merge(self::valueIds($value), ...array_map(
             static fn (ArrayItem|Arg $item): array => match (true) {
                 $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
-                $item->key === null => self::valueIds($item->value),
+                !$item->key instanceof Expr => self::valueIds($item->value),
                 default => [...self::valueIds($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
             },
             array_values($passedItems),
@@ -232,7 +232,7 @@ final class NodeContext
     {
         $enumCase = self::enumCaseReadBy($value);
 
-        return $enumCase === null ? [spl_object_id($value)] : [spl_object_id($value), spl_object_id($enumCase)];
+        return !$enumCase instanceof ClassConstFetch ? [spl_object_id($value)] : [spl_object_id($value), spl_object_id($enumCase)];
     }
 
     /**

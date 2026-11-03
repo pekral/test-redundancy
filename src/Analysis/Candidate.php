@@ -116,7 +116,7 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
-        $sharedSteps = $this->sharedDataset === null ? [] : [
+        $sharedSteps = !$this->sharedDataset instanceof SharedDataset ? [] : [
             sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, Action::quoted($this->sharedDataset->otherTests)),
         ];
 
@@ -128,7 +128,7 @@ final readonly class Candidate implements JsonSerializable
             return [...$sharedSteps, ...$this->missingInputSteps(), Action::VERIFY_STEP];
         }
 
-        if ($this->sharedDataset !== null && $this->addsNoValueOrCall()) {
+        if ($this->sharedDataset instanceof SharedDataset && $this->addsNoValueOrCall()) {
             return [...$sharedSteps, sprintf(Action::CONFIRM_STEP, Action::quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
@@ -154,7 +154,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function deleteOrReviewSharedRow(): Action
     {
-        return $this->sharedDataset === null ? Action::Delete : Action::Review;
+        return !$this->sharedDataset instanceof SharedDataset ? Action::Delete : Action::Review;
     }
 
     /**
@@ -320,7 +320,7 @@ final readonly class Candidate implements JsonSerializable
 
     private function coveringDatasetTakesDiffersBy(): bool
     {
-        return $this->coveringDatasetParameters === null
+        return !$this->coveringDatasetParameters instanceof DatasetParameters
             || (array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...))
                 && !array_any($this->coveringDifference ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
     }

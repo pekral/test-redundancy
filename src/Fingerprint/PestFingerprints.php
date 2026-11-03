@@ -177,7 +177,7 @@ final readonly class PestFingerprints
 
         $testCase = $prefix . ($call->name instanceof Name && $call->name->toLowerString() === 'it' ? 'it ' : '') . $description;
         $test = self::argument($call, 1);
-        $body = $test === null ? [] : [$test];
+        $body = !$test instanceof Node ? [] : [$test];
         $parameters = $test instanceof FunctionLike ? $test->getParams() : [];
         $datasetParameters = $datasetRows === [] ? null : DatasetRows::parameters($body, $parameters);
 
@@ -380,8 +380,8 @@ final readonly class PestFingerprints
     private static function datasetDefinition(Stmt $statement): array
     {
         $call = $statement instanceof Expression && $statement->expr instanceof FuncCall ? $statement->expr : null;
-        $name = $call === null ? null : self::functionCall($call, ['dataset']);
-        $rows = $call === null ? null : self::argument($call, 1);
+        $name = !$call instanceof FuncCall ? null : self::functionCall($call, ['dataset']);
+        $rows = !$call instanceof FuncCall ? null : self::argument($call, 1);
 
         return $name !== null && $rows instanceof Array_ ? [$name, $rows->items] : [null, []];
     }

@@ -163,15 +163,15 @@ final class TokenCollector
      */
     public static function nameOf(?Expr $node, array $readProperties): ?array
     {
-        $node = $node === null ? null : NodeContext::enumCaseReadBy($node) ?? $node;
+        $node = !$node instanceof Expr ? null : NodeContext::enumCaseReadBy($node) ?? $node;
         $token = $node instanceof Cast ? CastToken::withOperandName($node, $readProperties) : NonLiteralArguments::nameOrToken($node);
 
-        return $node === null || $token === null ? null : [$node, $token . ($readProperties[spl_object_id($node)] ?? '')];
+        return !$node instanceof Expr || $token === null ? null : [$node, $token . ($readProperties[spl_object_id($node)] ?? '')];
     }
 
     public static function listLength(Node $node): int
     {
-        $isListItem = static fn (ArrayItem $item): bool => $item->key === null && !$item->unpack;
+        $isListItem = static fn (ArrayItem $item): bool => !$item->key instanceof Expr && !$item->unpack;
 
         return $node instanceof Array_ && array_all($node->items, $isListItem) ? count($node->items) : 0;
     }

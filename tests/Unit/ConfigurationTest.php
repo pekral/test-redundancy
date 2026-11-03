@@ -72,7 +72,7 @@ it('rejects a configuration file that holds no JSON object', function (): void {
     $directory = temporaryDirectory();
     file_put_contents($directory . '/test-redundancy.json', '"text"');
 
-    expect(fn (): \Pekral\TestRedundancy\Configuration => Configuration::load($directory))->toThrow(JsonException::class);
+    expect(fn (): Configuration => Configuration::load($directory))->toThrow(JsonException::class);
 
     removeDirectory($directory);
 });
