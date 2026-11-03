@@ -6369,3 +6369,45 @@ it('reports the argument that only the covering test passes to a callable return
     ],
     'callable returned by a function' => ['app(Action::class)()', 'app(Action::class)($account)', 'in:function:function%3Aapp()#0/non-literal'],
 ]);
+
+it('computes differsBy for a row of an unnamed dataset (#171)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (string \$v): void {\n    expect(f(\$v))->toBeTrue();\n})->with(['one', 'two']);\n"
+            . "it('b', function (string \$v): void {\n    expect(f(\$v))->toBeFalse();\n})->with(['three']);\n",
+        linesByTest: ['it a › (\'one\')' => ['src/Store.php:5'], 'it b › (\'three\')' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->jsonSerialize()['differsBy'])->not->toBeNull();
+});
+
+it('matches a row Pest names from its value to its dataset element', function (string $rows, string $row, array $differsBy): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (mixed \$v): void {\n    expect(f(\$v))->toBeTrue();\n})->with({$rows});\n"
+            . "it('b', function (): void {\n    expect(f())->toBeTrue();\n});\n",
+        linesByTest: ["it a › {$row}" => ['src/Store.php:5'], 'it b' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toBe($differsBy);
+})->with([
+    'list of strings' => [
+        '[[[\'vip\', \'12\', \'345.67\']]]',
+        '([\'vip\', \'12\', \'345.67\'])',
+        ['in:function:f#0/value:list-item', 'in:function:f#0/value:\'vip\'', 'in:function:f#0/value:\'12\'', 'in:function:f#0/value:\'345.67\''],
+    ],
+    'object' => [
+        '[[(object) [\'plan\' => \'vip\']]]',
+        '(stdClass)',
+        ['in:function:f#0/non-literal', 'cast:object', 'in:cast:object/key:value:\'plan\'', 'in:cast:object/value:\'plan\'/value:\'vip\''],
+    ],
+    'string' => ['[\'customers\', \'total_revenue\']', '(\'total_revenue\')', ['in:function:f#0/value:\'total_revenue\'']],
+]);
+
+it('computes differsBy for a plain test covered by a row of an unnamed dataset', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    expect(f())->toBeTrue();\n});\n"
+            . "it('b', function (string \$v): void {\n    expect(f(\$v))->toBeTrue();\n})->with(['customers']);\n",
+        linesByTest: ['it a' => ['src/Store.php:5'], 'it b › (\'customers\')' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toBe([]);
+});

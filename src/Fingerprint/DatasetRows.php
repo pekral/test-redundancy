@@ -22,6 +22,7 @@ use PhpParser\Node\Expr\PostInc;
 use PhpParser\Node\Expr\PreDec;
 use PhpParser\Node\Expr\PreInc;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Expr\Yield_;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Param;
 use PhpParser\Node\Scalar\String_;
@@ -41,9 +42,10 @@ final class DatasetRows
      * @param array<\PhpParser\Node> $body
      * @param array<\PhpParser\Node\Param> $parameters
      * @param array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null> $rows
+     * @param (callable(\PhpParser\Node\Expr): ?string)|null $nameByValue
      * @return array<string, array<string, int>>
      */
-    public static function fingerprints(string $testCase, array $body, array $parameters, array $rows): array
+    public static function fingerprints(string $testCase, array $body, array $parameters, array $rows, ?callable $nameByValue = null): array
     {
         if ($rows === []) {
             return [$testCase => self::bodyTokens($body, $parameters)];
@@ -52,11 +54,13 @@ final class DatasetRows
         $fingerprints = [];
 
         foreach ($rows as $row) {
-            if ($row === null || !$row->key instanceof String_ || $row->value === null) {
+            $name = self::rowName($row, $nameByValue);
+
+            if ($row?->value === null || $name === null) {
                 continue;
             }
 
-            $fingerprints[$testCase . TestKey::DATASET_SEPARATOR . $row->key->value] = self::rowTokens($body, $parameters, $row->value);
+            $fingerprints[$testCase . TestKey::DATASET_SEPARATOR . $name] = self::rowTokens($body, $parameters, $row->value);
         }
 
         return $fingerprints;
@@ -72,6 +76,19 @@ final class DatasetRows
             array_keys(self::rowTokens($body, $parameters, DatasetParameters::sentinelRow($parameters))),
             $parameters,
         );
+    }
+
+    /**
+     * @param (callable(\PhpParser\Node\Expr): ?string)|null $nameByValue
+     */
+    private static function rowName(null|ArrayItem|Yield_ $row, ?callable $nameByValue): ?string
+    {
+        return match (true) {
+            $row?->value === null => null,
+            $row->key instanceof String_ => $row->key->value,
+            $row->key === null && $nameByValue !== null => $nameByValue($row->value),
+            default => null,
+        };
     }
 
     /**

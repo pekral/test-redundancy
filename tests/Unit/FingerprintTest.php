@@ -1002,7 +1002,7 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
         $object->it('ignored');
         PHP);
 
-    expect(array_keys($fingerprints))->toBe(['it adds › small', 'it adds › large', 'rejects', 'it reads a shared dataset'])
+    expect(array_keys($fingerprints))->toBe(['it adds › small', 'it adds › large', 'it adds › (4)', 'rejects', 'it reads a shared dataset'])
         ->and(array_keys($fingerprints['it adds › small']))->toEqualCanonicalizing(
             [
                 'function:expect',
@@ -1018,6 +1018,31 @@ it('fingerprints Pest tests, their dataset rows and chained modifiers', function
             ['function:fail', 'call:throws', 'call:throws#0/const:InvalidArgumentException::class', 'call:throws#1/value:\'Broken\''],
         );
 });
+
+it('names a dataset row without a key the way Pest names it', function (string $row, array $testCases): void {
+    $fingerprints = fingerprintsOf("<?php\nit('adds', fn (mixed \$value) => add(\$value))->with([{$row}]);");
+
+    expect(array_keys($fingerprints))->toBe($testCases);
+})->with([
+    'array with keys and more than three items' => ['[[\'k\' => 1, 2, 3, 4, 5]]', ['it adds › ([1, 2, 3, …])']],
+    'boolean' => ['TRUE', ['it adds › (true)']],
+    'constant' => ['PHP_INT_MAX', []],
+    'empty object' => ['(object) []', []],
+    'float' => ['345.67', ['it adds › (345.67)']],
+    'integer' => ['12', ['it adds › (12)']],
+    'negated constant' => ['-PHP_INT_MAX', []],
+    'negative number' => ['-3', ['it adds › (-3)']],
+    'null' => ['null', ['it adds › (null)']],
+    'row of several values' => ['[\'vip\', \'12\', \'345.67\']', ['it adds › (\'vip\', \'12\', \'345.67\')']],
+    'string longer than forty characters' => [
+        '\'a very long string that is longer than forty characters for sure\'',
+        ['it adds › (\'a very long string that is lo…r sure\')'],
+    ],
+    'string with a line break' => ['"line\nbreak"', []],
+    'string with a quote' => ['"it\'s"', ['it adds › (\'it\'s\')']],
+    'unpacked values' => ['[...$values]', []],
+    'value of a call' => ['value()', []],
+]);
 
 it('fingerprints a first-class-callable throws() as the bare call', function (): void {
     $fingerprints = fingerprintsOf('<?php test(\'rejects\', function (): void { fail(); })->throws(...);');
