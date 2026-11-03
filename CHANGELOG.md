@@ -14,9 +14,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `true` when no class in the file is a test case.
 - `DatasetRows::fingerprints()` takes a fifth, optional parameter `?callable $nameByValue` (#171). It names a row
   without a key from its value; a caller that passes nothing gets the same result as before.
+- `DatasetRows::fingerprints()` returns the fingerprint of the whole test, without a row name, when the test has rows
+  but none of them can be named (#172). It returned an empty array before. A test whose rows could not be read at all
+  already got that fingerprint.
+- `Candidate` takes an eleventh, optional parameter `bool $hasUnresolvedDatasetRow` (#172). A caller that passes
+  nothing gets the same steps as before.
 
 ### Fixed
 
+- A candidate whose test or covering test takes its rows from a dataset that is not an inline array now gets a
+  computed `differsBy` when the analysis can read the rows from the test file (#172). This holds for a function without
+  arguments whose body is one `return` of an array, a closure or a function whose body only yields rows, and a named
+  dataset keyed by a backed enum `->value` or a class constant with a string value that the same file declares. The
+  analysis reads no other file, loads no class, runs no code of the test, and follows no call inside such a body.
+- A candidate whose dataset row the analysis cannot resolve now gets the step `A dataset row of this test or of a
+  covering test could not be resolved by static analysis`, which names the reason, instead of `This test or its
+  dataset row could not be parsed` (#172). This holds for a dataset built at runtime, such as a variable, a function
+  with any other body, a loop, a condition or `yield from`, a dataset from another file, and a key the analysis cannot
+  name, such as an enum declared in another file or a value with a control character.
 - A candidate whose test or covering test is a row of a Pest dataset without a string key now gets a computed
   `differsBy` (#171). Pest names such a row from its values, such as `('customers')`, `(['vip', '12', '345.67'])` or
   `(stdClass)`, and the analysis read only rows with a string key, so the candidate got the step `This test or its

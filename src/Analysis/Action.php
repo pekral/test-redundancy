@@ -18,6 +18,10 @@ enum Action: string
 
     public const string UNPARSED_STEP = 'This test or its dataset row could not be parsed; compare it with coveredBy by hand.';
 
+    public const string UNRESOLVED_DATASET_ROW_STEP = 'A dataset row of this test or of a covering test could not be resolved '
+        . 'by static analysis: the dataset is built at runtime, comes from another file, or has a key the analysis cannot name. '
+        . 'The test itself was parsed; compare it with coveredBy by hand.';
+
     public const string ADD_ROW_STEP = 'Add a row with the values in differsBy to the dataset of "%s".';
 
     public const string ADD_SHARED_ROW_STEP = 'Add a row with the values in differsBy to the named dataset "%s", '
@@ -131,6 +135,11 @@ enum Action: string
             },
             self::VERIFY_STEP,
         ];
+    }
+
+    public static function unparsedStep(bool $hasUnresolvedDatasetRow): string
+    {
+        return $hasUnresolvedDatasetRow ? self::UNRESOLVED_DATASET_ROW_STEP : self::UNPARSED_STEP;
     }
 
     /**

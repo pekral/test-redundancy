@@ -95,6 +95,14 @@ final class FingerprintCache
         ));
     }
 
+    /**
+     * @param list<string> $coveringTestKeys
+     */
+    public function hasUnresolvedDatasetRow(string $testKey, array $coveringTestKeys): bool
+    {
+        return array_any([$testKey, ...$coveringTestKeys], $this->isUnresolvedDatasetRow(...));
+    }
+
     public function sharedDataset(string $testKey): ?SharedDataset
     {
         return $this->fileOf($testKey)?->sharedDatasets[TestKey::withoutDatasetRow(TestKey::testCase($testKey))] ?? null;
@@ -195,6 +203,16 @@ final class FingerprintCache
     private function arranged(array $counts, string $token): int
     {
         return ($counts[$token] ?? 0) - ($counts[TokenCollector::readToken($token)] ?? 0);
+    }
+
+    private function isUnresolvedDatasetRow(string $testKey): bool
+    {
+        $test = TestKey::withoutDatasetRow(TestKey::testCase($testKey));
+
+        return TestKey::isDatasetRow($testKey) && $this->of($testKey) === null && array_any(
+            array_keys($this->fileOf($testKey)->fingerprints ?? []),
+            static fn (string $testCase): bool => TestKey::withoutDatasetRow($testCase) === $test,
+        );
     }
 
     /**

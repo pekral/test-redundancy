@@ -17,6 +17,8 @@ use PhpParser\Node\Scalar\String_;
 final class PestRowName
 {
 
+    public const string CONTROL_CHARACTERS = '/[\x00-\x1f]/';
+
     private const int MAX_ITEMS = 3;
 
     private const int MAX_STRING_LENGTH = 40;
@@ -85,7 +87,7 @@ final class PestRowName
 
     private static function string(string $value): ?string
     {
-        if (preg_match('/[\x00-\x1f]/', $value) === 1) {
+        if (preg_match(self::CONTROL_CHARACTERS, $value) === 1) {
             return null;
         }
 

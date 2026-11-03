@@ -46,10 +46,7 @@ final readonly class PestFingerprints
         'flaky', 'group', 'issue', 'note', 'pr', 'references', 'repeat', 'see', 'skip', 'skipOnPhp', 'ticket', 'todo', 'wip',
     ];
 
-    /**
-     * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
-     */
-    private function __construct(private array $namedDatasets)
+    private function __construct(private FileDatasets $datasets)
     {
     }
 
@@ -195,7 +192,7 @@ final readonly class PestFingerprints
     /**
      * @return array{
      *     0: \PhpParser\Node\Expr\FuncCall|null,
-     *     1: array<\PhpParser\Node\ArrayItem|null>,
+     *     1: array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null>,
      *     2: array<string, int>,
      *     3: string|null,
      *     4: list<string>,
@@ -213,7 +210,7 @@ final readonly class PestFingerprints
 
             if ($method === 'with') {
                 $datasetArgument = self::argument($expression, 0);
-                $datasetRows = $this->datasetRows($datasetArgument);
+                $datasetRows = $this->datasets->rows($datasetArgument);
                 $dataset = $this->datasetName($datasetArgument);
                 $datasets = [...$datasets, ...$this->datasetNames($expression)];
             } elseif ($method !== null) {
@@ -242,18 +239,6 @@ final readonly class PestFingerprints
         }
 
         return TestLevelArgumentTokens::of($method, $call, withSource: $method !== self::AFTER_METHOD);
-    }
-
-    /**
-     * @return array<\PhpParser\Node\ArrayItem|null>
-     */
-    private function datasetRows(?Node $dataset): array
-    {
-        return match (true) {
-            $dataset instanceof Array_ => $dataset->items,
-            $dataset instanceof String_ => $this->namedDatasets[$dataset->value] ?? [],
-            default => [],
-        };
     }
 
     private function datasetName(?Node $dataset): ?string
@@ -320,7 +305,7 @@ final readonly class PestFingerprints
     {
         $statements = self::withoutNamespaces($statements);
 
-        return new self(self::namedDatasets($statements))->walk($statements, '');
+        return new self(new FileDatasets(self::namedDatasets($statements), $statements))->walk($statements, '');
     }
 
     /**
