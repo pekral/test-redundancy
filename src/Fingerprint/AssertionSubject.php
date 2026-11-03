@@ -11,6 +11,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Cast;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
@@ -43,7 +44,7 @@ final class AssertionSubject
             $token = TokenCollector::token($node);
             $subject = $token === null ? null : self::of($node, TokenCollector::calledMethod($token), $assignedValues);
 
-            if ($subject !== null) {
+            if ($subject instanceof Expr) {
                 $subjects[spl_object_id($node)] = $subject;
             }
         }
@@ -193,10 +194,10 @@ final class AssertionSubject
     private static function argument(Arg $argument, int $position): string
     {
         $literal = TokenCollector::isData($argument->value) ? (string) TokenCollector::token($argument->value) : null;
-        $names = new NodeFinder()->findFirst(
+        $names = !new NodeFinder()->findFirst(
             $argument->value,
             static fn (Node $node): bool => TokenCollector::isData($node) || $node instanceof FunctionLike,
-        ) === null
+        ) instanceof Node
             ? NonLiteralArguments::namesOf($argument->value, parameters: [])
             : [];
 
@@ -216,7 +217,7 @@ final class AssertionSubject
     {
         $token = match (true) {
             $part instanceof Cast => CastToken::of($part, $withArguments ? self::castOperand($part->expr) : self::token($part->expr)),
-            NodeContext::enumCaseReadBy($part) !== null => null,
+            NodeContext::enumCaseReadBy($part) instanceof ClassConstFetch => null,
             default => NonLiteralArguments::nameOrToken($part),
         };
 

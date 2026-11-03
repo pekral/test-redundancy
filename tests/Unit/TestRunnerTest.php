@@ -63,7 +63,7 @@ it('builds the PHPUnit command', function (): void {
 it('fails when no test runner is installed', function (): void {
     $directory = temporaryDirectory();
 
-    expect(fn (): \Pekral\TestRedundancy\Coverage\TestRunner => TestRunner::detect(Configuration::load($directory)))->toThrow(
+    expect(fn (): TestRunner => TestRunner::detect(Configuration::load($directory)))->toThrow(
         RuntimeException::class,
         'No test runner found',
     );

@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node;
 use PhpParser\Node\ClosureUse;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Param;
 use PhpParser\Node\StaticVar;
@@ -61,7 +62,7 @@ final class ParameterBinder extends NodeVisitorAbstract
             ? $node->var
             : null;
 
-        if ($declaredVariable !== null) {
+        if ($declaredVariable instanceof Expr) {
             $this->declarations[spl_object_id($declaredVariable)] = true;
         }
 

@@ -6,18 +6,27 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use Closure;
 use PhpParser\Error;
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
+use PhpParser\Node\Stmt\Const_;
 use PhpParser\Node\Stmt\Declare_;
+use PhpParser\Node\Stmt\Enum_;
+use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\GroupUse;
+use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Namespace_;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt\Trait_;
+use PhpParser\Node\Stmt\Use_;
 use PhpParser\ParserFactory;
 
 final class ContractFingerprints
 {
 
     private const array DECLARATIONS = [
-        Stmt\Use_::class, Stmt\GroupUse::class, Stmt\Const_::class, Stmt\Function_::class, Stmt\Enum_::class,
-        Stmt\Interface_::class, Stmt\Trait_::class, Stmt\Nop::class,
+        Use_::class, GroupUse::class, Const_::class, Function_::class, Enum_::class,
+        Interface_::class, Trait_::class, Nop::class,
     ];
 
     public static function analyse(string $testFile): FileFingerprints
@@ -53,7 +62,9 @@ final class ContractFingerprints
         return $statements !== null
             && self::fingerprintsOf($statements) === []
             && (self::onlyDeclares($statements, parentsAllowed: false)
-                || ($extendsNoTestCase !== null && self::onlyDeclares($statements, parentsAllowed: true) && $extendsNoTestCase($testFile)));
+                || ($extendsNoTestCase instanceof Closure
+                    && self::onlyDeclares($statements, parentsAllowed: true)
+                    && $extendsNoTestCase($testFile)));
     }
 
     /**
@@ -80,7 +91,7 @@ final class ContractFingerprints
         return array_all($statements, static fn (Stmt $statement): bool => match (true) {
             $statement instanceof Namespace_ => self::onlyDeclares($statement->stmts, $parentsAllowed),
             $statement instanceof Declare_ => self::onlyDeclares($statement->stmts ?? [], $parentsAllowed),
-            $statement instanceof Class_ => ($parentsAllowed || $statement->extends === null) && $statement->getTraitUses() === [],
+            $statement instanceof Class_ => ($parentsAllowed || !$statement->extends instanceof Name) && $statement->getTraitUses() === [],
             default => array_any(self::DECLARATIONS, static fn (string $declaration): bool => $statement instanceof $declaration),
         });
     }

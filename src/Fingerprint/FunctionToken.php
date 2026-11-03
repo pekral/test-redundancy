@@ -53,7 +53,7 @@ final class FunctionToken
     private static function elementName(ArrayDimFetch $element): ?string
     {
         $receiver = self::callableName($element->var);
-        $key = $element->dim === null ? null : self::dataName($element->dim);
+        $key = !$element->dim instanceof Expr ? null : self::dataName($element->dim);
 
         return $receiver === null || $key === null ? null : $receiver . '[' . $key . ']';
     }

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Pekral\TestRedundancy\Fingerprint;
 
+use PhpParser\Node;
 use PhpParser\Node\ArrayItem;
 use PhpParser\Node\ComplexType;
 use PhpParser\Node\Expr\Array_;
@@ -161,7 +162,7 @@ final readonly class DatasetParameters
      */
     private static function kinds(Param $parameter): array
     {
-        return $parameter->type === null ? self::VALUE_KINDS : self::kindsOfType($parameter->type);
+        return !$parameter->type instanceof Node ? self::VALUE_KINDS : self::kindsOfType($parameter->type);
     }
 
     /**

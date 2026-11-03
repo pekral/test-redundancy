@@ -155,7 +155,7 @@ final class OrderTokens
 
         return $call instanceof CallLike
             && !NodeContext::isAssertionCall($call)
-            && new NodeFinder()->findFirst($call, TokenCollector::isData(...)) !== null
+            && new NodeFinder()->findFirst($call, TokenCollector::isData(...)) instanceof Node
             ? $call
             : null;
     }

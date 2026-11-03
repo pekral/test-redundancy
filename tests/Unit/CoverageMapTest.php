@@ -44,11 +44,11 @@ it('fails on a missing or broken map', function (): void {
     $directory = temporaryDirectory();
     file_put_contents($directory . '/broken.json.gz', gzencode('{"commit": 1}'));
 
-    expect(fn (): \Pekral\TestRedundancy\Coverage\CoverageMap => CoverageMap::load($directory . '/missing.json.gz'))->toThrow(
+    expect(fn (): CoverageMap => CoverageMap::load($directory . '/missing.json.gz'))->toThrow(
         RuntimeException::class,
         'No coverage map',
     )
-        ->and(fn (): \Pekral\TestRedundancy\Coverage\CoverageMap => CoverageMap::load($directory . '/broken.json.gz'))->toThrow(
+        ->and(fn (): CoverageMap => CoverageMap::load($directory . '/broken.json.gz'))->toThrow(
             JsonException::class,
             'is not a coverage map',
         );

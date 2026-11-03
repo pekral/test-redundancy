@@ -16,6 +16,7 @@ use PhpParser\Node\Expr\BitwiseNot;
 use PhpParser\Node\Expr\BooleanNot;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Cast;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\NullsafePropertyFetch;
 use PhpParser\Node\Expr\PropertyFetch;
@@ -147,7 +148,7 @@ final class NonLiteralArguments
     public static function nameOrToken(?Expr $node): ?string
     {
         return match (true) {
-            $node === null => null,
+            !$node instanceof Expr => null,
             $node instanceof Variable,
             $node instanceof PropertyFetch,
             $node instanceof NullsafePropertyFetch,
@@ -213,7 +214,7 @@ final class NonLiteralArguments
             $value instanceof ArrayDimFetch => self::kindedNames(self::ELEMENT_PREFIX, [$value->var, $value->dim], $parameters),
             $value instanceof Cast => self::namesOf($value->expr, $parameters),
             $value instanceof Variable && in_array($value->name, $parameters, strict: true) => [],
-            NodeContext::enumCaseReadBy($value) !== null => [],
+            NodeContext::enumCaseReadBy($value) instanceof ClassConstFetch => [],
             $value instanceof Closure || $value instanceof ArrowFunction => [self::CLOSURE],
             default => array_filter([self::identity($value)], is_string(...)),
         };
@@ -312,7 +313,7 @@ final class NonLiteralArguments
      */
     private static function operandNames(?Node $operand, array $parameters): array
     {
-        return $operand !== null && TokenCollector::isData($operand)
+        return $operand instanceof Node && TokenCollector::isData($operand)
             ? array_filter([TokenCollector::token($operand)], is_string(...))
             : self::kindedNames(self::OPERAND_PREFIX, [$operand], $parameters);
     }
@@ -339,7 +340,7 @@ final class NonLiteralArguments
     {
         $key = $item->key;
 
-        return $key === null
+        return !$key instanceof Expr
             ? TokenCollector::LIST_ITEM
             : TokenCollector::nameOf($key, NodeContext::readProperties(new NodeFinder(), $key))[1] ?? null;
     }
@@ -371,7 +372,9 @@ final class NonLiteralArguments
 
     private static function isNonLiteral(Expr $value): bool
     {
-        return !TokenCollector::isData($value) && !$value instanceof Array_ && NodeContext::enumCaseReadBy($value) === null;
+        return !TokenCollector::isData($value)
+            && !$value instanceof Array_
+            && !NodeContext::enumCaseReadBy($value) instanceof ClassConstFetch;
     }
 
 }

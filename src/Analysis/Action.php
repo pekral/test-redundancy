@@ -147,7 +147,7 @@ enum Action: string
             return sprintf('Turn %s into one test with a dataset and add a row with the values in differsBy.', $coveringTests);
         }
 
-        return $shared === null
+        return !$shared instanceof SharedDataset
             ? sprintf(self::ADD_ROW_STEP, $coveringDataset)
             : sprintf(self::ADD_SHARED_ROW_STEP, $shared->name, self::quoted($shared->otherTests), $coveringDataset);
     }
