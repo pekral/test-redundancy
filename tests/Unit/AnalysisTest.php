@@ -6513,6 +6513,16 @@ it('names why a test covered by a row of a dataset the analysis cannot resolve h
     expect($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
 });
 
+it('names the parse step when a test without a fingerprint is not an unresolved dataset row (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nforeach ([1] as \$n) {\n    it('a' . \$n, function (): void {\n        expect(f(1))->toBe(1);\n    });\n}\n"
+            . "\$rows = ['one' => [1]];\nit('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(\$rows);\n",
+        linesByTest: ['it a1' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->steps()[0])->toBe(Action::UNPARSED_STEP);
+});
+
 it('resolves an enum key of a dataset without loading the enum class (#172)', function (): void {
     $requestedClasses = new ArrayObject();
     $autoloader = static function (string $class) use ($requestedClasses): void {
