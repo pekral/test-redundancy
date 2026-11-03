@@ -100,7 +100,9 @@ final class FingerprintCache
      */
     public function hasUnresolvedDatasetRow(string $testKey, array $coveringTestKeys): bool
     {
-        return array_any([$testKey, ...$coveringTestKeys], $this->isUnresolvedDatasetRow(...));
+        $unparsed = array_filter([$testKey, ...$coveringTestKeys], fn (string $key): bool => $this->of($key) === null);
+
+        return $unparsed !== [] && array_all($unparsed, $this->isUnresolvedDatasetRow(...));
     }
 
     public function sharedDataset(string $testKey): ?SharedDataset
