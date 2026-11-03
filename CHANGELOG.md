@@ -12,9 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   A PHP caller that passes only the file gets the same result as before and needs no change. A caller that wants a
   file of classes with a parent class left out of the run passes a closure that receives the file path and returns
   `true` when no class in the file is a test case.
+- `DatasetRows::fingerprints()` takes a fifth, optional parameter `?callable $nameByValue` (#171). It names a row
+  without a key from its value; a caller that passes nothing gets the same result as before.
 
 ### Fixed
 
+- A candidate whose test or covering test is a row of a Pest dataset without a string key now gets a computed
+  `differsBy` (#171). Pest names such a row from its values, such as `('customers')`, `(['vip', '12', '345.67'])` or
+  `(stdClass)`, and the analysis read only rows with a string key, so the candidate got the step `This test or its
+  dataset row could not be parsed` and `differsBy: null`. The same held for a plain test covered by such a row. The
+  analysis now names such a row the way Pest does when every value is a literal: a string, a number, `true`, `false`,
+  `null`, an array of such values, or `(object)` of a non-empty array. A row with any other value, a string with a
+  control character, and a row whose name repeats in the dataset, which Pest numbers as `#1`, `#2`, still get that
+  step.
 - `map` and `analyse` no longer abort under PHPUnit when a `*Test.php` file holds a helper class whose parent class is
   not a test case, such as `final class RecordingListTest extends \ArrayObject` (#168). 0.1.10 kept every class with
   a parent class in the run, because the parent can be an abstract test case that supplies the test methods, and

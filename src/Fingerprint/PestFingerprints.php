@@ -175,7 +175,7 @@ final readonly class PestFingerprints
             return [];
         }
 
-        $isIt = $call->name instanceof Name && $call->name->toLowerString() === 'it';
+        $testCase = $prefix . ($call->name instanceof Name && $call->name->toLowerString() === 'it' ? 'it ' : '') . $description;
         $test = self::argument($call, 1);
         $body = $test === null ? [] : [$test];
         $parameters = $test instanceof FunctionLike ? $test->getParams() : [];
@@ -188,7 +188,7 @@ final readonly class PestFingerprints
                 'parameters' => $datasetParameters,
                 'tokens' => TokenCollector::sum($tokens, $modifierTokens),
             ],
-            DatasetRows::fingerprints($prefix . ($isIt ? 'it ' : '') . $description, $body, $parameters, $datasetRows),
+            DatasetRows::fingerprints($testCase, $body, $parameters, $datasetRows, PestRowName::of(...)),
         );
     }
 
