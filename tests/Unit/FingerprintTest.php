@@ -684,9 +684,9 @@ it('gives a literal passed straight to a call the position of its argument', fun
         'store([fn () => 4]);',
         [
             'function:store' => 1,
+            'in:function:store#0/closure/expr/value:4' => 1,
             'in:function:store#0/value:list-item' => 1,
             'in:function:store#0/value:list-item/element:closure' => 1,
-            'value:4' => 1,
         ],
     ],
     'closure as an operand of an argument' => [
@@ -728,13 +728,13 @@ it('gives a literal passed straight to a call the position of its argument', fun
         [
             'function:store' => 1,
             'in:function:store#0/closure' => 1,
+            'in:function:store#0/closure/stmts#1/expr/expr/stmts#0/expr/value:2' => 1,
             'in:function:store#0/non-literal' => 1,
             'in:function:store#0/value:1' => 1,
             'in:function:store#0/value:3' => 1,
             'in:function:store#1/closure' => 1,
             'in:function:store#1/non-literal' => 1,
             'in:function:store#1/value:4' => 1,
-            'value:2' => 1,
         ],
     ],
 ]);

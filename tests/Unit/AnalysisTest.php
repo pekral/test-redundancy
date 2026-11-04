@@ -184,6 +184,27 @@ it('names the covering row values of a merge-into-dataset candidate (#174)', fun
         ]);
 });
 
+it('gives each differing literal inside a closure its own located differsBy entry (#175)', function (): void {
+    $candidate = analyzeTestPair(
+        candidateBody: 'mock()->withArgs(static fn ($a, $b): bool => $a === true && $b === true); run(true);',
+        coveringBody: 'mock()->withArgs(static fn ($a, $b): bool => $a === false && $b === false); run(false);',
+    )->candidates[0];
+
+    expect($candidate->jsonSerialize()['differsBy'])->each->toStartWith('in:');
+});
+
+it('names the path into the closure of each differing literal inside it (#175)', function (): void {
+    $candidate = analyzeTestPair(
+        candidateBody: 'mock()->withArgs(function ($c): bool { if ($c !== true) { return false; } return $c === true; });',
+        coveringBody: 'mock()->withArgs(function ($c): bool { if ($c !== false) { return false; } return $c === false; });',
+    )->candidates[0];
+
+    expect($candidate->jsonSerialize()['differsBy'])->toBe([
+        'in:call:withArgs#0/closure/stmts#0/cond/operator:notidentical#1/value:true',
+        'in:call:withArgs#0/closure/stmts#1/expr/operator:identical#1/value:true',
+    ]);
+});
+
 it('names the covering-side tokens in the review steps', function (): void {
     $steps = candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money'])->steps();
 
