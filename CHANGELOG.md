@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-04
+
 ### Changed
 
 - `ContractFingerprints::declaresNoTestCase()` takes a second, optional parameter `?Closure $extendsNoTestCase` (#168).
@@ -27,6 +29,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The arguments of a call of a callable that another call returns, such as `$this->app->make(Action::class)($account)`,
+  `app(Action::class)($account)` or `$factory()($account)`, now have their own tokens (#170). Before, such a call
+  carried no argument tokens, so a test that called the callable without an argument and a test that passed one had
+  the same fingerprint, and the analysis proposed a false `delete` that lost the test with the argument. The candidate
+  is now `review`, and `coveringDiffersBy` names the argument that only the covering test passes.
+- The text report escapes formatter tags, such as `<info>` or `</>`, in test names, `differsBy` values, failure
+  messages and tests without source lines (#178). Before, a value read from the test source that held such a tag
+  changed the styling of the report or dropped part of the value from the output.
 - Each literal or constant inside the body of a closure or an arrow function passed to a call now has its own
   `differsBy` entry with a path into the closure, such as
   `in:call:withArgs#0/closure/expr/operator:booleanand#0/operator:identical#1/value:true` and
