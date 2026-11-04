@@ -27,6 +27,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   arguments whose body is one `return` of an array, a closure or a function whose body only yields rows, and a named
   dataset keyed by a backed enum `->value` or a class constant with a string value that the same file declares. The
   analysis reads no other file, loads no class, runs no code of the test, and follows no call inside such a body.
+  The same holds for a named dataset whose value is a closure, an arrow function or a call of a function without
+  arguments, such as `dataset('numbers', fn () => [...])` (#172).
 - A candidate whose dataset row the analysis cannot resolve now gets the step `A dataset row of this test or of a
   covering test could not be resolved by static analysis`, which names the reason, instead of `This test or its
   dataset row could not be parsed` (#172). This holds for a dataset built at runtime, such as a variable, a function
