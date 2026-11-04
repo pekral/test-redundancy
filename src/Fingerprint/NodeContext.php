@@ -105,7 +105,7 @@ final class NodeContext
         );
 
         foreach (array_reverse($passedClosures) as $closure) {
-            $body = self::childrenOf($closure, [$closure instanceof ArrowFunction ? 'expr' : 'stmts']);
+            $body = self::childrenOf($closure, $closure instanceof ArrowFunction ? 'expr' : 'stmts');
 
             foreach (self::routes($body, [...$paths[spl_object_id($closure)], 'closure']) as $nodeId => $route) {
                 $paths[$nodeId] ??= $route;
@@ -261,7 +261,7 @@ final class NodeContext
             $childRoute = [...$route, $step];
             $routes += TokenCollector::isData($child) ? [spl_object_id($child) => $childRoute] : [];
             $routes += self::routes(
-                NonLiteralArguments::operandPositions($child) ?? self::childrenOf($child, $child->getSubNodeNames()),
+                NonLiteralArguments::operandPositions($child) ?? self::childrenOf($child, ...$child->getSubNodeNames()),
                 $childRoute,
             );
         }
@@ -270,22 +270,30 @@ final class NodeContext
     }
 
     /**
-     * @param list<string> $names
      * @return array<string, \PhpParser\Node>
      */
-    private static function childrenOf(Node $node, array $names): array
+    private static function childrenOf(Node $node, string ...$names): array
     {
         $children = [];
 
         foreach (array_intersect_key(get_object_vars($node), array_flip($names)) as $name => $child) {
-            foreach (is_array($child) ? $child : [$child] as $index => $grandchild) {
-                if ($grandchild instanceof Node) {
-                    $children[is_array($child) ? $name . '#' . $index : $name] = $grandchild;
-                }
-            }
+            $children += is_array($child) ? self::listedChildren($name, $child) : [$name => $child];
         }
 
-        return $children;
+        return array_filter($children, static fn (mixed $child): bool => $child instanceof Node);
+    }
+
+    /**
+     * @template TChild
+     * @param array<TChild> $children
+     * @return array<string, TChild>
+     */
+    private static function listedChildren(string $name, array $children): array
+    {
+        return array_combine(
+            array_map(static fn (int|string $index): string => $name . '#' . $index, array_keys($children)),
+            $children,
+        );
     }
 
     /**
