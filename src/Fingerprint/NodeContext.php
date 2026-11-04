@@ -92,6 +92,29 @@ final class NodeContext
         return $path === null ? '' : 'in:' . implode('/', $path) . '/';
     }
 
+    /**
+     * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
+     * @param array<int, list<string>> $paths
+     * @return array<int, list<string>>
+     */
+    public static function withClosureRoutes(NodeFinder $nodeFinder, Node|array $nodes, array $paths): array
+    {
+        $passedClosures = array_filter(
+            $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof Closure || $node instanceof ArrowFunction),
+            static fn (Node $closure): bool => isset($paths[spl_object_id($closure)]),
+        );
+
+        foreach (array_reverse($passedClosures) as $closure) {
+            $body = self::childrenOf($closure, [$closure instanceof ArrowFunction ? 'expr' : 'stmts']);
+
+            foreach (self::routes($body, [...$paths[spl_object_id($closure)], 'closure']) as $nodeId => $route) {
+                $paths[$nodeId] ??= $route;
+            }
+        }
+
+        return $paths;
+    }
+
     public static function kindOf(Node $node): string
     {
         return strtolower(substr((string) strrchr($node->getType(), '_'), 1));
@@ -223,6 +246,46 @@ final class NodeContext
             $nodeFinder->findInstanceOf($statements, Return_::class),
             static fn (Return_ $return): bool => !in_array($return, $nestedReturns, strict: true),
         ));
+    }
+
+    /**
+     * @param array<string, \PhpParser\Node|null> $children
+     * @param list<string> $route
+     * @return array<int, list<string>>
+     */
+    private static function routes(array $children, array $route): array
+    {
+        $routes = [];
+
+        foreach (array_filter($children, static fn (?Node $child): bool => $child instanceof Node) as $step => $child) {
+            $childRoute = [...$route, $step];
+            $routes += TokenCollector::isData($child) ? [spl_object_id($child) => $childRoute] : [];
+            $routes += self::routes(
+                NonLiteralArguments::operandPositions($child) ?? self::childrenOf($child, $child->getSubNodeNames()),
+                $childRoute,
+            );
+        }
+
+        return $routes;
+    }
+
+    /**
+     * @param list<string> $names
+     * @return array<string, \PhpParser\Node>
+     */
+    private static function childrenOf(Node $node, array $names): array
+    {
+        $children = [];
+
+        foreach (array_intersect_key(get_object_vars($node), array_flip($names)) as $name => $child) {
+            foreach (is_array($child) ? $child : [$child] as $index => $grandchild) {
+                if ($grandchild instanceof Node) {
+                    $children[is_array($child) ? $name . '#' . $index : $name] = $grandchild;
+                }
+            }
+        }
+
+        return $children;
     }
 
     /**

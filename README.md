@@ -525,6 +525,14 @@ test lacks.
   `merge-into-dataset`. The value a closure returns is the expression of each of its own `return` statements (see
   *Assertion subjects*). A closure that the test assigns to a variable and then passes on carries no such place, so
   `$f = fn () => 1; $g = fn () => 2; store($f, $g);` against the same test with the values swapped is `delete`.
+  Any other literal or constant in the body of such a closure carries the place of the closure, then `closure`, then
+  its path inside the closure: each step is the operand of an operator, written `operator:<kind>#<place>` as in
+  *Argument names*, or else the part of the PHP syntax tree it sits in, such as `stmts#0`, `cond` or `expr`.
+  `$mock->withArgs(fn ($a, $b) => $a === true && $b === true)` has
+  `in:call:withArgs#0/closure/expr/operator:booleanand#0/operator:identical#1/value:true` and
+  `in:call:withArgs#0/closure/expr/operator:booleanand#1/operator:identical#1/value:true`, so each place of a literal
+  that differs inside a closure is its own entry in `differsBy`. A literal in an argument of a call inside the closure
+  keeps the place of that call.
 - **Non-literal arguments.** An argument of a call that is not an assertion, whose value is not a literal, a constant,
   an enum case, a list or a map, carries the call and the position followed by `non-literal`, such as
   `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, so a

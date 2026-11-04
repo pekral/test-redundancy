@@ -139,6 +139,16 @@ final class NonLiteralArguments
         return self::operandsOf($value) !== null;
     }
 
+    /**
+     * @return array<string, \PhpParser\Node|null>|null
+     */
+    public static function operandPositions(Node $value): ?array
+    {
+        $operands = $value instanceof Expr ? self::operandsOf($value) : null;
+
+        return $operands === null ? null : self::placedOperands(self::OPERATOR_PREFIX . NodeContext::kindOf($value), $operands);
+    }
+
     public static function isCallArgument(string $token): bool
     {
         return self::isToken($token)
@@ -299,12 +309,25 @@ final class NonLiteralArguments
     private static function operatorNames(string $kind, array $operands, array $parameters): array
     {
         $token = self::OPERATOR_PREFIX . $kind;
+        $placedOperands = self::placedOperands($token, $operands);
 
         return array_merge([$token], ...array_map(
-            static fn (int $place, ?Node $operand): array => self::placed($token . '#' . $place, self::operandNames($operand, $parameters)),
-            array_keys($operands),
-            $operands,
+            static fn (string $place, ?Node $operand): array => self::placed($place, self::operandNames($operand, $parameters)),
+            array_keys($placedOperands),
+            $placedOperands,
         ));
+    }
+
+    /**
+     * @param array<\PhpParser\Node|null> $operands
+     * @return array<string, \PhpParser\Node|null>
+     */
+    private static function placedOperands(string $token, array $operands): array
+    {
+        return array_combine(
+            array_map(static fn (int $place): string => $token . '#' . $place, array_keys($operands)),
+            $operands,
+        );
     }
 
     /**

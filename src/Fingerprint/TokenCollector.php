@@ -237,7 +237,7 @@ final class TokenCollector
             }
         }
 
-        return $paths;
+        return NodeContext::withClosureRoutes($nodeFinder, $nodes, $paths);
     }
 
     /**
