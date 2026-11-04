@@ -216,8 +216,8 @@ it('names the path into a closure that a key or a cast wraps in an argument (#17
         sprintf('in:function:store#0/%s/closure/expr/operator:booleanand#1/operator:identical#1/value:true', $place),
     ]);
 })->with([
-    'keyed array item' => ["['a' => %s]", "value:'a'"],
     'cast' => ['(array) %s', 'cast:array'],
+    'keyed array item' => ['[\'a\' => %s]', 'value:\'a\''],
 ]);
 
 it('names the covering-side tokens in the review steps', function (): void {
