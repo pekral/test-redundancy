@@ -6540,3 +6540,48 @@ it('resolves an enum key of a dataset without loading the enum class (#172)', fu
 
     expect($requestedClasses->getArrayCopy())->not->toContain('UnloadedIntegrationType');
 });
+
+it('computes differsBy for a row of a named dataset a closure or a function call builds (#172)', function (string $declaration): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n{$declaration}\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('numbers');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('numbers');\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toContain('in:function:f#0/value:1');
+})->with([
+    'closure' => ['dataset(\'numbers\', fn () => [\'one\' => [1], \'two\' => [2]]);'],
+    'function call' => ["function numbers(): array\n{\n    return ['one' => [1], 'two' => [2]];\n}\ndataset('numbers', numbers());"],
+    'generator closure' => ["dataset('numbers', function (): Generator {\n    yield 'one' => [1];\n});"],
+]);
+
+it('names why a row of a named dataset a closure or a function call builds has no differsBy when the analysis cannot read it (#172)', function (
+    string $declaration,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n{$declaration}\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('numbers');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('numbers');\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toBeNull()
+        ->and($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
+})->with([
+    'function call with an argument' => [
+        "function numbers(int \$count): array\n{\n    return ['one' => [\$count]];\n}\ndataset('numbers', numbers(1));",
+    ],
+]);
+
+it('names a test whose dataset rows cannot be named in the shared dataset warning (#172)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\ndataset('rows', ['one' => [1], 'two' => [2]]);\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with('rows');\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with('rows');\n"
+            . "it('c', function (int \$v): void {\n    expect(h(\$v))->toBe(1);\n})->with([[\$unknown]])->with('rows');\n",
+        linesByTest: ['it a › one' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->steps()[0])->toBe(sprintf(Action::SHARED_DATASET_STEP, 'rows', Action::quoted(['it b', 'it c'])));
+});

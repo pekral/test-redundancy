@@ -7,7 +7,6 @@ namespace Pekral\TestRedundancy\Fingerprint;
 use Pekral\TestRedundancy\Support\TestKey;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
-use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
@@ -342,17 +341,17 @@ final readonly class PestFingerprints
 
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, array<\PhpParser\Node\ArrayItem|null>>
+     * @return array<string, \PhpParser\Node>
      */
     private static function namedDatasets(array $statements): array
     {
         $datasets = [];
 
         foreach ($statements as $statement) {
-            [$name, $rows] = self::datasetDefinition($statement);
+            [$name, $dataset] = self::datasetDefinition($statement);
 
-            if ($name !== null) {
-                $datasets[$name] = $rows;
+            if ($name !== null && $dataset !== null) {
+                $datasets[$name] = $dataset;
             }
         }
 
@@ -360,15 +359,15 @@ final readonly class PestFingerprints
     }
 
     /**
-     * @return array{0: string|null, 1: array<\PhpParser\Node\ArrayItem|null>}
+     * @return array{0: string|null, 1: \PhpParser\Node|null}
      */
     private static function datasetDefinition(Stmt $statement): array
     {
         $call = $statement instanceof Expression && $statement->expr instanceof FuncCall ? $statement->expr : null;
         $name = !$call instanceof FuncCall ? null : self::functionCall($call, ['dataset']);
-        $rows = !$call instanceof FuncCall ? null : self::argument($call, 1);
+        $dataset = !$call instanceof FuncCall ? null : self::argument($call, 1);
 
-        return $name !== null && $rows instanceof Array_ ? [$name, $rows->items] : [null, []];
+        return $name !== null && $dataset !== null ? [$name, $dataset] : [null, null];
     }
 
     private static function repeatsTest(Node $node): bool

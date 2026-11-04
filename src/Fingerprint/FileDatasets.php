@@ -41,7 +41,7 @@ final readonly class FileDatasets
     private array $keyValues;
 
     /**
-     * @param array<string, array<\PhpParser\Node\ArrayItem|null>> $namedDatasets
+     * @param array<string, \PhpParser\Node> $namedDatasets
      * @param array<\PhpParser\Node\Stmt> $statements
      */
     public function __construct(private array $namedDatasets, array $statements)
@@ -68,15 +68,22 @@ final readonly class FileDatasets
      */
     public function rows(?Node $dataset): array
     {
-        $rows = match (true) {
+        $rows = $this->declaredRows($dataset instanceof String_ ? $this->namedDatasets[$dataset->value] ?? null : $dataset);
+
+        return array_map($this->withStringKey(...), $rows);
+    }
+
+    /**
+     * @return array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null>
+     */
+    private function declaredRows(?Node $dataset): array
+    {
+        return match (true) {
             $dataset instanceof Array_ => $dataset->items,
-            $dataset instanceof String_ => $this->namedDatasets[$dataset->value] ?? [],
             $dataset instanceof FuncCall => $this->functionRows($dataset),
             $dataset instanceof Closure, $dataset instanceof ArrowFunction => $this->literalRows($dataset),
             default => [],
         };
-
-        return array_map($this->withStringKey(...), $rows);
     }
 
     /**
