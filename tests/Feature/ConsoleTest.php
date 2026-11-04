@@ -171,6 +171,41 @@ it('prints the lines only the union of the covering tests reaches in the text re
         ->and($display)->not->toContain('No new value or call');
 });
 
+it('prints formatter tags in a candidate verbatim and keeps the heading styled in the text report', function (): void {
+    $output = new BufferedOutput(decorated: true);
+    $candidate = new Candidate(
+        'tests/FooTest.php :: it stores <info>a</info>',
+        ['it forgets <fg=red>b</>'],
+        ['value:\'<error>x</error>\''],
+        ['value:\'y\''],
+        [],
+        assertsNothing: false,
+    );
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([
+        new FileReport('tests/FooTest.php', 2, 2, [$candidate], []),
+    ]);
+
+    expect($output->fetch())->toContain("\e[33mTests to review\e[39m")
+        ->toContain('it stores <info>a</info>')
+        ->toContain('- it forgets <fg=red>b</>')
+        ->toContain('differs by: value:\'<error>x</error>\'');
+});
+
+it('prints formatter tags in failed tests and tests without source lines verbatim in the text report', function (): void {
+    $output = new BufferedOutput();
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([
+        new FileReport('tests/FooTest.php', 2, 0, [], ['it reads <comment>c</comment>'], failedTests: [
+            'it adds <error>d</error>' => 'Failed asserting that \'<info>e</info>\' is identical to \'f\'.',
+        ]),
+    ]);
+
+    expect($output->fetch())->toContain('it reads <comment>c</comment>')
+        ->toContain('it adds <error>d</error>')
+        ->toContain('Failed asserting that \'<info>e</info>\' is identical to \'f\'.');
+});
+
 it('names a skipped test file in the text report instead of reporting its coverage', function (): void {
     $output = new BufferedOutput();
 
