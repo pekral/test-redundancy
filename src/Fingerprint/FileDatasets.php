@@ -54,7 +54,7 @@ final readonly class FileDatasets
                 $functions[$statement->name->toLowerString()] = $statement;
             }
 
-            if ($statement instanceof ClassLike && $statement->name !== null) {
+            if ($statement instanceof ClassLike && $statement->name instanceof Identifier) {
                 $keyValues = [...$keyValues, ...$this->keyValues($statement->name->toLowerString(), $statement->stmts)];
             }
         }
@@ -93,7 +93,7 @@ final readonly class FileDatasets
     {
         $function = $call->name instanceof Name && $call->args === [] ? $this->functions[$call->name->toLowerString()] ?? null : null;
 
-        return $function === null ? [] : $this->literalRows($function);
+        return !$function instanceof Function_ ? [] : $this->literalRows($function);
     }
 
     private function withStringKey(null|ArrayItem|Yield_ $row): null|ArrayItem|Yield_
