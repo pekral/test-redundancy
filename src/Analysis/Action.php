@@ -137,6 +137,16 @@ enum Action: string
         ];
     }
 
+    /**
+     * @param list<string> $coveringTokensForReview
+     * @param list<string> $coveringRowTokens
+     * @return list<string>
+     */
+    public function coveringDiffersBy(array $coveringTokensForReview, array $coveringRowTokens): array
+    {
+        return $this === self::MergeIntoDataset ? $coveringRowTokens : $coveringTokensForReview;
+    }
+
     public static function unparsedStep(bool $hasUnresolvedDatasetRow): string
     {
         return $hasUnresolvedDatasetRow ? self::UNRESOLVED_DATASET_ROW_STEP : self::UNPARSED_STEP;
