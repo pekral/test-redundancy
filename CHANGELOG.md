@@ -33,8 +33,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `in:call:withArgs#0/closure/expr/operator:booleanand#1/operator:identical#1/value:true` for
   `$mock->withArgs(fn ($a, $b) => $a === true && $b === true)` (#175). Before, both places were one entry without a
   location, `value:true`, so a reader who turned only one of them into a dataset parameter built a merged test that
-  checked a mix of both expectations. A literal that the closure returns, and a literal in an argument of a call
-  inside the closure, keep the path they had.
+  checked a mix of both expectations. This holds for a literal under an array key or a cast inside the closure too.
+  A literal that the closure returns, and a literal in an argument of a call inside the closure, keep the path they
+  had.
 - A candidate whose test or covering test takes its rows from a dataset that is not an inline array now gets a
   computed `differsBy` when the analysis can read the rows from the test file (#172). This holds for a function without
   arguments whose body is one `return` of an array, a closure or a function whose body only yields rows, and a named

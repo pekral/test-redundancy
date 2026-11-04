@@ -220,6 +220,37 @@ it('names the path into a closure that a key or a cast wraps in an argument (#17
     'keyed array item' => ['[\'a\' => %s]', 'value:\'a\''],
 ]);
 
+it('names the path into the closure of a literal under a key or a cast inside it (#175)', function (string $closure, array $differsBy): void {
+    $candidate = analyzeTestPair(
+        candidateBody: sprintf('mock()->withArgs(%s);', sprintf($closure, 'true')),
+        coveringBody: sprintf('mock()->withArgs(%s);', sprintf($closure, 'false')),
+    )->candidates[0];
+
+    expect($candidate->jsonSerialize()['differsBy'])->toBe($differsBy);
+})->with([
+    'array in a variable' => [
+        'function ($p): bool { $m = [\'x\' => %1$s]; $n = [\'x\' => %1$s]; return $p === [$m, $n]; }',
+        [
+            'in:call:withArgs#0/closure/stmts#0/expr/expr/items#0/value/value:true',
+            'in:call:withArgs#0/closure/stmts#1/expr/expr/items#0/value/value:true',
+        ],
+    ],
+    'cast' => [
+        'fn ($a, $b): bool => $a === (string) %1$s && $b === (string) %1$s',
+        [
+            'in:call:withArgs#0/closure/expr/operator:booleanand#0/operator:identical#1/expr/value:true',
+            'in:call:withArgs#0/closure/expr/operator:booleanand#1/operator:identical#1/expr/value:true',
+        ],
+    ],
+    'keyed array item' => [
+        'fn ($a, $b): bool => $a === [\'approval\' => %1$s] && $b === [\'approval\' => %1$s]',
+        [
+            'in:call:withArgs#0/closure/expr/operator:booleanand#0/operator:identical#1/items#0/value/value:true',
+            'in:call:withArgs#0/closure/expr/operator:booleanand#1/operator:identical#1/items#0/value/value:true',
+        ],
+    ],
+]);
+
 it('names the covering-side tokens in the review steps', function (): void {
     $steps = candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money'])->steps();
 

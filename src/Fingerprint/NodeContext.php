@@ -95,26 +95,35 @@ final class NodeContext
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @param array<int, list<string>> $paths
+     * @param array<int, string> $callArguments
      * @return array<int, list<string>>
      */
-    public static function withClosureRoutes(NodeFinder $nodeFinder, Node|array $nodes, array $paths): array
+    public static function withClosureRoutes(NodeFinder $nodeFinder, Node|array $nodes, array $paths, array $callArguments): array
     {
-        $passedClosures = array_filter(
-            $nodeFinder->find($nodes, static fn (Node $node): bool => $node instanceof Closure || $node instanceof ArrowFunction),
-            static fn (Node $closure): bool => isset($paths[spl_object_id($closure)]),
+        $passedClosures = $nodeFinder->find(
+            $nodes,
+            static fn (Node $node): bool => ($node instanceof Closure || $node instanceof ArrowFunction)
+                && isset($callArguments[spl_object_id($node)]),
         );
 
-        foreach (array_reverse($passedClosures) as $closure) {
+        foreach ($passedClosures as $closure) {
             $body = self::childrenOf($closure, $closure instanceof ArrowFunction ? 'expr' : 'stmts');
-            $closurePath = $paths[spl_object_id($closure)];
-            $paths = array_replace($paths, array_filter(
-                self::routes($body, [...$closurePath, 'closure']),
-                static fn (int $nodeId): bool => self::isEnclosingPart($paths[$nodeId] ?? [], $closurePath),
-                ARRAY_FILTER_USE_KEY,
-            ));
+            $routes = self::routes($body, [...$paths[spl_object_id($closure)], 'closure']);
+            $paths = array_replace($paths, array_diff_key($routes, $callArguments));
         }
 
         return $paths;
+    }
+
+    /**
+     * @param array<int, string> $readProperties
+     * @return array<int, string>
+     */
+    public static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem, array $readProperties): array
+    {
+        $key = TokenCollector::nameOf($arrayItem->key, $readProperties);
+
+        return $key === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
     }
 
     public static function kindOf(Node $node): string
@@ -282,27 +291,6 @@ final class NodeContext
         }
 
         return $routes;
-    }
-
-    /**
-     * @param list<string> $path
-     * @param list<string> $closurePath
-     */
-    private static function isEnclosingPart(array $path, array $closurePath): bool
-    {
-        $rest = $closurePath;
-
-        foreach ($path as $segment) {
-            $place = array_search($segment, $rest, strict: true);
-
-            if ($place === false) {
-                return false;
-            }
-
-            $rest = array_slice($rest, $place + 1);
-        }
-
-        return count($path) < count($closurePath);
     }
 
     /**

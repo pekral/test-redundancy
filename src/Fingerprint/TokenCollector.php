@@ -223,32 +223,23 @@ final class TokenCollector
     private static function paths(NodeFinder $nodeFinder, Node|array $nodes, array $subjects, array $readProperties): array
     {
         $paths = [];
+        $callArguments = [];
         $isPathNode = static fn (Node $node): bool => $node instanceof ArrayItem || $node instanceof CallLike || $node instanceof Cast;
 
         foreach ($nodeFinder->find($nodes, $isPathNode) as $pathNode) {
             $segments = match (true) {
-                $pathNode instanceof ArrayItem => self::keySegments($nodeFinder, $pathNode, $readProperties),
+                $pathNode instanceof ArrayItem => NodeContext::keySegments($nodeFinder, $pathNode, $readProperties),
                 $pathNode instanceof Cast => CastToken::segments($nodeFinder, $pathNode),
                 default => self::argumentSegments($pathNode, $subjects),
             };
+            $callArguments += $pathNode instanceof CallLike ? $segments : [];
 
             foreach ($segments as $nodeId => $segment) {
                 $paths[$nodeId][] = $segment;
             }
         }
 
-        return NodeContext::withClosureRoutes($nodeFinder, $nodes, $paths);
-    }
-
-    /**
-     * @param array<int, string> $readProperties
-     * @return array<int, string>
-     */
-    private static function keySegments(NodeFinder $nodeFinder, ArrayItem $arrayItem, array $readProperties): array
-    {
-        $key = self::nameOf($arrayItem->key, $readProperties);
-
-        return $key === null ? [] : array_fill_keys(NodeContext::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
+        return NodeContext::withClosureRoutes($nodeFinder, $nodes, $paths, $callArguments);
     }
 
     /**
