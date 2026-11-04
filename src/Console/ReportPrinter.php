@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Console;
 use Pekral\TestRedundancy\Analysis\AgentReport;
 use Pekral\TestRedundancy\Analysis\Candidate;
 use Pekral\TestRedundancy\Analysis\FileReport;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 final readonly class ReportPrinter
@@ -70,7 +71,7 @@ final readonly class ReportPrinter
 
         if ($report->testsWithoutSourceLines !== []) {
             $this->io->writeln('<comment>Tests without source lines (check what they test, or "source")</comment>');
-            $this->io->listing($report->testsWithoutSourceLines);
+            $this->io->listing(array_map(OutputFormatter::escape(...), $report->testsWithoutSourceLines));
         }
 
         if ($report->candidates === []) {
@@ -95,7 +96,9 @@ final readonly class ReportPrinter
 
         $this->io->writeln('<comment>Failed tests (left out of the analysis; fix them and run analyse again)</comment>');
         $this->io->listing(array_map(
-            static fn (string $test, string $message): string => $test . "\n    " . str_replace("\n", "\n    ", $message),
+            static fn (string $test, string $message): string => OutputFormatter::escape(
+                $test . "\n    " . str_replace("\n", "\n    ", $message),
+            ),
             array_keys($report->failedTests),
             $report->failedTests,
         ));
@@ -105,7 +108,7 @@ final readonly class ReportPrinter
     {
         $coveringTokens = $candidate->coveringTokensForReview();
 
-        return sprintf(
+        return OutputFormatter::escape(sprintf(
             "%s\n    action: %s\n    covered by:\n      - %s\n    differs by: %s%s%s",
             $candidate->testCase(),
             $candidate->action()->value,
@@ -113,7 +116,7 @@ final readonly class ReportPrinter
             $candidate->differsBy === null ? self::UNPARSED : implode(', ', $candidate->differsBy),
             $coveringTokens === [] ? '' : "\n    covering differs by: " . implode(', ', $coveringTokens),
             $candidate->unionOnlyLines === [] ? '' : "\n    union only lines: " . implode(', ', $candidate->unionOnlyLines),
-        );
+        ));
     }
 
     /**
