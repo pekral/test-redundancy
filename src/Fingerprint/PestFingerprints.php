@@ -367,7 +367,7 @@ final readonly class PestFingerprints
         $name = !$call instanceof FuncCall ? null : self::functionCall($call, ['dataset']);
         $dataset = !$call instanceof FuncCall ? null : self::argument($call, 1);
 
-        return $name !== null && $dataset !== null ? [$name, $dataset] : [null, null];
+        return $name !== null && $dataset instanceof Node ? [$name, $dataset] : [null, null];
     }
 
     private static function repeatsTest(Node $node): bool
