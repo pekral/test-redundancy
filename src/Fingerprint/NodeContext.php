@@ -107,11 +107,11 @@ final class NodeContext
         foreach (array_reverse($passedClosures) as $closure) {
             $body = self::childrenOf($closure, $closure instanceof ArrowFunction ? 'expr' : 'stmts');
             $closurePath = $paths[spl_object_id($closure)];
-
-            foreach (self::routes($body, [...$closurePath, 'closure']) as $nodeId => $route) {
-                $path = $paths[$nodeId] ?? [];
-                $paths[$nodeId] = self::isEnclosingPart($path, $closurePath) ? $route : $path;
-            }
+            $paths = array_replace($paths, array_filter(
+                self::routes($body, [...$closurePath, 'closure']),
+                static fn (int $nodeId): bool => self::isEnclosingPart($paths[$nodeId] ?? [], $closurePath),
+                ARRAY_FILTER_USE_KEY,
+            ));
         }
 
         return $paths;
@@ -234,6 +234,19 @@ final class NodeContext
     }
 
     /**
+     * @template TChild
+     * @param array<TChild> $children
+     * @return array<string, TChild>
+     */
+    public static function listedChildren(string $name, array $children): array
+    {
+        return array_combine(
+            array_map(static fn (int|string $index): string => $name . '#' . $index, array_keys($children)),
+            $children,
+        );
+    }
+
+    /**
      * @param array<\PhpParser\Node> $statements
      * @return list<\PhpParser\Node\Stmt\Return_>
      */
@@ -304,19 +317,6 @@ final class NodeContext
         }
 
         return array_filter($children, static fn (mixed $child): bool => $child instanceof Node);
-    }
-
-    /**
-     * @template TChild
-     * @param array<TChild> $children
-     * @return array<string, TChild>
-     */
-    public static function listedChildren(string $name, array $children): array
-    {
-        return array_combine(
-            array_map(static fn (int|string $index): string => $name . '#' . $index, array_keys($children)),
-            $children,
-        );
     }
 
     /**
