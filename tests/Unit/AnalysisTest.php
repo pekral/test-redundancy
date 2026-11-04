@@ -205,6 +205,21 @@ it('names the path into the closure of each differing literal inside it (#175)',
     ]);
 });
 
+it('names the path into a closure that a key or a cast wraps in an argument (#175)', function (string $wrapped, string $place): void {
+    $candidate = analyzeTestPair(
+        candidateBody: sprintf('store(%s);', sprintf($wrapped, 'fn ($a, $b): bool => $a === true && $b === true')),
+        coveringBody: sprintf('store(%s);', sprintf($wrapped, 'fn ($a, $b): bool => $a === false && $b === false')),
+    )->candidates[0];
+
+    expect($candidate->jsonSerialize()['differsBy'])->toBe([
+        sprintf('in:function:store#0/%s/closure/expr/operator:booleanand#0/operator:identical#1/value:true', $place),
+        sprintf('in:function:store#0/%s/closure/expr/operator:booleanand#1/operator:identical#1/value:true', $place),
+    ]);
+})->with([
+    'keyed array item' => ["['a' => %s]", "value:'a'"],
+    'cast' => ['(array) %s', 'cast:array'],
+]);
+
 it('names the covering-side tokens in the review steps', function (): void {
     $steps = candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money'])->steps();
 

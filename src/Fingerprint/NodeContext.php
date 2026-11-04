@@ -106,9 +106,11 @@ final class NodeContext
 
         foreach (array_reverse($passedClosures) as $closure) {
             $body = self::childrenOf($closure, $closure instanceof ArrowFunction ? 'expr' : 'stmts');
+            $closurePath = $paths[spl_object_id($closure)];
 
-            foreach (self::routes($body, [...$paths[spl_object_id($closure)], 'closure']) as $nodeId => $route) {
-                $paths[$nodeId] ??= $route;
+            foreach (self::routes($body, [...$closurePath, 'closure']) as $nodeId => $route) {
+                $path = $paths[$nodeId] ?? [];
+                $paths[$nodeId] = self::isEnclosingPart($path, $closurePath) ? $route : $path;
             }
         }
 
@@ -270,6 +272,27 @@ final class NodeContext
     }
 
     /**
+     * @param list<string> $path
+     * @param list<string> $closurePath
+     */
+    private static function isEnclosingPart(array $path, array $closurePath): bool
+    {
+        $rest = $closurePath;
+
+        foreach ($path as $segment) {
+            $place = array_search($segment, $rest, strict: true);
+
+            if ($place === false) {
+                return false;
+            }
+
+            $rest = array_slice($rest, $place + 1);
+        }
+
+        return count($path) < count($closurePath);
+    }
+
+    /**
      * @return array<string, \PhpParser\Node>
      */
     private static function childrenOf(Node $node, string ...$names): array
@@ -288,7 +311,7 @@ final class NodeContext
      * @param array<TChild> $children
      * @return array<string, TChild>
      */
-    private static function listedChildren(string $name, array $children): array
+    public static function listedChildren(string $name, array $children): array
     {
         return array_combine(
             array_map(static fn (int|string $index): string => $name . '#' . $index, array_keys($children)),
