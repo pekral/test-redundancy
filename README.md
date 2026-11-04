@@ -531,8 +531,10 @@ test lacks.
   `$mock->withArgs(fn ($a, $b) => $a === true && $b === true)` has
   `in:call:withArgs#0/closure/expr/operator:booleanand#0/operator:identical#1/value:true` and
   `in:call:withArgs#0/closure/expr/operator:booleanand#1/operator:identical#1/value:true`, so each place of a literal
-  that differs inside a closure is its own entry in `differsBy`. A literal in an argument of a call inside the closure
-  keeps the place of that call.
+  that differs inside a closure is its own entry in `differsBy`. A key or a cast inside the closure adds no place of
+  its own: `$mock->withArgs(fn ($a) => $a === ['approval' => true])` has
+  `in:call:withArgs#0/closure/expr/operator:identical#1/items#0/value/value:true`. A literal in an argument of a call
+  inside the closure keeps the place of that call.
 - **Non-literal arguments.** An argument of a call that is not an assertion, whose value is not a literal, a constant,
   an enum case, a list or a map, carries the call and the position followed by `non-literal`, such as
   `in:function:recalculate#2/non-literal` for `recalculate($job, 5, $campaign->id)`. It names the position only, so a
