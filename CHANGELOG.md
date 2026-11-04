@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   already got that fingerprint.
 - `Candidate` takes an eleventh, optional parameter `bool $hasUnresolvedDatasetRow` (#172). A caller that passes
   nothing gets the same steps as before.
+- `coveringDiffersBy` of a `merge-into-dataset` candidate now lists the tokens of the covering test in the places where
+  `differsBy` lists the tokens of the candidate, such as `in:function:store#1/value:2` against
+  `in:function:store#1/value:1` (#174). It was empty before, so the values of the covering row had to be read from the
+  covering test. `Candidate::coveringTokensForReview()`, the text report and the `coveringDiffersBy` of every other
+  action do not change.
 
 ### Fixed
 

@@ -104,7 +104,7 @@ final readonly class Candidate implements JsonSerializable
         return [
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
-            'coveringDiffersBy' => $this->coveringTokensForReview(),
+            'coveringDiffersBy' => $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens()),
             'differsBy' => $this->differsBy,
             'steps' => $this->steps(),
             'test' => $this->testCase(),

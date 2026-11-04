@@ -131,7 +131,6 @@ it('reports the covering-side tokens that made the action review', function (Can
     'call in both tests' => [candidate('it works', ['it also works'], ['call:toThrow'], ['call:forget']), []],
     'call in one of two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1'], ['call:forget']), []],
     'call in the covering test of a test that adds nothing' => [candidate('it works', ['it also works'], [], ['call:forget']), ['call:forget']],
-    'data in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2']), []],
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null, coveringDifference: null), []],
 ]);
 
@@ -164,14 +163,26 @@ it('names coveringDiffersBy only the tokens that made the action review', functi
         ),
         Action::ReviewDatasetRow,
     ],
-    'other values of one test of the same file' => [
-        fn (): FileReport => analyzeTestPair(
-            candidateBody: 'store(\'a\', 1); expect(g())->toBe(1);',
-            coveringBody: 'store(\'b\', 2); expect(g())->toBe(2);',
-        ),
-        Action::MergeIntoDataset,
-    ],
 ]);
+
+it('names the covering row values of a merge-into-dataset candidate (#174)', function (): void {
+    $candidate = analyzeTestPair(
+        candidateBody: 'store(\'a\', 1); expect(g())->toBe(1);',
+        coveringBody: 'store(\'b\', 2); expect(g())->toBe(2);',
+    )->candidates[0];
+
+    expect($candidate->action())->toBe(Action::MergeIntoDataset)
+        ->and($candidate->jsonSerialize()['differsBy'])->toBe([
+            'in:function:store#0/value:\'a\'',
+            'in:function:store#1/value:1',
+            'in:expect:function:g/call:toBe#0/value:1',
+        ])
+        ->and($candidate->jsonSerialize()['coveringDiffersBy'])->toBe([
+            'in:function:store#0/value:\'b\'',
+            'in:function:store#1/value:2',
+            'in:expect:function:g/call:toBe#0/value:2',
+        ]);
+});
 
 it('names the covering-side tokens in the review steps', function (): void {
     $steps = candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget', 'new:Money'])->steps();
@@ -2461,7 +2472,7 @@ it('still merges a test whose covering test expects the same exception through i
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'differsBy'))->toBe(['in:function:validate#0/value:\'\''])
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:function:validate#0/value:\'a\''])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 });
 
@@ -2481,7 +2492,7 @@ it('still merges a test whose throws() argument differs from the one of its cove
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'differsBy'))->toBe(['in:function:validate#0/value:\'\''])
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:function:validate#0/value:\'a\''])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 })->with([
     'a comment after the last statement of a closure' => [
@@ -2558,11 +2569,18 @@ it('asks to merge a test whose expected value replaces the value under which its
             'in:function:build#0/value:1',
             'in:expect:function:build/call:toBe#0/value:\'options\'/value:[]',
         ])
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([
+            'in:function:build#0/value:2',
+            'in:expect:function:build/call:toBe#0/value:\'options\'/key:value:\'color\'',
+            'in:expect:function:build/call:toBe#0/value:\'options\'/value:\'color\'/value:\'red\'',
+        ])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 });
 
-it('asks to merge a test whose expected empty list replaces the list in which its covering test expects elements', function (string $source): void {
+it('asks to merge a test whose expected empty list replaces the list in which its covering test expects elements', function (
+    string $source,
+    array $coveringDiffersBy,
+): void {
     $report = analyzeTokenTest(
         source: $source,
         linesByTest: [
@@ -2574,7 +2592,7 @@ it('asks to merge a test whose expected empty list replaces the list in which it
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it builds no items')
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([])
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy)
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset');
 })->with([
     'empty list as the whole expected value' => [
@@ -2583,6 +2601,12 @@ it('asks to merge a test whose expected empty list replaces the list in which it
             it('builds no items', fn () => expect(build(1))->toBe([]));
             it('builds two items', fn () => expect(build(2))->toBe(['x', 'y']));
             PHP,
+        [
+            'in:function:build#0/value:2',
+            'in:expect:function:build/call:toBe#0/value:list-item',
+            'in:expect:function:build/call:toBe#0/value:\'x\'',
+            'in:expect:function:build/call:toBe#0/value:\'y\'',
+        ],
     ],
     'empty list under a key' => [
         <<<'PHP'
@@ -2590,12 +2614,19 @@ it('asks to merge a test whose expected empty list replaces the list in which it
             it('builds no items', fn () => expect(build(1))->toBe(['items' => []]));
             it('builds two items', fn () => expect(build(2))->toBe(['items' => ['x', 'y']]));
             PHP,
+        [
+            'in:function:build#0/value:2',
+            'in:expect:function:build/call:toBe#0/value:\'items\'/value:list-item',
+            'in:value:\'items\'/value:\'x\'',
+            'in:value:\'items\'/value:\'y\'',
+        ],
     ],
 ]);
 
 it('asks to merge a test that passes an enum value to the argument its covering test passes another value to', function (
     string $source,
     string $enumValue,
+    string $coveringValue,
 ): void {
     $report = analyzeTokenTest(
         source: $source,
@@ -2607,7 +2638,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
         ->and(valueAt($json, 'test'))->toBe('it passes the enum value')
         ->and(valueAt($json, 'differsBy'))->toBe([$enumValue])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([]);
+        ->and(valueAt($json, 'coveringDiffersBy'))->toBe([$coveringValue]);
 })->with([
     'enum name against the enum value passed straight to a call' => [
         <<<'PHP'
@@ -2616,6 +2647,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => store(CouponType::FIXED->value));
             PHP,
         'in:function:store#0/const:CouponType::FIXED->name',
+        'in:function:store#0/const:CouponType::FIXED->value',
     ],
     'enum value against a literal as an item of a list passed to a call' => [
         <<<'PHP'
@@ -2624,6 +2656,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => store(['fixed']));
             PHP,
         'in:function:store#0/const:CouponType::FIXED->value',
+        'in:function:store#0/value:\'fixed\'',
     ],
     'enum value against a literal passed straight to a call' => [
         <<<'PHP'
@@ -2632,6 +2665,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => $this->post('/import', 'percentual')->assertOk());
             PHP,
         'in:call:post#1/const:CouponType::FIXED->value',
+        'in:call:post#1/value:\'percentual\'',
     ],
     'enum value against a literal under a key of an array passed to a call' => [
         <<<'PHP'
@@ -2640,6 +2674,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => $this->post('/import', ['default_type' => 'percentual'])->assertOk());
             PHP,
         'in:call:post#1/value:\'default_type\'/const:CouponType::FIXED->value',
+        'in:call:post#1/value:\'default_type\'/value:\'percentual\'',
     ],
     'enum value against the enum case as an item of a list passed to a call' => [
         <<<'PHP'
@@ -2648,6 +2683,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => store([CouponType::FIXED]));
             PHP,
         'in:function:store#0/const:CouponType::FIXED->value',
+        'in:function:store#0/const:CouponType::FIXED',
     ],
     'enum value against the enum case passed straight to a call' => [
         <<<'PHP'
@@ -2656,6 +2692,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => store(CouponType::FIXED));
             PHP,
         'in:function:store#0/const:CouponType::FIXED->value',
+        'in:function:store#0/const:CouponType::FIXED',
     ],
     'enum value against the enum case under a key of an array passed to a call' => [
         <<<'PHP'
@@ -2664,6 +2701,7 @@ it('asks to merge a test that passes an enum value to the argument its covering 
             it('passes another value', fn () => $this->post('/import', ['type' => CouponType::FIXED])->assertOk());
             PHP,
         'in:call:post#1/value:\'type\'/const:CouponType::FIXED->value',
+        'in:call:post#1/value:\'type\'/const:CouponType::FIXED',
     ],
 ]);
 
