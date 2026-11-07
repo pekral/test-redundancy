@@ -926,6 +926,11 @@ test lacks.
   dataset, every row with it gets the number Pest adds in the order of the rows: `['a', 'a', 'b', 'a']` gives
   `('a') #1`, `('a') #2`, `('b')` and `('a') #3`. A repeated name of a row with a key, and a repeated name in a
   dataset that a test combines with another one, stay unresolved.
+  A row of a PHPUnit data provider with a string key is named by the key. Every other row is named by the counter
+  PHPUnit uses, which starts at `0` and counts only those rows, whatever integer key a row has: `[[1], 'named' => [2],
+  [3], 7 => [4]]` gives `0`, `named`, `1` and `2`. This holds for a provider that returns an array, and for a generator
+  whose statements are only `yield` expressions. A key the analysis cannot read, such as a class constant, stops the
+  counter, and the rows after it stay unresolved.
 - **Local variables.** A literal, constant, empty array, list or map (as defined for dataset rows) that the test
   assigns once to a local variable in its own statements is counted where the test reads the variable:
   `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,

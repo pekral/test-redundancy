@@ -6925,3 +6925,29 @@ it('computes differsBy for a row whose name repeats in its dataset (#180)', func
         ->and($repeated->candidates[0]->testCase())->toBe('it checks › (\'a\') #2')
         ->and($repeated->candidates[0]->differsBy)->toBe(['in:function:check#0/value:\'a\'']);
 });
+
+it('computes differsBy for a PHPUnit data provider row without a key (#182)', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            final class TokenTest extends PHPUnit\Framework\TestCase
+            {
+                public static function rows(): array
+                {
+                    return [[1], [2]];
+                }
+
+                #[PHPUnit\Framework\Attributes\DataProvider('rows')]
+                public function testRows(int $value): void
+                {
+                    $this->assertTrue(check($value));
+                }
+            }
+            PHP,
+        linesByTest: ['testRows › 0' => ['src/Check.php:5'], 'testRows › 1' => ['src/Check.php:5', 'src/Check.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('testRows › 0')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:check#0/value:1']);
+});

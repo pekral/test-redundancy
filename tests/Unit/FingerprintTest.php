@@ -1801,3 +1801,41 @@ it('leaves a combined row unresolved when its row name repeats in its dataset (#
 
     expect(array_keys($fingerprints))->toBe(['it checks › (\'b\') / dataset "one']);
 });
+
+it('names a PHPUnit data provider row without a string key by the counter PHPUnit uses (#182)', function (string $provider, array $expected): void {
+    $fingerprints = fingerprintsOf(<<<PHP
+        <?php
+        final class ProbeTest extends PHPUnit\Framework\TestCase
+        {
+            public static function rows(): iterable
+            {
+                {$provider}
+            }
+
+            #[PHPUnit\Framework\Attributes\DataProvider('rows')]
+            public function testRows(int \$value): void
+            {
+                \$this->assertSame(1, check(\$value));
+            }
+        }
+        PHP);
+
+    expect(array_keys($fingerprints))->toBe($expected);
+})->with([
+    'a key the analysis cannot read stops the counter' => [
+        'return [[1], self::KEY => [2], [3]];',
+        ['testRows › 0'],
+    ],
+    'array with keys of every kind' => [
+        'return [[1], \'named\' => [2], [3], 7 => [4], \'8\' => [5]];',
+        ['testRows › 0', 'testRows › named', 'testRows › 1', 'testRows › 2', 'testRows › 3'],
+    ],
+    'generator of top-level yields' => [
+        "yield [1];\n        yield 'named' => [2];\n        yield [3];",
+        ['testRows › 0', 'testRows › named', 'testRows › 1'],
+    ],
+    'generator with a loop' => [
+        "foreach ([1, 2] as \$value) {\n            yield [\$value];\n        }",
+        ['testRows'],
+    ],
+]);
