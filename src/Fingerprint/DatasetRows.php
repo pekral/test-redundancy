@@ -48,9 +48,10 @@ final class DatasetRows
     public static function fingerprints(string $testCase, array $body, array $parameters, array $rows, ?callable $nameByValue = null): array
     {
         $fingerprints = [];
+        $names = self::rowNames(array_values($rows), $nameByValue);
 
-        foreach ($rows as $row) {
-            $name = self::rowName($row, $nameByValue);
+        foreach (array_values($rows) as $position => $row) {
+            $name = $names[$position];
 
             if ($row?->value === null || $name === null) {
                 continue;
@@ -72,6 +73,29 @@ final class DatasetRows
             array_keys(self::rowTokens($body, $parameters, DatasetParameters::sentinelRow($parameters))),
             $parameters,
         );
+    }
+
+    /**
+     * @param list<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null> $rows
+     * @param (callable(\PhpParser\Node\Expr): ?string)|null $nameByValue
+     * @return list<string|null>
+     */
+    private static function rowNames(array $rows, ?callable $nameByValue): array
+    {
+        $names = array_map(static fn (null|ArrayItem|Yield_ $row): ?string => self::rowName($row, $nameByValue), $rows);
+        $counts = array_count_values(array_filter($names, is_string(...)));
+        $occurrences = [];
+
+        foreach ($names as $position => $name) {
+            if ($name === null || $counts[$name] === 1) {
+                continue;
+            }
+
+            $occurrences[$name] = ($occurrences[$name] ?? 0) + 1;
+            $names[$position] = $rows[$position]?->key instanceof Expr ? null : $name . ' #' . $occurrences[$name];
+        }
+
+        return $names;
     }
 
     /**

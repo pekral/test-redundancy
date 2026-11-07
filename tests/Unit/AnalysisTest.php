@@ -6913,3 +6913,15 @@ it('deletes a test that duplicates a row of another test dataset (#176)', functi
     expect($candidate?->action())->toBe(Action::Delete)
         ->and($candidate?->coveredBy)->toContain('it b › (\'179/200\')');
 });
+
+it('computes differsBy for a row whose name repeats in its dataset (#180)', function (): void {
+    $repeated = analyzeTokenTest(
+        source: "<?php\nit('checks', function (string \$value): void {\n    expect(check(\$value, 1))->toBeTrue();\n})->with(['a', 'a']);\n"
+            . "it('checks b', function (): void {\n    expect(check('b', 1))->toBeTrue();\n});\n",
+        linesByTest: ['it checks › (\'a\') #2' => ['src/Check.php:5'], 'it checks b' => ['src/Check.php:5', 'src/Check.php:6']],
+    );
+
+    expect($repeated->candidates)->toHaveCount(1)
+        ->and($repeated->candidates[0]->testCase())->toBe('it checks › (\'a\') #2')
+        ->and($repeated->candidates[0]->differsBy)->toBe(['in:function:check#0/value:\'a\'']);
+});

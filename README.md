@@ -922,6 +922,10 @@ test lacks.
   the datasets, and the row name is the one Pest reports, such as `plain" / dataset "slash` for the rows `'plain'` and
   `'slash'`, or `('ab') / dataset "slash` for a row without a key. When a row of one dataset cannot be named, its
   combinations stay unresolved.
+  A row without a key is named from its values, as Pest prints them, such as `('ab')`. When that name repeats in one
+  dataset, every row with it gets the number Pest adds in the order of the rows: `['a', 'a', 'b', 'a']` gives
+  `('a') #1`, `('a') #2`, `('b')` and `('a') #3`. A repeated name of a row with a key, and a repeated name in a
+  dataset that a test combines with another one, stay unresolved.
 - **Local variables.** A literal, constant, empty array, list or map (as defined for dataset rows) that the test
   assigns once to a local variable in its own statements is counted where the test reads the variable:
   `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,

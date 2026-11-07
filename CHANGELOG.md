@@ -16,6 +16,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   dataset row the analysis cannot resolve, and `unknown (the test could not be parsed)` for a test it cannot parse
   (#188). Before, both printed `unknown (the test or a dataset row could not be parsed)`, while the first step already
   named the real reason since #172. The README names both reasons for a `null` `differsBy`.
+- A Pest row without a key whose name repeats in its dataset is named the way Pest numbers it, such as `('a') #1`,
+  `('a') #2` and `('a') #3` for `->with(['a', 'a', 'b', 'a'])`, and gets a computed `differsBy` (#180). Before, every
+  such row got the name without the number, the rows overwrote each other, and none matched a test of the coverage run.
+  A repeated name of a row with a key, and a repeated name in a dataset combined with another one, stay unresolved.
 - An item of a list under an array key now carries the call path of the array, followed by the key and a `list`
   segment, such as `in:expect:function:build/call:toBe#0/value:'items'/list/value:'x'` for
   `expect(build())->toBe(['items' => ['x']])` (#191). Before, such an item had only the key path,
