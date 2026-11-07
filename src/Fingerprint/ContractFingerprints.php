@@ -6,6 +6,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 
 use Closure;
 use PhpParser\Error;
+use PhpParser\ErrorHandler\Collecting;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
@@ -19,6 +20,8 @@ use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\Use_;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 
 final class ContractFingerprints
@@ -29,10 +32,15 @@ final class ContractFingerprints
         Interface_::class, Trait_::class, Nop::class,
     ];
 
-    public static function analyse(string $testFile): FileFingerprints
+    public static function analyse(string $testFile, ?ClassDeclarations $declarations = null): FileFingerprints
     {
         $statements = self::statements($testFile);
-        $pest = PestFingerprints::analyse($statements);
+
+        if ($declarations instanceof ClassDeclarations) {
+            new NodeTraverser(new NameResolver(new Collecting(), ['replaceNodes' => false]))->traverse($statements);
+        }
+
+        $pest = PestFingerprints::analyse($statements, $declarations);
         $phpUnit = PhpUnitFingerprints::analyse($statements);
 
         return new FileFingerprints(

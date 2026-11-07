@@ -44,7 +44,7 @@ final readonly class FileDatasets
      * @param array<string, \PhpParser\Node> $namedDatasets
      * @param array<\PhpParser\Node\Stmt> $statements
      */
-    public function __construct(private array $namedDatasets, array $statements)
+    public function __construct(private array $namedDatasets, array $statements, private ?ClassDeclarations $declarations = null)
     {
         $functions = [];
         $keyValues = [];
@@ -69,7 +69,14 @@ final readonly class FileDatasets
      */
     public function combinedRows(array $datasets): array
     {
-        return count($datasets) > 1 ? DatasetCombination::rows(array_map($this->rows(...), $datasets)) : $this->rows($datasets[0] ?? null);
+        return count($datasets) > 1
+            ? DatasetCombination::rows(array_map($this->rows(...), $datasets), $this->rowName(...))
+            : $this->rows($datasets[0] ?? null);
+    }
+
+    public function rowName(Expr $row): ?string
+    {
+        return PestRowName::of($row, $this->declarations);
     }
 
     /**
@@ -128,7 +135,17 @@ final readonly class FileDatasets
             default => null,
         };
 
-        return $constant === null ? null : $this->keyValues[$constant] ?? null;
+        return $constant === null ? null : $this->keyValues[$constant] ?? $this->declaredKeyValue($key);
+    }
+
+    private function declaredKeyValue(?Expr $key): ?string
+    {
+        $enumCase = $key instanceof PropertyFetch && $key->var instanceof ClassConstFetch
+            ? $this->declarations?->enumCase($key->var)
+            : null;
+        $value = $key instanceof ClassConstFetch ? $this->declarations?->constant($key) : $enumCase['value'] ?? null;
+
+        return is_string($value) ? $value : null;
     }
 
     /**
