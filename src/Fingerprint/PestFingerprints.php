@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Fingerprint;
 use Pekral\TestRedundancy\Support\TestKey;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
@@ -199,18 +200,15 @@ final readonly class PestFingerprints
      */
     private function unwrapChain(Node $expression): array
     {
-        $datasetRows = [];
+        $datasetArguments = [];
         $modifierTokens = [];
-        $dataset = null;
         $datasets = [];
 
         while ($expression instanceof MethodCall) {
             $method = $expression->name instanceof Identifier ? $expression->name->toString() : null;
 
             if ($method === 'with') {
-                $datasetArgument = self::argument($expression, 0);
-                $datasetRows = $this->datasets->rows($datasetArgument);
-                $dataset = $this->datasetName($datasetArgument);
+                $datasetArguments = [...$this->arguments($expression), ...$datasetArguments];
                 $datasets = [...$datasets, ...$this->datasetNames($expression)];
             } elseif ($method !== null) {
                 $modifierTokens = TokenCollector::sum($modifierTokens, $this->modifierTokens($method, $expression));
@@ -221,9 +219,9 @@ final readonly class PestFingerprints
 
         return [
             $expression instanceof FuncCall ? $expression : null,
-            $datasetRows,
+            $this->datasets->combinedRows($datasetArguments),
             $modifierTokens,
-            $dataset,
+            $this->singleDatasetName($datasetArguments),
             array_values(array_unique(array_filter($datasets, static fn (?string $name): bool => $name !== null))),
         ];
     }
@@ -240,6 +238,14 @@ final readonly class PestFingerprints
         return TestLevelArgumentTokens::of($method, $call, withSource: $method !== self::AFTER_METHOD);
     }
 
+    /**
+     * @param list<\PhpParser\Node\Expr> $datasetArguments
+     */
+    private function singleDatasetName(array $datasetArguments): ?string
+    {
+        return count($datasetArguments) === 1 ? $this->datasetName($datasetArguments[0]) : null;
+    }
+
     private function datasetName(?Node $dataset): ?string
     {
         return $dataset instanceof String_ ? $dataset->value : null;
@@ -254,6 +260,17 @@ final readonly class PestFingerprints
             fn (Node $argument): ?string => $argument instanceof Arg ? $this->datasetName($argument->value) : null,
             array_values($call->args),
         );
+    }
+
+    /**
+     * @return list<\PhpParser\Node\Expr>
+     */
+    private function arguments(MethodCall $call): array
+    {
+        return array_values(array_map(
+            static fn (Arg $argument): Expr => $argument->value,
+            array_filter($call->args, static fn (Node $argument): bool => $argument instanceof Arg),
+        ));
     }
 
     /**

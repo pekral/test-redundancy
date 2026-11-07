@@ -38,6 +38,11 @@ final class TestKey
         return $dataset === $testCase ? null : $dataset;
     }
 
+    public static function datasetRowName(string $label): string
+    {
+        return trim((string) preg_replace('/^"?dataset\s*/', '', $label), '"');
+    }
+
     public static function isDatasetRow(string $testKey): bool
     {
         return str_contains(self::testCase($testKey), self::DATASET_SEPARATOR);

@@ -185,7 +185,7 @@ final readonly class CoverageReader
             return [$method, null];
         }
 
-        return [$matches[1], trim((string) preg_replace('/^"?dataset\s*/', '', $matches[2]), '"')];
+        return [$matches[1], TestKey::datasetRowName($matches[2])];
     }
 
 }

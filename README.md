@@ -917,6 +917,11 @@ test lacks.
   `fn (string $email): string => rawurlencode($email)`, therefore differ in `differsBy`, and the row is not `delete`.
   Two closures that differ only in whitespace or line breaks have the same token. A closure inside an array argument,
   such as `['map' => fn ($x) => $x]`, carries only the tokens of its body.
+  A test that combines several datasets, through several arguments of one `->with()` or through chained `->with()`
+  calls, gets one row for each combination, as Pest runs it: the values of the rows follow one another in the order of
+  the datasets, and the row name is the one Pest reports, such as `plain" / dataset "slash` for the rows `'plain'` and
+  `'slash'`, or `('ab') / dataset "slash` for a row without a key. When a row of one dataset cannot be named, its
+  combinations stay unresolved.
 - **Local variables.** A literal, constant, empty array, list or map (as defined for dataset rows) that the test
   assigns once to a local variable in its own statements is counted where the test reads the variable:
   `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,

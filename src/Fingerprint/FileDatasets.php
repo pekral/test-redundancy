@@ -64,6 +64,15 @@ final readonly class FileDatasets
     }
 
     /**
+     * @param list<\PhpParser\Node\Expr> $datasets
+     * @return array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null>
+     */
+    public function combinedRows(array $datasets): array
+    {
+        return count($datasets) > 1 ? DatasetCombination::rows(array_map($this->rows(...), $datasets)) : $this->rows($datasets[0] ?? null);
+    }
+
+    /**
      * @return array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null>
      */
     public function rows(?Node $dataset): array

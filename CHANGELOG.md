@@ -35,6 +35,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   styled text: a backslash before `<` lost one backslash, so `json_decode()` failed on the invalid escape `\<`, and a
   formatter tag such as `<info>…</info>` inside a value was removed. A test named
   `it normalizes App\Models\<x> <info>y</info>` produced such output.
+- A Pest test that combines several datasets, through several arguments of one `->with()` call or through chained
+  `->with()` calls, gets a computed `differsBy` (#183). The analysis read only one dataset, so the combined row names
+  Pest reports, such as `plain" / dataset "slash`, never matched, and every candidate of such a test had
+  `differsBy: null` and the step that the dataset row could not be resolved. Each combination now has the values of its
+  rows in the order of the datasets and the row name Pest reports. A combination with a row the analysis cannot name
+  stays unresolved, as before.
 
 ## [0.2.1] - 2026-11-07
 
