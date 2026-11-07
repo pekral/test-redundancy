@@ -26,10 +26,11 @@ final class DatasetCombination
 
         foreach ($datasets as $rows) {
             $next = [];
+            $rowLabels = self::uniqueLabels($rows);
 
             foreach ($combinations as [$labels, $items]) {
-                foreach ($rows as $row) {
-                    $next[] = [[...$labels, self::label($row)], [...$items, ...self::items($row)]];
+                foreach (array_values($rows) as $position => $row) {
+                    $next[] = [[...$labels, $rowLabels[$position]], [...$items, ...self::items($row)]];
                 }
             }
 
@@ -49,6 +50,18 @@ final class DatasetCombination
         return in_array(needle: null, haystack: $labels, strict: true)
             ? null
             : new ArrayItem(new Array_($items), new String_(TestKey::datasetRowName(implode(self::SEPARATOR, $labels))));
+    }
+
+    /**
+     * @param array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null> $rows
+     * @return list<string|null>
+     */
+    private static function uniqueLabels(array $rows): array
+    {
+        $labels = array_map(self::label(...), array_values($rows));
+        $counts = array_count_values(array_filter($labels, is_string(...)));
+
+        return array_map(static fn (?string $label): ?string => $label !== null && $counts[$label] === 1 ? $label : null, $labels);
     }
 
     private static function label(null|ArrayItem|Yield_ $row): ?string

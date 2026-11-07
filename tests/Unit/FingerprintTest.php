@@ -1779,3 +1779,25 @@ it('orders the casts in a list by their source, like other composite elements', 
     'float cast printed as the type its cast token names' => ['store([(float) $a, (int) $b]);', 'in:function:store#0/items:(float) $a>(int) $b'],
     'object and integer casts' => ['store([(object) [\'a\' => 1], (int) $id]);', 'in:function:store#0/items:(object) [\'a\' => 1]>(int) $id'],
 ]);
+
+it('names a row whose name repeats in its dataset the way Pest numbers it (#180)', function (): void {
+    $fingerprints = fingerprintsOf(
+        "<?php\nit('checks', function (string \$value): void {\n    expect(check(\$value))->toBeTrue();\n})->with(['a', 'a', 'b', 'a']);\n",
+    );
+
+    expect(array_keys($fingerprints))->toBe([
+        'it checks › (\'a\') #1',
+        'it checks › (\'a\') #2',
+        'it checks › (\'b\')',
+        'it checks › (\'a\') #3',
+    ]);
+});
+
+it('leaves a combined row unresolved when its row name repeats in its dataset (#180)', function (): void {
+    $fingerprints = fingerprintsOf(
+        "<?php\nit('checks', function (string \$value, int \$limit): void {\n    expect(check(\$value, \$limit))->toBeTrue();\n})"
+            . "->with(['a', 'a', 'b'])->with(['one' => [1]]);\n",
+    );
+
+    expect(array_keys($fingerprints))->toBe(['it checks › (\'b\') / dataset "one']);
+});
