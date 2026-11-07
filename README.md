@@ -3,14 +3,32 @@
 Fewer tests, the same coverage
 <br>
 <a href="LICENSE"><img alt="MIT Licensed" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square"></a>
+<img alt="PHP ^8.4" src="https://img.shields.io/badge/php-%5E8.4-777bb4.svg?style=flat-square">
 <img alt="Checks" src="https://github.com/pekral/test-redundancy/workflows/Checks/badge.svg">
 <br clear="left">
 </h1>
 
-`test-redundancy` finds the test cases in a **PHPUnit** or **Pest** suite whose covered lines other test cases
-already cover, and tells you — or an AI agent — what each of them asserts beyond those tests. Point it at a test folder
-or file. It runs the tests once with per-test coverage and returns a JSON list of candidates to delete, merge into a
-dataset, or review, so the suite keeps 100% coverage with fewer and simpler tests.
+**`test-redundancy` finds the redundant tests in a PHPUnit or Pest suite — and tells you what each of them still
+asserts, so you keep 100% coverage with fewer and simpler tests.**
+
+Point it at a test folder or file. It runs the tests once with per-test coverage and lists every test case whose
+covered lines other test cases already cover. For each one it says what to do — delete it, merge it into a dataset, or
+review it — and what it asserts beyond the tests that cover it. The JSON output is built for AI agents; `--format=text`
+is built for people.
+
+- 🔍 **Finds candidates** — test cases whose covered lines other test cases already cover, every dataset row separately.
+- 🧬 **Compares contracts, not only lines** — `differsBy` lists the literals, calls and keys a candidate has and its covering test lacks.
+- 🧭 **Says what to do** — every candidate has an `action` and numbered `steps`.
+- ✅ **Proves nothing was lost** — `verify` fails when a source line the last analysis covered is no longer covered.
+- ⚡ **Runs in parallel** — the test files are split into balanced groups by their measured durations.
+
+## Contents
+
+- [Requirements](#requirements) · [Installation](#installation) · [Quick start](#quick-start)
+- [Usage](#usage) · [Configuration](#configuration)
+- [Reading the report](#reading-the-report) · [Verifying that coverage stayed](#verifying-that-coverage-stayed) · [Comparing across files](#comparing-across-files)
+- [Reference: when a candidate is `review`](#when-a-candidate-is-review-not-delete) · [Reference: how `differsBy` names a difference](#how-differsby-names-a-difference)
+- [How it works](#how-it-works) · [Development](#development)
 
 ---
 
@@ -23,17 +41,101 @@ dataset, or review, so the suite keeps 100% coverage with fewer and simpler test
 | Coverage driver | `pcov` (the tool limits `pcov.directory` to the `source` directories) or `xdebug` |
 | Test runner | `vendor/bin/pest` or `vendor/bin/phpunit` |
 
-Contributing to this repository needs PHP 8.4+ with `pcov`.
-
----
-
 ## Installation
 
 ```bash
 composer require --dev pekral/test-redundancy
 ```
 
+The tool keeps its local state (the coverage map, the baseline, the file durations and the runner cache) in
+`.test-redundancy/`. Add it to `.gitignore`:
+
+```bash
+echo ".test-redundancy/" >> .gitignore
+```
+
+## Quick start
+
+1. **Analyse** a test folder and read the report:
+
+   ```bash
+   vendor/bin/test-redundancy tests/Unit/Billing --format=text
+   ```
+
+2. **Act** on each candidate. Follow its `steps` — see [How to read a candidate](#how-to-read-a-candidate).
+
+3. **Verify** that every source line the analysed tests covered is still covered:
+
+   ```bash
+   vendor/bin/test-redundancy verify
+   ```
+
+   `verify` exits with `1` and lists the lost lines when a change dropped coverage.
+
 ---
+
+## Usage
+
+```bash
+# A test folder or a single test file
+vendor/bin/test-redundancy tests/Unit/Billing
+vendor/bin/test-redundancy tests/Unit/Billing/InvoiceTest.php
+
+# No path: the test files the branch changes against origin/HEAD, or against --base
+vendor/bin/test-redundancy
+vendor/bin/test-redundancy --base=master
+
+# A report for people instead of JSON
+vendor/bin/test-redundancy tests/Unit --format=text
+
+# More or fewer parallel processes than the configuration says
+vendor/bin/test-redundancy tests/Unit --processes=8
+
+# After changing the tests: fail when a source line the last analyse covered is no longer covered
+vendor/bin/test-redundancy verify
+```
+
+| Command | What it does |
+| --- | --- |
+| `analyse` (default) | Lists the tests whose covered lines other tests already cover, as candidates to review. |
+| `verify` | Fails when a source line the last `analyse` run covered is no longer covered. |
+| `map` | Builds the per-test coverage map that `analyse --across` compares with. |
+
+| Option | Commands | Meaning |
+| --- | --- | --- |
+| `--format=json\|text` | `analyse` | `json` (default, for AI agents) or `text` (for people). |
+| `--pretty` | `analyse`, `verify` | Indents the JSON, which is compact by default. |
+| `--processes=N` | all | Parallel processes; overrides `processes` in the configuration. |
+| `--base=<ref>` | `analyse` | Git ref for the changed test files when no path is given; default `origin/HEAD`. |
+| `--across` | `analyse` | Compares with every test in the coverage map — see [Comparing across files](#comparing-across-files). |
+
+`vendor/bin/test-redundancy analyse --help` lists every option.
+
+> [!WARNING]
+> The tests always run in parallel, on the test tokens 1…`processes`. Never start the tool next to another run of the
+> same suite.
+
+<details>
+<summary><b>How the tool runs your tests</b></summary>
+
+A folder is expanded to its test files first. The files of every run, whether you name a folder, one file or
+several paths, are split into up to `processes` groups that run concurrently, each with its own `TEST_TOKEN`. Each group
+is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
+`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing, and a
+`*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method or a
+trait, and runs no other statement, is left out of the run. A file whose classes have a parent class is left out only
+when none of them extends `PHPUnit\Framework\TestCase`: a child process loads the file through the runner's
+`vendor/autoload.php` to find that out, and a file that cannot be loaded stays in the run.
+Every run stores the time of each test file from its JUnit log in
+`.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
+group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
+stored time the files are split round-robin. The split changes how long the run takes. For tests that share no state
+inside one process it never changes the report or the baseline; a test whose coverage depends on what an earlier test
+file in the same group already ran, such as a static cache, can cover other lines in another group.
+Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
+between runs. `vendor/bin/test-redundancy analyse --help` lists every option.
+
+</details>
 
 ## Configuration
 
@@ -62,46 +164,24 @@ when it exists, otherwise `vendor/bin/phpunit`. To change that, add `test-redund
 
 ---
 
-## Usage
+## Reading the report
 
-```bash
-# A test folder or a single test file
-vendor/bin/test-redundancy tests/Unit/Billing
-vendor/bin/test-redundancy tests/Unit/Billing/InvoiceTest.php
+### How to read a candidate
 
-# No path: the test files the branch changes against origin/HEAD, or against --base
-vendor/bin/test-redundancy
-vendor/bin/test-redundancy --base=master
+A candidate runs no line the other tests do not run. Coverage cannot see what a test asserts, so a candidate is not
+proof that a test is useless. The `action` of each candidate says how to judge it:
 
-# A report for people instead of JSON
-vendor/bin/test-redundancy tests/Unit --format=text
+| `action` | Meaning | What to do |
+| --- | --- | --- |
+| `delete` | The candidate adds nothing new. | Delete it when a test under `coveredBy` asserts the same input and the same result. |
+| `merge-into-dataset` | It differs only in data from one test of the same file. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. |
+| `review-dataset-row` | A row of the same dataset runs the same lines. | Compare it with the sibling row. Delete it when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input. |
+| `review` | It asserts something the covering tests do not, differs in more than data, is a row of a named dataset another test uses, or could not be parsed. | Judge it yourself. When in doubt, keep it. |
 
-# More or fewer parallel processes than the configuration says
-vendor/bin/test-redundancy tests/Unit --processes=8
+Keep a test that asserts a different result, a different input class (empty, boundary, another tenant, invalid), an
+ordering, or a rejection.
 
-# After changing the tests: fail when a source line the last analyse covered is no longer covered
-vendor/bin/test-redundancy verify
-```
-
-The JSON is compact; `--pretty` indents it.
-
-The tests always run in parallel, on the test tokens 1…`processes`, so never start the tool next to another run of the
-same suite. A folder is expanded to its test files first. The files of every run, whether you name a folder, one file or
-several paths, are split into up to `processes` groups that run concurrently, each with its own `TEST_TOKEN`. Each group
-is one non-parallel `pest` or `phpunit` process with the coverage settings passed through `-d` options and the project's
-`phpunit.xml` or `phpunit.xml.dist` passed through `--configuration`. A folder without test files runs nothing, and a
-`*Test.php` file that only declares an enum, an interface, a trait, a function or a class without a test method or a
-trait, and runs no other statement, is left out of the run. A file whose classes have a parent class is left out only
-when none of them extends `PHPUnit\Framework\TestCase`: a child process loads the file through the runner's
-`vendor/autoload.php` to find that out, and a file that cannot be loaded stays in the run.
-Every run stores the time of each test file from its JUnit log in
-`.test-redundancy/durations.json` (next to the map). The next run puts the longest file first and every file into the
-group with the smallest total, so no group collects the slowest files; a file without a stored time goes first. Without any
-stored time the files are split round-robin. The split changes how long the run takes. For tests that share no state
-inside one process it never changes the report or the baseline; a test whose coverage depends on what an earlier test
-file in the same group already ran, such as a static cache, can cover other lines in another group.
-Every run passes `--cache-directory=.test-redundancy/cache`, so the coverage analysis cache survives
-between runs. `vendor/bin/test-redundancy analyse --help` lists every option.
+The candidates of one file can be removed together without losing a covered line. Re-run the tool after each change.
 
 ### The JSON report
 
@@ -179,7 +259,84 @@ of every worker group that finished are stored for the next run.
 to include them. A process that ends without a coverage file or a JUnit log, such as a fatal error or a timeout, still
 aborts the run. `map` and `verify` still abort when a test case fails.
 
+### Test files with a single test case
+
+Without `--across`, `analyse` compares a test case only with the other test cases of the same file, so a file with one
+test case can never hold a candidate. `analyse` therefore does not run such a file. It counts the test cases of each
+file before the coverage run with the same `nikic/php-parser` fingerprints as the rest of the report, and skips a file
+only when all of these hold:
+
+- The file declares exactly one Pest `it()` / `test()` or one PHPUnit test method.
+- No dataset reaches it: no `->with()`, no `->repeat()`, no `#[DataProvider]`, `#[DataProviderExternal]`, `#[TestWith]`,
+  `@dataProvider` or `@testWith`. A named or shared dataset, a dataset the parser cannot resolve, and a `describe()`
+  block with a dataset all keep the file in the run, because the number of runs is known only at run time.
+- The parser resolves every `it()` / `test()` call. A test that a loop generates, a test with a description that is not a
+  string literal, two tests with the same description, and a file that does not parse keep the file in the run.
+
+A skipped file stays in the report: it counts in `summary.testFiles` and `summary.testCases` as one test case, it is
+counted in `summary.skippedFiles`, and it has no candidate, no `coveredLines` and no `testsWithoutSourceLines`, because
+it did not run. The candidates of every other file are the same as when the file runs. `--across` and `map` run every
+file, because there a single test case is compared with the test cases of other files.
+
+## Verifying that coverage stayed
+
+`analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). Add
+`.test-redundancy/` to `.gitignore`; the map, the baseline, the file durations and the runner cache are local state. After
+the tests change, `verify` runs the same test files again and compares:
+
+```json
+{"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy","unstableLines":[]}
+```
+
+A test file that `analyse` skipped stays in the baseline without lines, so `verify` runs it and reports its deletion in
+`missingTestFiles`. `verify` cannot know the lines that only a deleted skipped file covered, because `analyse` never ran it.
+
+
+It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
+mapped test file still covers does not count as lost.
+
+<details>
+<summary><b>Lost lines vs. unstable lines</b></summary>
+
+`analyse` also stores a hash of every analysed test file, of every covered source file and of the test support files.
+The support files are the other files, not named `*Test.php`, in the top-level directory of a test file, such as
+`tests/`: Pest datasets, `tests/Pest.php`, base test cases, traits and fixtures. When a line is no longer covered, none
+of the test files that covered it changed, its source file did not change and no support file changed, `verify` lists it
+in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such
+a test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
+also covered, a line of a source file that changed since `analyse`, and every lost line after a support file was
+changed, added or deleted stay in `lostLines`, and `verify` exits with `1`. When a changed support file is the reason and no
+baseline test file is missing, the `instruction` tells the agent to check that file or to run `analyse` again, not to
+restore a test. When a baseline test file is missing too, the `instruction` still tells the agent to restore the test and
+adds that a changed support file may also be the reason. A baseline written before source file hashes
+or support file hashes existed reports every lost line in `lostLines`; run `analyse` again to restore the distinction.
+
+</details>
+
+## Comparing across files
+
+```bash
+# Per-test coverage of the given tests (default: tests)
+vendor/bin/test-redundancy map tests
+
+# Compare a folder or a file with every mapped test
+vendor/bin/test-redundancy tests/Unit/Billing --across
+```
+
+`--across` reads unchanged test files from the map and re-runs only the changed ones. It warns when source files changed
+since the map was built. Of two tests that cover each other, it proposes at most one.
+
+---
+
+## Reference
+
+These two sections define exactly when the tool proposes `delete` or `merge-into-dataset`, and how it names a
+difference. Read them when a verdict surprises you.
+
 ### When a candidate is `review`, not `delete`
+
+<details>
+<summary><b>Show the rules for <code>delete</code> and <code>merge-into-dataset</code></b></summary>
 
 `delete` needs an empty `differsBy` and every one of these conditions. The tool checks them in this order: while
 `unionOnlyLines` is not empty, `coveringDiffersBy` stays empty and the steps name only the lines and the covering tests.
@@ -330,10 +487,15 @@ modifiers, the closure carries no `source:` token, because its tokens already de
 and a failure in it fails the test. A test whose only expectation is in its `->after()` closure therefore does not get
 the step that says the test asserts nothing.
 
+</details>
+
 ### How `differsBy` names a difference
 
 `differsBy` lists the literals, constants, functions, calls and `new` expressions the candidate has and the covering
 test lacks.
+
+<details>
+<summary><b>Show every token rule</b></summary>
 
 - **One covering test, not a union.** With several covering tests, `differsBy` is the smallest difference against one
   of them.
@@ -726,78 +888,7 @@ test lacks.
   does not pass it on, such as `$user->email`, or whose first read is in a loop body keeps the tokens of the call
   without a path.
 
-### Test files with a single test case
-
-Without `--across`, `analyse` compares a test case only with the other test cases of the same file, so a file with one
-test case can never hold a candidate. `analyse` therefore does not run such a file. It counts the test cases of each
-file before the coverage run with the same `nikic/php-parser` fingerprints as the rest of the report, and skips a file
-only when all of these hold:
-
-- The file declares exactly one Pest `it()` / `test()` or one PHPUnit test method.
-- No dataset reaches it: no `->with()`, no `->repeat()`, no `#[DataProvider]`, `#[DataProviderExternal]`, `#[TestWith]`,
-  `@dataProvider` or `@testWith`. A named or shared dataset, a dataset the parser cannot resolve, and a `describe()`
-  block with a dataset all keep the file in the run, because the number of runs is known only at run time.
-- The parser resolves every `it()` / `test()` call. A test that a loop generates, a test with a description that is not a
-  string literal, two tests with the same description, and a file that does not parse keep the file in the run.
-
-A skipped file stays in the report: it counts in `summary.testFiles` and `summary.testCases` as one test case, it is
-counted in `summary.skippedFiles`, and it has no candidate, no `coveredLines` and no `testsWithoutSourceLines`, because
-it did not run. The candidates of every other file are the same as when the file runs. `--across` and `map` run every
-file, because there a single test case is compared with the test cases of other files.
-
-### Verifying that coverage stayed
-
-`analyse` stores the source lines the analysed tests cover in `.test-redundancy/baseline.json` (next to the map). Add
-`.test-redundancy/` to `.gitignore`; the map, the baseline, the file durations and the runner cache are local state. After
-the tests change, `verify` runs the same test files again and compares:
-
-```json
-{"baselineLines":4,"instruction":"Every source line the analysed tests covered before is still covered.","lostLines":[],"missingTestFiles":[],"ok":true,"tool":"pekral/test-redundancy","unstableLines":[]}
-```
-
-A test file that `analyse` skipped stays in the baseline without lines, so `verify` runs it and reports its deletion in
-`missingTestFiles`. `verify` cannot know the lines that only a deleted skipped file covered, because `analyse` never ran it.
-
-It exits with `1` and lists every line in `lostLines` when a change dropped coverage. After `--across`, a line another
-mapped test file still covers does not count as lost.
-
-`analyse` also stores a hash of every analysed test file, of every covered source file and of the test support files.
-The support files are the other files, not named `*Test.php`, in the top-level directory of a test file, such as
-`tests/`: Pest datasets, `tests/Pest.php`, base test cases, traits and fixtures. When a line is no longer covered, none
-of the test files that covered it changed, its source file did not change and no support file changed, `verify` lists it
-in `unstableLines` instead of `lostLines`, exits with `0` and tells the agent not to restore a test. The coverage of such
-a test depends on state outside the test run, such as a cache or a database. A line that a changed or deleted test file
-also covered, a line of a source file that changed since `analyse`, and every lost line after a support file was
-changed, added or deleted stay in `lostLines`, and `verify` exits with `1`. When a changed support file is the reason and no
-baseline test file is missing, the `instruction` tells the agent to check that file or to run `analyse` again, not to
-restore a test. When a baseline test file is missing too, the `instruction` still tells the agent to restore the test and
-adds that a changed support file may also be the reason. A baseline written before source file hashes
-or support file hashes existed reports every lost line in `lostLines`; run `analyse` again to restore the distinction.
-
-### How to read a candidate
-
-A candidate runs no line the other tests do not run. Coverage cannot see what a test asserts, so a candidate is not
-proof that a test is useless:
-
-1. **Delete** it only when a test under `coveredBy` asserts the same input and the same result.
-2. **Merge it into a dataset** when the two differ only in data.
-3. **Keep** a test that asserts a different result, a different input class (empty, boundary, another tenant,
-   invalid), an ordering, or a rejection. When in doubt, keep it.
-
-The candidates of one file can be removed together without losing a covered line. Re-run the tool after each change.
-
-### Comparing across files
-
-```bash
-# Per-test coverage of the given tests (default: tests)
-vendor/bin/test-redundancy map tests
-
-# Compare a folder or a file with every mapped test
-vendor/bin/test-redundancy tests/Unit/Billing --across
-```
-
-`--across` reads unchanged test files from the map and re-runs only the changed ones. It warns when source files changed
-since the map was built. Of two tests that cover each other, it proposes at most one.
+</details>
 
 ---
 
@@ -814,7 +905,9 @@ since the map was built. Of two tests that cover each other, it proposes at most
 
 ---
 
-## Testing
+## Development
+
+Contributing to this repository needs PHP 8.4+ with `pcov`.
 
 ```bash
 composer install
@@ -841,18 +934,9 @@ Monday, and Dependabot proposes Composer and GitHub Actions updates weekly.
 
 ---
 
-## Changelog
+## Changelog · Contributing · Security · License
 
-See [CHANGELOG](CHANGELOG.md).
-
-## Contributing
-
-See [CONTRIBUTING](CONTRIBUTING.md).
-
-## Security
-
-See [the security policy](SECURITY.md).
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+- [CHANGELOG](CHANGELOG.md)
+- [CONTRIBUTING](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- MIT — see [LICENSE](LICENSE)
