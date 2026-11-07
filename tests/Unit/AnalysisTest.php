@@ -6845,3 +6845,52 @@ it('reviews, and does not delete, a test whose covering test passes more keys to
         ->and($report->candidates[0]->action())->toBe(Action::Review)
         ->and($report->candidates[0]->steps()[0])->toStartWith('The covering test "it rejects a stored segment › other segment type" expects');
 });
+
+it(
+    'computes differsBy for a row of a test that combines several datasets (#183)',
+    function (string $with, string $row, string $coveringRow, array $differsBy): void {
+        $report = analyzeTokenTest(
+            source: "<?php\nit('a', function (string \$code, string \$separator): void {\n"
+            . "    expect(normalize(\$code, \$separator))->toBeString();\n}){$with};\n",
+            linesByTest: [
+                "it a › {$row}" => ['src/Normalizer.php:5'],
+                "it a › {$coveringRow}" => ['src/Normalizer.php:5', 'src/Normalizer.php:6'],
+            ],
+        );
+    
+        expect($report->candidates)->toHaveCount(1)
+            ->and($report->candidates[0]->testCase())->toBe("it a › {$row}")
+            ->and($report->candidates[0]->differsBy)->toBe($differsBy);
+    },
+)->with([
+    'chained with() calls' => [
+        '->with([\'plain\' => [\'ab\']])->with([\'slash\' => [\'/\'], \'space\' => [\' \']])',
+        'plain" / dataset "space',
+        'plain" / dataset "slash',
+        ['in:function:normalize#1/value:\' \''],
+    ],
+    'rows without a key' => [
+        '->with([\'ab\', \'cd\'])->with([\'slash\' => [\'/\']])',
+        '(\'cd\') / dataset "slash',
+        '(\'ab\') / dataset "slash',
+        ['in:function:normalize#0/value:\'cd\''],
+    ],
+    'several datasets in one with() call' => [
+        '->with([\'plain\' => [\'ab\'], \'other\' => [\'cd\']], [\'slash\' => [\'/\']])',
+        'plain" / dataset "slash',
+        'other" / dataset "slash',
+        ['in:function:normalize#0/value:\'ab\''],
+    ],
+]);
+
+it('leaves a combined row unresolved when a row of one dataset cannot be named (#183)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (mixed \$value, string \$separator): void {\n    expect(normalize(\$value, \$separator))->toBeString();\n})"
+            . "->with([new Code()])->with(['slash' => ['/']]);\nit('b', function (): void {\n    expect(normalize('ab', '/'))->toBeString();\n});\n",
+        linesByTest: ['it b' => ['src/Normalizer.php:5'], 'it a › (Code) / dataset "slash' => ['src/Normalizer.php:5', 'src/Normalizer.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBeNull()
+        ->and($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
+});
