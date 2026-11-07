@@ -136,7 +136,7 @@ it('reports a file without candidates as covering a line no other test case cove
     expect($output->fetch())->toContain('Every test case covers a line no other test case covers.');
 });
 
-it('prints the covering-side tokens that made the action review in the text report', function (): void {
+it('prints the covering-side tokens of a review and the covering row values of a merge in the text report (#190)', function (): void {
     $output = new BufferedOutput();
     $candidates = [
         new Candidate('tests/FooTest.php :: it stores', ['it forgets'], ['value:1'], ['value:2', 'call:forget'], [], assertsNothing: false),
@@ -147,8 +147,11 @@ it('prints the covering-side tokens that made the action review in the text repo
 
     $display = $output->fetch();
 
-    expect($display)->toContain("differs by: value:1\n    covering differs by: call:forget")
-        ->and(substr_count($display, 'covering differs by'))->toBe(1);
+    expect($display)->toContain("it stores\n    action: review")
+        ->toContain("differs by: value:1\n    covering differs by: call:forget")
+        ->toContain("it adds\n    action: merge-into-dataset")
+        ->toContain("differs by: value:1\n    covering differs by: value:2")
+        ->and(substr_count($display, 'covering differs by'))->toBe(2);
 });
 
 it('prints the lines only the union of the covering tests reaches in the text report', function (): void {
