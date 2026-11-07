@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-07
+
 ### Fixed
 
 - A dataset key that is an enum case value or a class constant of a class declared in another file of the project,
@@ -937,7 +939,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/pekral/test-redundancy/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/pekral/test-redundancy/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/pekral/test-redundancy/compare/0.1.10...0.2.0
 [0.1.10]: https://github.com/pekral/test-redundancy/compare/0.1.9...0.1.10
