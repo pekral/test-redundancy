@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The text report prints for a `merge-into-dataset` candidate the covering row values that the JSON field
+  `coveringDiffersBy` lists, such as `covering differs by: value:2` (#190). Before, the line came from the tokens that
+  make a candidate `review`, so it was missing for every merge candidate. Every other action prints the same line as
+  before.
 - An item of a list under an array key now carries the call path of the array, followed by the key and a `list`
   segment, such as `in:expect:function:build/call:toBe#0/value:'items'/list/value:'x'` for
   `expect(build())->toBe(['items' => ['x']])` (#191). Before, such an item had only the key path,

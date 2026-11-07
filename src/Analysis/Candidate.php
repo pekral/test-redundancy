@@ -60,7 +60,9 @@ final readonly class Candidate implements JsonSerializable
     {
         return match (true) {
             $this->differsBy === null => Action::Review,
-            $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->deleteOrReviewSharedRow(),
+            $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->sharedDataset instanceof SharedDataset
+                ? Action::Review
+                : Action::Delete,
             $this->differsBy === [] => Action::Review,
             $this->differsOnlyInDataFromOneTestOfTheSameFile()
                 && $this->coveringTokensForReview() === []
@@ -82,10 +84,7 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
                 $this->coveringTokens(),
-                fn (string $token): bool => (!TokenKind::isData($token) && !NonLiteralArguments::isToken($token))
-                    || (TokenKind::isInputKey($token) && !$this->isInValueDiffersByLists($token))
-                    || $this->isInArgumentPositionOnlyTheCoveringTestFills(NonLiteralArguments::argumentPositionOf($token))
-                    || $this->isExpectationOnlyTheCoveringTestHas($token),
+                new CoveringSlots($this->differsBy ?? [], $this->coveringDatasetParameters)->isFilledOnlyByTheCoveringTest(...),
             )),
             $this->differsBy !== [] => $this->coveringExpectedExceptions(),
             default => [],
@@ -110,7 +109,7 @@ final readonly class Candidate implements JsonSerializable
         return [
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
-            'coveringDiffersBy' => $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens()),
+            'coveringDiffersBy' => $this->coveringDiffersBy(),
             'coveringOnly' => $this->coveringOnly(),
             'differsBy' => $this->differsBy,
             'seconds' => $this->seconds === null ? null : round($this->seconds, 3),
@@ -128,6 +127,14 @@ final readonly class Candidate implements JsonSerializable
         return $this->action() === Action::Keep
             ? Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack)
             : $this->stepsToDecide();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function coveringDiffersBy(): array
+    {
+        return $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens());
     }
 
     /**
@@ -185,11 +192,6 @@ final readonly class Candidate implements JsonSerializable
         return !$this->sharedDataset instanceof SharedDataset ? [] : [
             sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, Action::quoted($this->sharedDataset->otherTests)),
         ];
-    }
-
-    private function deleteOrReviewSharedRow(): Action
-    {
-        return !$this->sharedDataset instanceof SharedDataset ? Action::Delete : Action::Review;
     }
 
     /**
@@ -312,37 +314,6 @@ final readonly class Candidate implements JsonSerializable
     private function coveringTokens(): array
     {
         return array_map(TokenCollector::withoutRead(...), $this->coveringDifference ?? []);
-    }
-
-    private function isInValueDiffersByLists(string $key): bool
-    {
-        return array_any(
-            $this->differsBy ?? [],
-            static fn (string $token): bool => preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token, $matches) === 1
-                && $matches[1] !== ''
-                && $matches[2] === ''
-                && str_starts_with($key, $matches[1]),
-        );
-    }
-
-    private function isInArgumentPositionOnlyTheCoveringTestFills(?string $position): bool
-    {
-        return $position !== null && !NonLiteralArguments::isPositionFilledBy($position, $this->differsBy ?? []);
-    }
-
-    private function isListOnlyTheCoveringTestExpects(string $token): bool
-    {
-        return str_ends_with($token, TokenCollector::LIST_ITEM)
-            && !in_array(substr($token, 0, -strlen(TokenCollector::LIST_ITEM)) . 'value:[]', $this->differsBy ?? [], strict: true);
-    }
-
-    private function isExpectationOnlyTheCoveringTestHas(string $token): bool
-    {
-        return TokenKind::isExpectation($token)
-            && $this->coveringDatasetParameters?->takes($token) !== true
-            && ($this->isListOnlyTheCoveringTestExpects($token)
-                || (TokenKind::isKey($token) && !$this->isInValueDiffersByLists($token))
-                || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: true)));
     }
 
     private function differsOnlyInDataFromOneTestOfTheSameFile(): bool

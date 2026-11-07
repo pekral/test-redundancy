@@ -120,7 +120,7 @@ final readonly class ReportPrinter
 
     private function describe(Candidate $candidate): string
     {
-        $coveringTokens = $candidate->coveringTokensForReview();
+        $coveringTokens = $candidate->coveringDiffersBy();
 
         return OutputFormatter::escape(sprintf(
             "%s\n    action: %s%s\n    covered by:\n      - %s\n    differs by: %s%s%s%s",
