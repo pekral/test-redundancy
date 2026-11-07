@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use Pekral\TestRedundancy\Coverage\CoverageMap;
+use Pekral\TestRedundancy\Coverage\CoverageResult;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
 use Pekral\TestRedundancy\Support\TestKey;
 
@@ -17,11 +18,11 @@ final readonly class RedundancyAnalyzer
 
     /**
      * @param array<string, array<string, array<string, true>>> $testsByFile
-     * @param array<string, string> $failedTests
      * @return list<\Pekral\TestRedundancy\Analysis\FileReport>
      */
-    public function analyze(array $testsByFile, ?CoverageMap $map, array $failedTests = []): array
+    public function analyze(array $testsByFile, ?CoverageMap $map, ?CoverageResult $run = null): array
     {
+        $run ??= CoverageResult::empty();
         $analyzedTests = array_filter(array_merge([], ...array_values($testsByFile)), static fn (array $lines): bool => $lines !== []);
         $fixedTests = $this->fixedTests($analyzedTests, $testsByFile, $map);
         $eliminated = $this->eliminate($analyzedTests, $fixedTests);
@@ -47,10 +48,11 @@ final readonly class RedundancyAnalyzer
                             $coverings[$testKey],
                             $this->coverPool($testKey, $analyzedTests, $removed, $pool),
                         ),
+                    $run->seconds[$testKey] ?? null,
                 );
             }
 
-            $reports[] = $this->fileReport($testFile, $tests, $candidates, $failedTests);
+            $reports[] = $this->fileReport($testFile, $tests, $candidates, $run);
         }
 
         return $reports;
@@ -80,7 +82,7 @@ final readonly class RedundancyAnalyzer
      * @param list<string> $coveredBy
      * @param list<string> $unionOnlyLines
      */
-    private function candidate(string $testKey, string $file, array $coveredBy, array $unionOnlyLines): Candidate
+    private function candidate(string $testKey, string $file, array $coveredBy, array $unionOnlyLines, ?float $seconds): Candidate
     {
         return new Candidate(
             $testKey,
@@ -94,6 +96,8 @@ final readonly class RedundancyAnalyzer
             $this->fingerprints->omittedArguments($testKey, $coveredBy),
             count($coveredBy) === 1 ? $this->fingerprints->sharedDataset($coveredBy[0]) : null,
             $this->fingerprints->hasUnresolvedDatasetRow($testKey, $coveredBy),
+            $seconds,
+            $this->fingerprints->rejectionsTheCoveringTestsLack($testKey, $coveredBy),
         );
     }
 
@@ -113,9 +117,8 @@ final readonly class RedundancyAnalyzer
     /**
      * @param array<string, array<string, true>> $tests
      * @param list<\Pekral\TestRedundancy\Analysis\Candidate> $candidates
-     * @param array<string, string> $failedTests
      */
-    private function fileReport(string $testFile, array $tests, array $candidates, array $failedTests): FileReport
+    private function fileReport(string $testFile, array $tests, array $candidates, CoverageResult $run): FileReport
     {
         return new FileReport(
             $testFile,
@@ -123,7 +126,11 @@ final readonly class RedundancyAnalyzer
             count(array_merge([], ...array_values($tests))),
             $candidates,
             array_map(TestKey::testCase(...), array_keys(array_filter($tests, static fn (array $lines): bool => $lines === []))),
-            failedTests: $this->failedTestsOf($testFile, $failedTests),
+            failedTests: $this->failedTestsOf($testFile, $run->failedTests),
+            passedOnRetry: array_values(array_map(
+                TestKey::testCase(...),
+                array_filter($run->passedOnRetry, static fn (string $testKey): bool => TestKey::file($testKey) === $testFile),
+            )),
         );
     }
 

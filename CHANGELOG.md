@@ -6,6 +6,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Every candidate has `seconds`, its time in the coverage run, and every file and the summary have `candidateSeconds`,
+  the sum over their candidates. The JSON and the text report order the files by `candidateSeconds` and the candidates
+  of a file by `seconds`, so the review starts where removing a redundant test saves the most time. `seconds` is `null`
+  for a test the run did not measure, such as a test `--across` took from the coverage map; such a candidate comes last.
+- A new action `keep` marks a candidate that asserts a rejection — an error status, a validation error or an exception —
+  when no covering test asserts any rejection. Its only step says to keep the test, because it covers the error path.
+  A candidate that differs only in data from one test of the same file stays `merge-into-dataset`. `summary.byAction`
+  counts `keep`, and the text report lists such candidates under `Tests to keep`.
+- Every candidate has `coveringOnly`. For a candidate with an empty `differsBy` it lists every token the covering tests
+  have and the candidate lacks, assertions included, so the report shows what the covering test asserts beyond the
+  candidate. It is empty for every other candidate.
+- `analyse` runs the files of failed test cases once more. A test case that passes in this retry is analysed and listed
+  in `passedOnRetry` of its file; `summary.passedOnRetry` counts them. A test case that fails again stays in
+  `failedTests`. When the retry run itself aborts, the result of the first run stays.
+
+### Changed
+
+- `RedundancyAnalyzer::analyze()` takes an optional `?CoverageResult $run` as its third parameter instead of
+  `array $failedTests`. A caller that passed failed tests passes `new CoverageResult($linesByTest, $failedTests, [], [])`.
+- `CoverageResult` takes two more required parameters, `array $seconds` and `array $passedOnRetry`;
+  `CoverageResult::empty()` returns a result without tests.
+
 ## [0.2.0] - 2026-11-04
 
 ### Changed

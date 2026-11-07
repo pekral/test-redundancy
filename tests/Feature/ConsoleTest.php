@@ -73,7 +73,7 @@ it('prints the JSON report for an agent by default', function (): void {
 
     expect($tester->getStatusCode())->toBe(0)
         ->and(valueAt($report, 'summary.candidates'))->toBe(3)
-        ->and(valueAt($report, 'files.0.candidates.0.action'))->toBe('delete');
+        ->and(array_column((array) valueAt($report, 'files.0.candidates'), 'action'))->toContain('delete');
 });
 
 it('prints a text report for people', function (): void {
@@ -574,4 +574,91 @@ it('fails to verify without a baseline', function (): void {
     expect(fn (): int => command($project, 'verify')->execute([]))->toThrow(RuntimeException::class, 'No baseline');
 
     removeDirectory($project);
+});
+
+/**
+ * @return string the project whose test fails in the first run and does what $retryBody says in the retry
+ */
+function flakyTestProject(string $retryBody): string
+{
+    $project = pestProject();
+    file_put_contents($project . '/tests/CalculatorTest.php', <<<PHP
+
+
+        it('adds one and one once the marker exists', function (): void {
+            \$marker = __DIR__ . '/../flaky-marker';
+
+            if (!is_file(\$marker)) {
+                touch(\$marker);
+                expect(1)->toBe(2);
+            }
+
+            {$retryBody}
+        });
+        PHP, FILE_APPEND);
+
+    return $project;
+}
+
+it('retries the files of failed tests once and analyses a test that passes on the retry', function (): void {
+    $tester = command(flakyTestProject('expect((new Calculator())->add(1, 1))->toBe(2);'), 'analyse');
+
+    $tester->execute(['paths' => ['tests']]);
+    $report = decodedJson($tester->getDisplay());
+    $calculator = array_values(array_filter(
+        (array) valueAt($report, 'files'),
+        static fn (mixed $file): bool => is_array($file) && $file['file'] === 'tests/CalculatorTest.php',
+    ))[0];
+
+    expect($tester->getStatusCode())->toBe(0)
+        ->and(valueAt($report, 'summary.failedTests'))->toBe(0)
+        ->and(valueAt($report, 'summary.passedOnRetry'))->toBe(1)
+        ->and(valueAt($calculator, 'passedOnRetry'))->toBe(['it adds one and one once the marker exists']);
+});
+
+it('keeps the result of the first run when the retry run itself fails', function (): void {
+    $tester = command(flakyTestProject('exit(255);'), 'analyse');
+
+    $tester->execute(['paths' => ['tests']]);
+    $report = decodedJson($tester->getDisplay());
+
+    expect($tester->getStatusCode())->toBe(1)
+        ->and(valueAt($report, 'summary.failedTests'))->toBe(1)
+        ->and(valueAt($report, 'summary.passedOnRetry'))->toBe(0);
+});
+
+it('orders the candidates by seconds and prints the keep group, the seconds and coveringOnly in the text report', function (): void {
+    $output = new BufferedOutput();
+    $candidates = [
+        new Candidate('tests/FooTest.php :: it is fast', ['it covers'], [], ['call:assertOk'], ['src/Foo.php:3'], assertsNothing: false, seconds: 0.1),
+        new Candidate('tests/FooTest.php :: it is slow', ['it covers'], [], ['call:assertOk'], ['src/Foo.php:3'], assertsNothing: false, seconds: 2.5),
+        new Candidate('tests/FooTest.php :: it is unmeasured', ['it covers'], [], [], ['src/Foo.php:3'], assertsNothing: false),
+        new Candidate(
+            'tests/FooTest.php :: it is not found',
+            ['it covers'],
+            ['call:assertNotFound'],
+            [],
+            [],
+            assertsNothing: false,
+            rejectionsTheCoveringTestsLack: ['call:assertNotFound'],
+        ),
+    ];
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([
+        new FileReport('tests/BarTest.php', 2, 2, [], [], passedOnRetry: ['it flakes']),
+        new FileReport('tests/FooTest.php', 5, 2, $candidates, []),
+    ]);
+
+    $display = $output->fetch();
+
+    expect(strpos($display, 'tests/FooTest.php'))->toBeLessThan((int) strpos($display, 'tests/BarTest.php'))
+        ->and(strpos($display, 'it is slow'))->toBeLessThan((int) strpos($display, 'it is fast'))
+        ->and(strpos($display, 'it is fast'))->toBeLessThan((int) strpos($display, 'it is unmeasured'))
+        ->and($display)->toContain("action: review\n    seconds: 2.500")
+        ->toContain('covering only: call:assertOk')
+        ->toMatch('/Candidate seconds +2\.600/')
+        ->toContain('Tests to keep (they assert a rejection no covering test asserts)')
+        ->toContain('action: keep')
+        ->toContain('Tests that failed and passed on a retry')
+        ->toContain('it flakes');
 });

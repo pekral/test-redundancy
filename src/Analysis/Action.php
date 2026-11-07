@@ -13,6 +13,7 @@ enum Action: string
     case MergeIntoDataset = 'merge-into-dataset';
     case ReviewDatasetRow = 'review-dataset-row';
     case Review = 'review';
+    case Keep = 'keep';
 
     public const string VERIFY_STEP = 'Run vendor/bin/test-redundancy verify; it must report "ok": true.';
 
@@ -93,6 +94,10 @@ enum Action: string
         . 'for example when a call throws, a record exists, or an output buffer is open; '
         . 'keep this test when it does, and delete it only when it does not.';
 
+    public const string KEEP_STEP = 'This test asserts the rejection in %2$s, such as an error status, a validation error '
+        . 'or an exception, and the covering tests %1$s assert no rejection: this test covers the error path, '
+        . 'and the covering tests cover another path through the same lines. Keep this test.';
+
     private const string REVIEW_DIFFERS_BY_STEP = 'Check whether differsBy holds an assertion the covering tests lack: '
         . 'another result, input class, ordering or rejection.';
 
@@ -106,6 +111,10 @@ enum Action: string
         ?string $coveringDataset = null,
         ?SharedDataset $coveringSharedDataset = null,
     ): array {
+        if ($this === self::Keep) {
+            return [sprintf(self::KEEP_STEP, $coveringTests, implode(', ', $coveringDiffersBy))];
+        }
+
         return [
             ...match ($this) {
                 self::Delete => [
@@ -120,18 +129,7 @@ enum Action: string
                     sprintf('Compare this row with %s.', $coveringTests),
                     'Delete the row when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input.',
                 ],
-                self::Review => $coveringDiffersBy === [] ? [
-                    self::REVIEW_DIFFERS_BY_STEP,
-                    'Delete this test only when it does not; otherwise keep it.',
-                ] : [
-                    self::REVIEW_DIFFERS_BY_STEP,
-                    sprintf(
-                        'Check whether coveringDiffersBy (%s), which the covering test has and this test lacks, '
-                            . 'changes the result the covering test asserts.',
-                        implode(', ', $coveringDiffersBy),
-                    ),
-                    'Delete this test only when neither check finds a difference; otherwise keep it.',
-                ],
+                self::Review => self::reviewSteps($coveringDiffersBy),
             },
             self::VERIFY_STEP,
         ];
@@ -169,6 +167,26 @@ enum Action: string
         return !$shared instanceof SharedDataset
             ? sprintf(self::ADD_ROW_STEP, $coveringDataset)
             : sprintf(self::ADD_SHARED_ROW_STEP, $shared->name, self::quoted($shared->otherTests), $coveringDataset);
+    }
+
+    /**
+     * @param list<string> $coveringDiffersBy
+     * @return list<string>
+     */
+    private static function reviewSteps(array $coveringDiffersBy): array
+    {
+        return $coveringDiffersBy === [] ? [
+            self::REVIEW_DIFFERS_BY_STEP,
+            'Delete this test only when it does not; otherwise keep it.',
+        ] : [
+            self::REVIEW_DIFFERS_BY_STEP,
+            sprintf(
+                'Check whether coveringDiffersBy (%s), which the covering test has and this test lacks, '
+                    . 'changes the result the covering test asserts.',
+                implode(', ', $coveringDiffersBy),
+            ),
+            'Delete this test only when neither check finds a difference; otherwise keep it.',
+        ];
     }
 
 }

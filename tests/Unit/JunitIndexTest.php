@@ -184,3 +184,24 @@ it('leaves a failed test case out of the lines and does not count it as a test w
     unlink($coverage);
     removeDirectory($root);
 });
+
+it('reports the seconds of each test case by the key of the coverage report', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests', recursive: true);
+    touch($root . '/tests/FooTest.php');
+    $index = junitIndex(<<<'XML'
+        <testsuites>
+            <testcase name="it rows with data set &quot;dataset &quot;one&quot;&quot;" file="tests/FooTest.php::it rows" class="P" time="0.5"/>
+            <testcase name="it rows with data set &quot;dataset &quot;two&quot;&quot;" file="tests/FooTest.php::it rows" class="P" time="0.25"/>
+            <testcase name="it plain" file="tests/FooTest.php::it plain" class="P" time="1"/>
+        </testsuites>
+        XML, $root);
+
+    expect(new CoverageReader(Configuration::load($root))->secondsByTest($index))->toBe([
+        'tests/FooTest.php :: it rows › one' => 0.5,
+        'tests/FooTest.php :: it rows › two' => 0.25,
+        'tests/FooTest.php :: it plain' => 1.0,
+    ]);
+
+    removeDirectory($root);
+});

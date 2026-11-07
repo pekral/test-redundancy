@@ -5,12 +5,12 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use JsonSerializable;
-use Pekral\TestRedundancy\Fingerprint\AssertionSubject;
 use Pekral\TestRedundancy\Fingerprint\DatasetParameters;
 use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
 use Pekral\TestRedundancy\Fingerprint\PestFingerprints;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 use Pekral\TestRedundancy\Fingerprint\TokenCollector;
+use Pekral\TestRedundancy\Fingerprint\TokenKind;
 use Pekral\TestRedundancy\Support\TestKey;
 
 final readonly class Candidate implements JsonSerializable
@@ -22,6 +22,7 @@ final readonly class Candidate implements JsonSerializable
      * @param list<string>|null $coveringDifference
      * @param list<string> $unionOnlyLines
      * @param list<string> $omittedByCovering
+     * @param list<string> $rejectionsTheCoveringTestsLack
      */
     public function __construct(
         public string $testKey,
@@ -35,6 +36,8 @@ final readonly class Candidate implements JsonSerializable
         public array $omittedByCovering = [],
         public ?SharedDataset $coveringSharedDataset = null,
         public bool $hasUnresolvedDatasetRow = false,
+        public ?float $seconds = null,
+        public array $rejectionsTheCoveringTestsLack = [],
     ) {
     }
 
@@ -59,12 +62,13 @@ final readonly class Candidate implements JsonSerializable
             $this->differsBy === null => Action::Review,
             $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->deleteOrReviewSharedRow(),
             $this->differsBy === [] => Action::Review,
-            $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
-            $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
             $this->differsOnlyInDataFromOneTestOfTheSameFile()
                 && $this->coveringTokensForReview() === []
                 && $this->coveringDatasetTakesDiffersBy()
                 && $this->omittedByCovering === [] => Action::MergeIntoDataset,
+            $this->rejectionsTheCoveringTestsLack !== [] => Action::Keep,
+            $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
+            $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
             default => Action::Review,
         };
     }
@@ -78,8 +82,8 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() => $this->inputOnlyTheCoveringTestPasses(),
             $this->differsOnlyInDataFromOneTestOfTheSameFile() => array_values(array_filter(
                 $this->coveringTokens(),
-                fn (string $token): bool => (!self::isData($token) && !NonLiteralArguments::isToken($token))
-                    || ($this->isInputKey($token) && !$this->isInValueDiffersByLists($token))
+                fn (string $token): bool => (!TokenKind::isData($token) && !NonLiteralArguments::isToken($token))
+                    || (TokenKind::isInputKey($token) && !$this->isInValueDiffersByLists($token))
                     || $this->isInArgumentPositionOnlyTheCoveringTestFills(NonLiteralArguments::argumentPositionOf($token))
                     || $this->isExpectationOnlyTheCoveringTestHas($token),
             )),
@@ -93,7 +97,9 @@ final readonly class Candidate implements JsonSerializable
      *     action: string,
      *     coveredBy: list<string>,
      *     coveringDiffersBy: list<string>,
+     *     coveringOnly: list<string>,
      *     differsBy: list<string>|null,
+     *     seconds: float|null,
      *     steps: list<string>,
      *     test: string,
      *     unionOnlyLines: list<string>,
@@ -105,7 +111,9 @@ final readonly class Candidate implements JsonSerializable
             'action' => $this->action()->value,
             'coveredBy' => $this->coveredBy,
             'coveringDiffersBy' => $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens()),
+            'coveringOnly' => $this->coveringOnly(),
             'differsBy' => $this->differsBy,
+            'seconds' => $this->seconds === null ? null : round($this->seconds, 3),
             'steps' => $this->steps(),
             'test' => $this->testCase(),
             'unionOnlyLines' => $this->unionOnlyLines,
@@ -117,9 +125,25 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
-        $sharedSteps = !$this->sharedDataset instanceof SharedDataset ? [] : [
-            sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, Action::quoted($this->sharedDataset->otherTests)),
-        ];
+        return $this->action() === Action::Keep
+            ? Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack)
+            : $this->stepsToDecide();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function coveringOnly(): array
+    {
+        return $this->differsBy === [] ? $this->coveringTokens() : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stepsToDecide(): array
+    {
+        $sharedSteps = $this->sharedSteps();
 
         if ($this->unionOnlyLines !== []) {
             return [...$sharedSteps, sprintf(Action::UNION_ONLY_LINES_STEP, Action::quoted($this->coveredBy)), Action::VERIFY_STEP];
@@ -153,6 +177,16 @@ final readonly class Candidate implements JsonSerializable
         return $this->differsBy === null ? [Action::unparsedStep($this->hasUnresolvedDatasetRow), ...$steps] : $steps;
     }
 
+    /**
+     * @return list<string>
+     */
+    private function sharedSteps(): array
+    {
+        return !$this->sharedDataset instanceof SharedDataset ? [] : [
+            sprintf(Action::SHARED_DATASET_STEP, $this->sharedDataset->name, Action::quoted($this->sharedDataset->otherTests)),
+        ];
+    }
+
     private function deleteOrReviewSharedRow(): Action
     {
         return !$this->sharedDataset instanceof SharedDataset ? Action::Delete : Action::Review;
@@ -164,7 +198,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function nonDataTokens(array $tokens): array
     {
-        return array_values(array_filter($tokens, static fn (string $token): bool => !self::isData($token)));
+        return array_values(array_filter($tokens, static fn (string $token): bool => !TokenKind::isData($token)));
     }
 
     /**
@@ -172,7 +206,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringKeys(): array
     {
-        return array_values(array_filter($this->coveringTokensForReview(), $this->isInputKey(...)));
+        return array_values(array_filter($this->coveringTokensForReview(), TokenKind::isInputKey(...)));
     }
 
     /**
@@ -189,7 +223,7 @@ final readonly class Candidate implements JsonSerializable
     private function coveringArguments(): array
     {
         return array_values(
-            array_diff(array_filter($this->coveringTokensForReview(), $this->isArgument(...)), $this->coveringKeys()),
+            array_diff(array_filter($this->coveringTokensForReview(), TokenKind::isArgument(...)), $this->coveringKeys()),
         );
     }
 
@@ -206,7 +240,7 @@ final readonly class Candidate implements JsonSerializable
      */
     private function coveringExpectations(): array
     {
-        return array_values(array_filter($this->coveringTokensForReview(), $this->isExpectation(...)));
+        return array_values(array_filter($this->coveringTokensForReview(), TokenKind::isExpectation(...)));
     }
 
     /**
@@ -266,7 +300,7 @@ final readonly class Candidate implements JsonSerializable
                 $this->assertsNothing ? $this->coveringTokens() : $this->coveringDifference ?? [],
                 fn (string $token): bool => !TokenCollector::isAssertionToken($token)
                     && (NonLiteralArguments::identityPositionOf($token) === null || NonLiteralArguments::isCallArgument($token))
-                    && ($this->assertsNothing || !self::isData($token) || $this->isKey($token) || $this->isArgument($token)),
+                    && ($this->assertsNothing || !TokenKind::isData($token) || TokenKind::isKey($token) || TokenKind::isArgument($token)),
             ),
         );
     }
@@ -303,10 +337,10 @@ final readonly class Candidate implements JsonSerializable
 
     private function isExpectationOnlyTheCoveringTestHas(string $token): bool
     {
-        return $this->isExpectation($token)
+        return TokenKind::isExpectation($token)
             && $this->coveringDatasetParameters?->takes($token) !== true
             && ($this->isListOnlyTheCoveringTestExpects($token)
-                || ($this->isKey($token) && !$this->isInValueDiffersByLists($token))
+                || (TokenKind::isKey($token) && !$this->isInValueDiffersByLists($token))
                 || $this->isInArgumentPositionOnlyTheCoveringTestFills(TokenCollector::argumentPosition($token, ofAssertion: true)));
     }
 
@@ -342,31 +376,6 @@ final readonly class Candidate implements JsonSerializable
         }
 
         return null;
-    }
-
-    private function isInputKey(string $token): bool
-    {
-        return $this->isKey($token) && !TokenCollector::isAssertionToken($token);
-    }
-
-    private function isArgument(string $token): bool
-    {
-        return TokenCollector::argumentPosition($token, ofAssertion: false) !== null || NonLiteralArguments::isCallArgument($token);
-    }
-
-    private function isKey(string $token): bool
-    {
-        return preg_match(TokenCollector::KEY_TOKEN_PATTERN, $token) === 1;
-    }
-
-    private function isExpectation(string $token): bool
-    {
-        return self::isData($token) && TokenCollector::isAssertionToken($token) && !AssertionSubject::isFailureMessage($token);
-    }
-
-    private static function isData(string $token): bool
-    {
-        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 && !NonLiteralArguments::isNameOrPosition($token);
     }
 
 }

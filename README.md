@@ -18,7 +18,8 @@ is built for people.
 
 - 🔍 **Finds candidates** — test cases whose covered lines other test cases already cover, every dataset row separately.
 - 🧬 **Compares contracts, not only lines** — `differsBy` lists the literals, calls and keys a candidate has and its covering test lacks.
-- 🧭 **Says what to do** — every candidate has an `action` and numbered `steps`.
+- 🧭 **Says what to do** — every candidate has an `action` and numbered `steps`; a test of an error path that no covering test asserts is marked `keep`.
+- ⏱️ **Starts where it pays** — files and candidates are ordered by the time each candidate took, so the slowest redundant tests come first.
 - ✅ **Proves nothing was lost** — `verify` fails when a source line the last analysis covered is no longer covered.
 - ⚡ **Runs in parallel** — the test files are split into balanced groups by their measured durations.
 
@@ -177,11 +178,16 @@ proof that a test is useless. The `action` of each candidate says how to judge i
 | `merge-into-dataset` | It differs only in data from one test of the same file. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. |
 | `review-dataset-row` | A row of the same dataset runs the same lines. | Compare it with the sibling row. Delete it when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input. |
 | `review` | It asserts something the covering tests do not, differs in more than data, is a row of a named dataset another test uses, or could not be parsed. | Judge it yourself. When in doubt, keep it. |
+| `keep` | It asserts a rejection — an error status, a validation error or an exception — and no covering test asserts any rejection. | Keep it. It covers the error path, and the covering tests cover another path through the same lines. |
 
 Keep a test that asserts a different result, a different input class (empty, boundary, another tenant, invalid), an
 ordering, or a rejection.
 
 The candidates of one file can be removed together without losing a covered line. Re-run the tool after each change.
+
+The report starts where a review saves the most time. The files are ordered by `candidateSeconds`, the time all their
+candidates took in the coverage run, and the candidates of a file by their own `seconds`. A candidate without a measured
+time, such as a test the `--across` analysis took from the coverage map, comes last in its file.
 
 ### The JSON report
 
@@ -196,7 +202,9 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "action": "merge-into-dataset",
           "coveredBy": ["it adds two numbers › negative numbers"],
           "coveringDiffersBy": ["in:call:add#0/value:-1", "in:call:add#1/value:-2", "in:expect:new:Calculator/call:add/call:toBe#0/value:-3"],
+          "coveringOnly": [],
           "differsBy": ["in:call:add#0/value:0", "in:call:add#1/value:5", "in:expect:new:Calculator/call:add/call:toBe#0/value:5"],
+          "seconds": 0,
           "steps": [
             "Add a row with the values in differsBy to the dataset of \"it adds two numbers\".",
             "Delete this test.",
@@ -206,17 +214,21 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
           "unionOnlyLines": []
         }
       ],
+      "candidateSeconds": 0.008,
       "coveredLines": 4,
       "failedTests": [],
       "file": "tests/CalculatorTest.php",
+      "passedOnRetry": [],
       "testCases": 6,
       "testsWithoutSourceLines": []
     }
   ],
   "summary": {
-    "byAction": { "delete": 1, "merge-into-dataset": 1, "review-dataset-row": 1, "review": 0 },
+    "byAction": { "delete": 1, "merge-into-dataset": 1, "review-dataset-row": 1, "review": 0, "keep": 0 },
     "candidates": 3,
+    "candidateSeconds": 0.008,
     "failedTests": 0,
+    "passedOnRetry": 0,
     "seconds": 0,
     "skippedFiles": 1,
     "staleMap": null,
@@ -236,20 +248,46 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `coveredBy` | A small set of kept tests, picked greedily, that covers every line of the candidate. A test from another file carries its path. A single test that runs every line of the candidate and has an empty `differsBy` is preferred, so a test that passes the values of a dataset row is covered by that row, and the action is `delete`. That preferred single test can be a kept test, or a candidate that this report removes after this one. The action of that candidate then decides whether the shared input stays. |
 | `differsBy` | The tokens the candidate has, or has more times, and the closest covering test lacks — see [How `differsBy` names a difference](#how-differsby-names-a-difference). `null` when the test or its dataset row cannot be parsed; the first step then says so. |
 | `coveringDiffersBy` | The tokens of the covering test that made the action `review` although `differsBy` holds only data or is empty — see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). It also lists the arguments and the calls of a Pest `->throws()`, `->throwsIf()` or `->throwsUnless()` that only the covering test has, when one test covers the candidate and `unionOnlyLines` is empty — see the same section. The `review` steps name them. For a `merge-into-dataset` candidate, the tokens of the covering test in the places where `differsBy` lists the tokens of the candidate, so the report holds the values of both dataset rows. Empty for every other candidate. |
+| `coveringOnly` | For a candidate with an empty `differsBy`: every token the covering tests have and the candidate lacks, assertions included, such as `in:expect:property:subscriber/property:tags/call:toBe#0/value:'vip'`. An assertion there shows that the covering test asserts more than the candidate on the same lines; the candidate is a weaker copy only when it passes the same input. Empty for every other candidate. |
+| `seconds`, `candidateSeconds` | The time of the candidate in the coverage run, in seconds, and the sum over the candidates of the file and of the report (`summary.candidateSeconds`). `seconds` is `null` when the run did not measure the test, such as a test the `--across` analysis took from the coverage map. The time includes the coverage overhead, so compare it between candidates, not with a normal test run. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. A `merge-into-dataset` candidate whose covering test is a row of a dataset test gets the step `Add a row with the values in differsBy to the dataset of "<test>".`, because that test already has a dataset; when that dataset is a named dataset (`dataset('name', …)`) that other tests of the same file also use with `->with('name')` at any position of their chain or as any argument of a `->with()`, the step names the dataset and those tests instead, because the new row is added to each of them (a name passed through a variable, a constant or a spread argument, a test the analysis does not parse, and a test inside a `describe()` block bound with `describe(…)->with('name')`, are not detected, so the step stays the plain one); a plain covering test gets `Turn "<test>" into one test with a dataset and add a row with the values in differsBy.` |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed. [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, or could not be parsed; `keep` — asserts a rejection that no covering test asserts, see [Tests of an error path](#tests-of-an-error-path). [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `failedTests` | The test cases that failed in the coverage run, each as `{"test": …, "message": …}` with the failure message. The analysis leaves them out: a failed test case is never a candidate and never a covering test, and it is not counted in `testCases`. See [Failed tests](#failed-tests). |
 | `summary.failedTests` | The number of failed test cases in the report. |
+| `passedOnRetry`, `summary.passedOnRetry` | The test cases that failed in the coverage run and passed in the retry of their files, and their number. They are analysed like every other test case. See [Failed tests](#failed-tests). |
 | `summary.staleMap` | With `--across`: `null`, or the map commit and the source files changed since it was built. |
 | `summary.seconds` | How long the analysis took. |
 | `summary.skippedFiles` | The number of test files `analyse` did not run, because each declares one test case and no dataset — see [Test files with a single test case](#test-files-with-a-single-test-case). They count in `summary.testFiles` and `summary.testCases` as one test case each and have no candidate. |
 | `workflow` | The rules an agent follows for the whole report. |
 
+### Tests of an error path
+
+A test that asserts a rejection is `keep` when no covering test asserts any rejection. The covering tests then run the
+same lines on another path, such as the success path, and deleting the test would lose the only check of the error
+path. A rejection is one of these calls in the test, outside a string or a constant:
+
+- an HTTP status assertion of Laravel: `assertStatus()` with a literal from 400 to 599, `assertBadRequest()`,
+  `assertUnauthorized()`, `assertForbidden()`, `assertNotFound()`, `assertUnprocessable()`, `assertServerError()` and
+  the other error status assertions;
+- a validation error: `assertInvalid()`, `assertJsonValidationErrors()`, `assertJsonValidationErrorFor()`,
+  `assertSessionHasErrors()`, `assertSessionHasErrorsIn()`;
+- an exception: Pest `toThrow()`, `->throws()`, `->throwsIf()`, `->throwsUnless()`, PHPUnit `expectException()` and
+  its variants, and Laravel `assertThrows()`. A negated `->not->toThrow()` is not a rejection.
+
+A candidate that differs from one test of the same file only in data stays `merge-into-dataset`, even when the data is
+an error status: the new row keeps the case. When a covering test asserts a rejection too, even another one, the
+candidate stays `review`, because the two tests can check two inputs of the same error path. A status passed as a
+constant, such as `Response::HTTP_NOT_FOUND`, is not recognized: the analysis loads no class.
+
 ### Failed tests
 
-A failing test case does not discard the run. `analyse` leaves every failed or errored test case out of the analysis, so
+A failing test case does not discard the run. When a test case fails, `analyse` runs the files of the failed test cases
+once more. A test case that passes in this retry is analysed like every other test case and is listed in
+`passedOnRetry`, because its result depends on timing, the order of the tests or shared state. When the retry run itself
+aborts, such as on a fatal error, the result of the first run stays. `analyse` leaves every test case that failed in the
+retry too out of the analysis, so
 it is never a candidate and never a covering test. Leaving out a covering test can only remove candidates, so the
 result stays safe. The JSON report lists each of them with its failure message in `failedTests`, and the text format
 prints a `Failed tests` list for the file. The coverage of every other test case is complete, and the measured durations

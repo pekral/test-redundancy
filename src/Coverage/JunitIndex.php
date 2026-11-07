@@ -18,6 +18,7 @@ final readonly class JunitIndex
      * @param array<string, float> $testSeconds
      * @param array<string, true> $passedTestKeys
      * @param array<string, string> $failureByTestId
+     * @param array<string, float> $secondsByTestId
      */
     private function __construct(
         private array $fileByClass,
@@ -25,6 +26,7 @@ final readonly class JunitIndex
         private array $testSeconds,
         private array $passedTestKeys,
         private array $failureByTestId,
+        private array $secondsByTestId,
     ) {
     }
 
@@ -38,6 +40,7 @@ final readonly class JunitIndex
         $testSeconds = [];
         $passedTestKeys = [];
         $failureByTestId = [];
+        $secondsByTestId = [];
 
         foreach (self::testCasesOf($junitFile) as $testCase) {
             $class = (string) $testCase['class'];
@@ -52,6 +55,7 @@ final readonly class JunitIndex
             $descriptionByEvaluable[$class . '::' . PestName::evaluable($description)] = $description;
             $testKey = TestKey::make($fileByClass[$class] ?? $class, $description);
             $testSeconds[$testKey] = ($testSeconds[$testKey] ?? 0.0) + (float) $testCase['time'];
+            $secondsByTestId[$class . '::' . $name] = ($secondsByTestId[$class . '::' . $name] ?? 0.0) + (float) $testCase['time'];
             $failure = $testCase->failure[0] ?? $testCase->error[0] ?? null;
 
             if ($failure === null) {
@@ -63,7 +67,7 @@ final readonly class JunitIndex
             $failureByTestId[$class . '::' . $name] = self::failureMessage((string) $failure, $class, $name);
         }
 
-        return new self($fileByClass, $descriptionByEvaluable, $testSeconds, $passedTestKeys, $failureByTestId);
+        return new self($fileByClass, $descriptionByEvaluable, $testSeconds, $passedTestKeys, $failureByTestId, $secondsByTestId);
     }
 
     /**
@@ -87,6 +91,14 @@ final readonly class JunitIndex
     public function failureByTestId(): array
     {
         return $this->failureByTestId;
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    public function secondsByTestId(): array
+    {
+        return $this->secondsByTestId;
     }
 
     /**

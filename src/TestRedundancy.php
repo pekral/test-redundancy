@@ -59,7 +59,7 @@ final readonly class TestRedundancy
     {
         $skipped = array_filter($testFiles, $this->declaresSingleTestCase(...));
         $analysed = array_values(array_diff($testFiles, $skipped));
-        $run = $analysed === [] ? new CoverageResult([], []) : $this->coverageRun->run($analysed);
+        $run = $analysed === [] ? CoverageResult::empty() : $this->coverageRun->run($analysed);
         $testsByFile = $this->testsByFile($analysed, $run->linesByTest);
         $this->saveBaseline([...array_fill_keys($testFiles, []), ...$testsByFile], across: false);
         $analyzer = new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot));
@@ -69,7 +69,7 @@ final readonly class TestRedundancy
             $reports = [
                 ...$reports,
                 ...(isset($testsByFile[$testFile])
-                    ? $analyzer->analyze([$testFile => $testsByFile[$testFile]], map: null, failedTests: $run->failedTests)
+                    ? $analyzer->analyze([$testFile => $testsByFile[$testFile]], map: null, run: $run)
                     : [FileReport::skipped($testFile)]),
             ];
         }
@@ -87,7 +87,7 @@ final readonly class TestRedundancy
         $testsByFile = [];
 
         $unmapped = [];
-        $failedTests = [];
+        $run = CoverageResult::empty();
 
         foreach ($testFiles as $testFile) {
             $mapped = $sourceChanged || $this->git->changedSince($map->commit, [$testFile]) !== [] ? [] : $map->testsOfFile($testFile);
@@ -104,12 +104,11 @@ final readonly class TestRedundancy
         if ($unmapped !== []) {
             $run = $this->coverageRun->run($unmapped);
             $testsByFile = [...$testsByFile, ...$this->testsByFile($unmapped, $run->linesByTest)];
-            $failedTests = $run->failedTests;
         }
 
         $this->saveBaseline($testsByFile, across: true);
 
-        return new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot))->analyze($testsByFile, $map, $failedTests);
+        return new RedundancyAnalyzer(new FingerprintCache($this->configuration->projectRoot))->analyze($testsByFile, $map, $run);
     }
 
     public function verify(): Verification
