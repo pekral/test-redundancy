@@ -60,6 +60,21 @@ final readonly class CoverageReader
         return $failedTests;
     }
 
+    /**
+     * @return array<string, float>
+     */
+    public function secondsByTest(JunitIndex $junit): array
+    {
+        $secondsByTest = [];
+
+        foreach ($junit->secondsByTestId() as $testId => $seconds) {
+            $testKey = self::testKeyOf($testId, $junit);
+            $secondsByTest[$testKey] = ($secondsByTest[$testKey] ?? 0.0) + $seconds;
+        }
+
+        return $secondsByTest;
+    }
+
     public static function testKeyOf(string $testId, JunitIndex $junit): string
     {
         [$class, $method] = array_pad(explode('::', (string) preg_replace('/^P\\\\/', '', $testId), 2), 2, '');

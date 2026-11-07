@@ -2,6 +2,7 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Analysis\Candidate;
 use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Coverage\CoverageBaseline;
 use Pekral\TestRedundancy\TestRedundancy;
@@ -340,6 +341,43 @@ it('runs several test files and a folder as the same concurrent groups', functio
 });
 
 /**
+ * @param list<\Pekral\TestRedundancy\Analysis\FileReport> $reports
+ * @return list<\Pekral\TestRedundancy\Analysis\FileReport>
+ */
+function withoutSeconds(array $reports): array
+{
+    return array_map(
+        static fn (FileReport $report): FileReport => new FileReport(
+            $report->testFile,
+            $report->testCases,
+            $report->coveredLines,
+            array_map(
+                static fn (Candidate $candidate): Candidate => new Candidate(
+                    $candidate->testKey,
+                    $candidate->coveredBy,
+                    $candidate->differsBy,
+                    $candidate->coveringDifference,
+                    $candidate->unionOnlyLines,
+                    $candidate->assertsNothing,
+                    $candidate->sharedDataset,
+                    $candidate->coveringDatasetParameters,
+                    $candidate->omittedByCovering,
+                    $candidate->coveringSharedDataset,
+                    $candidate->hasUnresolvedDatasetRow,
+                    rejectionsTheCoveringTestsLack: $candidate->rejectionsTheCoveringTestsLack,
+                ),
+                $report->candidates,
+            ),
+            $report->testsWithoutSourceLines,
+            $report->skipped,
+            $report->failedTests,
+            $report->passedOnRetry,
+        ),
+        $reports,
+    );
+}
+
+/**
  * @return array<string, string>
  */
 function takeWorkerTokens(string $project): array
@@ -442,7 +480,7 @@ it('balances the concurrent groups by the durations of the last run without chan
     expect(array_keys(is_array($recorded) ? $recorded : []))->toEqualCanonicalizing($testFiles)
         ->and($roundRobinTokens)->toBe(['Alpha' => '1', 'Beta' => '2', 'Gamma' => '1'])
         ->and($balancedTokens)->toBe(['Alpha' => '1', 'Beta' => '2', 'Gamma' => '2'])
-        ->and($balanced)->toEqual($roundRobin)
+        ->and(withoutSeconds($balanced))->toEqual(withoutSeconds($roundRobin))
         ->and((string) file_get_contents($project . '/.test-redundancy/baseline.json'))->toBe($roundRobinBaseline);
 
     removeDirectory($project);

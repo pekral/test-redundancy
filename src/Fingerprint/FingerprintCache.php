@@ -122,6 +122,25 @@ final class FingerprintCache
         return $parameters?->forCandidate(array_keys($this->of($testKey) ?? []));
     }
 
+    /**
+     * @param list<string> $coveringTestKeys
+     * @return list<string>
+     */
+    public function rejectionsTheCoveringTestsLack(string $testKey, array $coveringTestKeys): array
+    {
+        $tokens = $this->tokens($testKey, $coveringTestKeys);
+
+        if ($tokens === null || array_any(
+            $tokens['covering'],
+            static fn (array $covering): bool => RejectionAssertion::tokensOf(array_keys($covering)) !== [],
+        )
+        ) {
+            return [];
+        }
+
+        return RejectionAssertion::tokensOf(array_keys($tokens['own']));
+    }
+
     public function assertsNothing(string $testKey): bool
     {
         $tokens = array_keys($this->of($testKey) ?? []);

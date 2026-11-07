@@ -10,6 +10,7 @@ use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
 use Pekral\TestRedundancy\Analysis\StaleMap;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
+use Pekral\TestRedundancy\Fingerprint\RejectionAssertion;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
 
 function analyzer(): RedundancyAnalyzer
@@ -317,10 +318,12 @@ it('serializes a candidate and a file report for an agent', function (): void {
         'candidates' => 1,
         'testsWithoutSourceLines' => 1,
         'skippedFiles' => 0,
-        'byAction' => ['delete' => 0, 'merge-into-dataset' => 0, 'review-dataset-row' => 1, 'review' => 0],
+        'byAction' => ['delete' => 0, 'merge-into-dataset' => 0, 'review-dataset-row' => 1, 'review' => 0, 'keep' => 0],
+        'candidateSeconds' => 0,
         'seconds' => 4,
         'staleMap' => ['commit' => 'abc123', 'changedSourceFiles' => ['src/Foo.php']],
         'failedTests' => 0,
+        'passedOnRetry' => 0,
     ])->and($json['files'])->toEqual([
         [
             'file' => 'tests/FooTest.php',
@@ -328,6 +331,8 @@ it('serializes a candidate and a file report for an agent', function (): void {
             'coveredLines' => 5,
             'testsWithoutSourceLines' => [],
             'failedTests' => [],
+            'passedOnRetry' => [],
+            'candidateSeconds' => 0,
             'candidates' => [
                 [
                     'test' => 'it works › empty',
@@ -335,7 +340,9 @@ it('serializes a candidate and a file report for an agent', function (): void {
                     'steps' => Action::ReviewDatasetRow->steps('"it works › blank"', coveringDiffersBy: []),
                     'coveredBy' => ['it works › blank'],
                     'coveringDiffersBy' => [],
+                    'coveringOnly' => [],
                     'differsBy' => ['value:\'\''],
+                    'seconds' => null,
                     'unionOnlyLines' => [],
                 ],
             ],
@@ -346,9 +353,11 @@ it('serializes a candidate and a file report for an agent', function (): void {
             'coveredLines' => 0,
             'testsWithoutSourceLines' => ['it reads the config'],
             'failedTests' => [],
+            'passedOnRetry' => [],
+            'candidateSeconds' => 0,
             'candidates' => [],
         ],
-    ])->and($json['workflow'])->toHaveCount(7)
+    ])->and($json['workflow'])->toHaveCount(11)
         ->and(valueAt(decodedJson((string) json_encode(candidate('it works', ['it also works'], differsBy: null))), 'steps.0'))->toContain(
             'could not be parsed',
         )
@@ -1176,7 +1185,17 @@ it('asks for a review of a test that passes the code under test a list without a
             'action' => 'review',
             'coveredBy' => ['it loads the subscriber relation with the requested columns'],
             'coveringDiffersBy' => ['in:call:getByListIdAndLastId#4/value:list-item', 'in:call:getByListIdAndLastId#4/value:\'email\''],
+            'coveringOnly' => [
+                'in:expect:property:subscriber/property:email/call:and#0/property:subscriber/property:tags',
+                'in:call:getByListIdAndLastId#4/value:list-item',
+                'in:call:getByListIdAndLastId#4/value:\'email\'',
+                'expect:property:subscriber/property:tags/call:toBe',
+                'expect:property:subscriber/property:email/call:and',
+                'value:0',
+                'in:expect:property:subscriber/property:tags/call:toBe#0/value:\'vip\'',
+            ],
             'differsBy' => [],
+            'seconds' => null,
             'steps' => [
                 'The covering test "it loads the subscriber relation with the requested columns" passes the values in coveringDiffersBy '
                     . '(in:call:getByListIdAndLastId#4/value:list-item, in:call:getByListIdAndLastId#4/value:\'email\') '
@@ -3236,7 +3255,7 @@ it('gives every action concrete steps that end with verify', function (Action $a
 
     expect($steps)->toHaveCount(3)
         ->and($steps[2])->toBe(Action::VERIFY_STEP);
-})->with(Action::cases());
+})->with(array_filter(Action::cases(), static fn (Action $action): bool => $action !== Action::Keep));
 
 it('asks for a review of a test without an assertion whose covering test arranges more data without literals', function (): void {
     $report = analyzeTokenTest(
@@ -6689,4 +6708,73 @@ it('names a test whose dataset rows cannot be named in the shared dataset warnin
     );
 
     expect($report->candidates[0]->steps()[0])->toBe(sprintf(Action::SHARED_DATASET_STEP, 'rows', Action::quoted(['it b', 'it c'])));
+});
+
+it('keeps a test that asserts a rejection no covering test asserts', function (string $candidateBody, string $coveringBody, Action $action): void {
+    $report = analyzeTestPair($candidateBody, $coveringBody);
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'both assert a rejection' => ['get(\'/a\')->assertNotFound()->assertSee(\'x\');', 'get(\'/b\')->assertNotFound();', Action::Review],
+    'error status a dataset row can hold' => ['get(\'/a\')->assertStatus(422);', 'get(\'/a\')->assertStatus(201);', Action::MergeIntoDataset],
+    'error status against success status, the other way than a row' => [
+        'get(\'/a\')->assertStatus(422)->assertSee(\'x\');',
+        'get(\'/a\')->assertStatus(201);',
+        Action::Keep,
+    ],
+    'exception against a result' => ['expect(fn () => f(0))->toThrow(InvalidArgumentException::class);', 'expect(f(1))->toBe(1);', Action::Keep],
+    'not found against ok' => ['get(\'/a\')->assertNotFound();', 'get(\'/a\')->assertOk();', Action::Keep],
+    'not to throw' => ['expect(fn () => f(1))->not->toThrow(Exception::class);', 'expect(f(1))->toBe(1);', Action::Review],
+    'unprocessable against an error status' => ['get(\'/a\')->assertUnprocessable();', 'get(\'/a\')->assertStatus(422);', Action::Review],
+    'validation errors against no assertion of the field' => [
+        'post(\'/a\', [])->assertJsonValidationErrors([\'name\']);',
+        'post(\'/a\', [\'name\' => \'x\'])->assertCreated();',
+        Action::Keep,
+    ],
+]);
+
+it('reads the rejection tokens of a fingerprint', function (string $token, bool $isRejection): void {
+    expect(RejectionAssertion::tokensOf([$token]))->toBe($isRejection ? [$token] : []);
+})->with([
+    'error status' => ['in:call:assertStatus#0/value:404', true],
+    'negated' => ['not:call:toThrow', false],
+    'other call' => ['call:assertOk', false],
+    'read token' => ['read:call:assertForbidden', false],
+    'rejection inside a closure' => ['in:call:tap#0/closure/expr/call:toThrow', true],
+    'rejection method' => ['call:assertForbidden', true],
+    'server error status' => ['in:call:assertStatus#0/value:500', true],
+    'success status' => ['in:call:assertStatus#0/value:200', false],
+    'test-level throws' => ['call:throws#0/const:E::class', true],
+]);
+
+it('orders the files of the agent report by candidate seconds and the candidates of a file by seconds', function (): void {
+    $fast = new Candidate('tests/FooTest.php :: it is fast', ['it covers'], ['value:1'], [], [], assertsNothing: false, seconds: 0.25);
+    $slow = new Candidate('tests/FooTest.php :: it is slow', ['it covers'], ['value:2'], [], [], assertsNothing: false, seconds: 1.0);
+    $unmeasured = new Candidate('tests/FooTest.php :: it is unmeasured', ['it covers'], ['value:3'], [], [], assertsNothing: false);
+    $json = decodedJson((string) json_encode(new AgentReport([
+        new FileReport(
+            'tests/BarTest.php',
+            2,
+            1,
+            [new Candidate('tests/BarTest.php :: it a', ['it b'], ['value:1'], [], [], assertsNothing: false, seconds: 0.5)],
+            [],
+        ),
+        new FileReport('tests/FooTest.php', 4, 1, [$unmeasured, $fast, $slow], []),
+    ], 1, staleMap: null)));
+
+    expect(array_column((array) $json['files'], 'file'))->toBe(['tests/FooTest.php', 'tests/BarTest.php'])
+        ->and(array_column((array) valueAt($json, 'files.0.candidates'), 'test'))->toBe(['it is slow', 'it is fast', 'it is unmeasured'])
+        ->and(valueAt($json, 'files.0.candidateSeconds'))->toBe(1.25)
+        ->and(valueAt($json, 'summary.candidateSeconds'))->toBe(1.75);
+});
+
+it('names the rejection and the covering test in the step of a keep candidate', function (): void {
+    $report = analyzeTestPair('get(\'/a\')->assertNotFound();', 'get(\'/a\')->assertOk();');
+
+    expect($report->candidates[0]->steps())->toBe([
+        'This test asserts the rejection in call:assertNotFound, such as an error status, a validation error or an exception, '
+            . 'and the covering tests "it b" assert no rejection: this test covers the error path, '
+            . 'and the covering tests cover another path through the same lines. Keep this test.',
+    ]);
 });

@@ -7,6 +7,7 @@ namespace Pekral\TestRedundancy\Coverage;
 use Pekral\TestRedundancy\Configuration;
 use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Support\TestFiles;
+use Pekral\TestRedundancy\Support\TestKey;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -42,7 +43,30 @@ final readonly class CoverageRun
      */
     public function run(array $paths): CoverageResult
     {
-        return $this->runGroups($this->groups($paths), tolerateFailedTests: true);
+        $result = $this->runGroups($this->groups($paths), tolerateFailedTests: true);
+        $failedFiles = $this->filesOf($result->failedTests);
+
+        if ($failedFiles === []) {
+            return $result;
+        }
+
+        try {
+            return $result->withRetry($this->runGroups($this->groups($failedFiles), tolerateFailedTests: true), $failedFiles);
+        } catch (ProcessFailedException) {
+            return $result;
+        }
+    }
+
+    /**
+     * @param array<string, string> $failedTests
+     * @return list<string>
+     */
+    private function filesOf(array $failedTests): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(TestKey::file(...), array_keys($failedTests)),
+            fn (string $file): bool => is_file($this->configuration->projectRoot . DIRECTORY_SEPARATOR . $file),
+        )));
     }
 
     /**
@@ -112,28 +136,7 @@ final readonly class CoverageRun
                 $runs[] = $this->start($paths, $environment);
             }
 
-            $reader = new CoverageReader($this->configuration);
-            $linesByTest = [];
-            $failedTests = [];
-            $secondsByFile = [];
-
-            foreach ($runs as [$process, $coverageFile, $junitFile]) {
-                $exitCode = $process->wait();
-                $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
-                $groupFailedTests = $reader->failedTests($junit);
-
-                if ($exitCode !== 0 && !($tolerateFailedTests && $groupFailedTests !== [] && filesize($coverageFile) > 0)) {
-                    throw new ProcessFailedException($process);
-                }
-
-                $linesByTest = [...$linesByTest, ...$reader->linesByTest($coverageFile, $junit)];
-                $failedTests = [...$failedTests, ...$groupFailedTests];
-                $secondsByFile = [...$secondsByFile, ...$junit->secondsByFile()];
-            }
-
-            $this->recordDurations($secondsByFile);
-
-            return new CoverageResult($linesByTest, $failedTests);
+            return $this->collect($runs, $tolerateFailedTests);
         } finally {
             foreach ($runs as [$process, $coverageFile, $junitFile]) {
                 $process->stop();
@@ -141,6 +144,37 @@ final readonly class CoverageRun
                 unlink($junitFile);
             }
         }
+    }
+
+    /**
+     * @param list<array{0: \Symfony\Component\Process\Process, 1: string, 2: string}> $runs
+     */
+    private function collect(array $runs, bool $tolerateFailedTests): CoverageResult
+    {
+        $reader = new CoverageReader($this->configuration);
+        $linesByTest = [];
+        $failedTests = [];
+        $secondsByTest = [];
+        $secondsByFile = [];
+
+        foreach ($runs as [$process, $coverageFile, $junitFile]) {
+            $exitCode = $process->wait();
+            $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
+            $groupFailedTests = $reader->failedTests($junit);
+
+            if ($exitCode !== 0 && !($tolerateFailedTests && $groupFailedTests !== [] && filesize($coverageFile) > 0)) {
+                throw new ProcessFailedException($process);
+            }
+
+            $linesByTest = [...$linesByTest, ...$reader->linesByTest($coverageFile, $junit)];
+            $failedTests = [...$failedTests, ...$groupFailedTests];
+            $secondsByTest = [...$secondsByTest, ...$reader->secondsByTest($junit)];
+            $secondsByFile = [...$secondsByFile, ...$junit->secondsByFile()];
+        }
+
+        $this->recordDurations($secondsByFile);
+
+        return new CoverageResult($linesByTest, $failedTests, $secondsByTest, []);
     }
 
     /**
