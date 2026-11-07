@@ -12,8 +12,8 @@ Fewer tests, the same coverage
 asserts, so you keep 100% coverage with fewer and simpler tests.**
 
 Point it at a test folder or file. It runs the tests once with per-test coverage and lists every test case whose
-covered lines other test cases already cover. For each one it says what to do — delete it, merge it into a dataset, or
-review it — and what it asserts beyond the tests that cover it. The JSON output is built for AI agents; `--format=text`
+covered lines other test cases already cover. For each one it says what to do — delete it, merge it into a dataset,
+review it, or keep it as the only test of an error path — and what it asserts beyond the tests that cover it. The JSON output is built for AI agents; `--format=text`
 is built for people.
 
 - 🔍 **Finds candidates** — test cases whose covered lines other test cases already cover, every dataset row separately.
@@ -63,7 +63,8 @@ echo ".test-redundancy/" >> .gitignore
    vendor/bin/test-redundancy tests/Unit/Billing --format=text
    ```
 
-2. **Act** on each candidate. Follow its `steps` — see [How to read a candidate](#how-to-read-a-candidate).
+2. **Act** on each candidate, from the top: the report puts the slowest candidates first. Follow its `steps` — see
+   [How to read a candidate](#how-to-read-a-candidate).
 
 3. **Verify** that every source line the analysed tests covered is still covered:
 
