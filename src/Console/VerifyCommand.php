@@ -32,7 +32,7 @@ final class VerifyCommand extends Command
         $processes = $input->getOption('processes');
         $verification = TestRedundancy::forProject($this->projectRoot, is_numeric($processes) ? (int) $processes : null)->verify();
 
-        $output->writeln(Json::encode($verification, pretty: $input->getOption('pretty') === true));
+        $output->writeln(Json::encode($verification, pretty: $input->getOption('pretty') === true), OutputInterface::OUTPUT_RAW);
 
         return $verification->isOk() ? self::SUCCESS : self::FAILURE;
     }

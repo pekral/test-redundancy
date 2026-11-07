@@ -31,6 +31,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Effect on existing output: the tokens of such list items and orders change in `differsBy`, `coveringDiffersBy` and
   `coveringOnly`, so the action of a candidate can change between 0.2.1 and this version. The coverage map and the
   baseline store source lines only, so they stay valid.
+- `analyse --format=json` and `verify` print the JSON verbatim (#198). Before, the console formatter parsed the JSON as
+  styled text: a backslash before `<` lost one backslash, so `json_decode()` failed on the invalid escape `\<`, and a
+  formatter tag such as `<info>…</info>` inside a value was removed. A test named
+  `it normalizes App\Models\<x> <info>y</info>` produced such output.
 
 ## [0.2.1] - 2026-11-07
 

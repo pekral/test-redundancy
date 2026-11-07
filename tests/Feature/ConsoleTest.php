@@ -2,6 +2,7 @@
 
 declare(strict_types = 1);
 
+use Pekral\TestRedundancy\Analysis\AgentReport;
 use Pekral\TestRedundancy\Analysis\Candidate;
 use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Console\Application;
@@ -661,4 +662,30 @@ it('orders the candidates by seconds and prints the keep group, the seconds and 
         ->toContain('action: keep')
         ->toContain('Tests that failed and passed on a retry')
         ->toContain('it flakes');
+});
+
+it('prints the JSON report verbatim when a value holds a backslash before a tag or a formatter tag (#198)', function (): void {
+    $output = new BufferedOutput(decorated: true);
+    $candidate = new Candidate('tests/FooTest.php :: it maps App\\Models\\<x> <info>y</info>', ['it covers'], ['value:1'], [], [], assertsNothing: false);
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printJson(
+        new AgentReport([new FileReport('tests/FooTest.php', 2, 1, [$candidate], [])], 0, staleMap: null),
+        pretty: false,
+    );
+
+    expect(valueAt(decodedJson($output->fetch()), 'files.0.candidates.0.test'))->toBe('it maps App\\Models\\<x> <info>y</info>');
+});
+
+it('prints the verify report verbatim when a lost line holds a backslash before a tag or a formatter tag (#198)', function (): void {
+    $project = pestProject();
+    command($project, 'analyse')->execute(['paths' => ['tests']]);
+    $baselinePath = $project . '/build/baseline.json';
+    $baseline = decodedJson((string) file_get_contents($baselinePath));
+    $baseline['lines'] = [...(array) $baseline['lines'], 'src/App\\<x> <info>y</info>.php:1'];
+    file_put_contents($baselinePath, (string) json_encode($baseline));
+
+    $verify = command($project, 'verify');
+    $verify->execute([]);
+
+    expect(valueAt(decodedJson($verify->getDisplay()), 'lostLines'))->toBe(['src/App\\<x> <info>y</info>.php:1']);
 });
