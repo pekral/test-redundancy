@@ -692,3 +692,23 @@ it('prints the verify report verbatim when a lost line holds a backslash before 
 
     expect(valueAt(decodedJson($verify->getDisplay()), 'lostLines'))->toBe(['src/App\\<x> <info>y</info>.php:1']);
 });
+
+it('names why differsBy is unknown in the text report the way the first step does (#188)', function (bool $hasUnresolvedDatasetRow, string $reason): void {
+    $output = new BufferedOutput();
+    $candidate = new Candidate(
+        'tests/FooTest.php :: it stores › one',
+        ['it stores › two'],
+        differsBy: null,
+        coveringDifference: null,
+        unionOnlyLines: [],
+        assertsNothing: false,
+        hasUnresolvedDatasetRow: $hasUnresolvedDatasetRow,
+    );
+
+    new ReportPrinter(new SymfonyStyle(new ArrayInput([]), $output))->printText([new FileReport('tests/FooTest.php', 2, 1, [$candidate], [])]);
+
+    expect($output->fetch())->toContain('differs by: ' . $reason);
+})->with([
+    'unparsed test' => [false, 'unknown (the test could not be parsed)'],
+    'unresolved dataset row' => [true, 'unknown (a dataset row could not be resolved by static analysis)'],
+]);

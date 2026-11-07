@@ -12,6 +12,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `coveringDiffersBy` lists, such as `covering differs by: value:2` (#190). Before, the line came from the tokens that
   make a candidate `review`, so it was missing for every merge candidate. Every other action prints the same line as
   before.
+- The text report prints `unknown (a dataset row could not be resolved by static analysis)` for a candidate whose
+  dataset row the analysis cannot resolve, and `unknown (the test could not be parsed)` for a test it cannot parse
+  (#188). Before, both printed `unknown (the test or a dataset row could not be parsed)`, while the first step already
+  named the real reason since #172. The README names both reasons for a `null` `differsBy`.
 - An item of a list under an array key now carries the call path of the array, followed by the key and a `list`
   segment, such as `in:expect:function:build/call:toBe#0/value:'items'/list/value:'x'` for
   `expect(build())->toBe(['items' => ['x']])` (#191). Before, such an item had only the key path,

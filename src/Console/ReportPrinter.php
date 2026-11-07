@@ -25,7 +25,9 @@ final readonly class ReportPrinter
     private const string SKIPPED = 'Skipped: the file declares one test case and no dataset, '
         . 'so no other test case of the file can cover it.';
 
-    private const string UNPARSED = 'unknown (the test or a dataset row could not be parsed)';
+    private const string UNPARSED = 'unknown (the test could not be parsed)';
+
+    private const string UNRESOLVED_DATASET_ROW = 'unknown (a dataset row could not be resolved by static analysis)';
 
     private const string KEEP = 'Tests to keep (they assert a rejection no covering test asserts)';
 
@@ -128,7 +130,11 @@ final readonly class ReportPrinter
             $candidate->action()->value,
             $candidate->seconds === null ? '' : sprintf("\n    seconds: %.3f", $candidate->seconds),
             implode("\n      - ", $candidate->coveredBy),
-            $candidate->differsBy === null ? self::UNPARSED : implode(', ', $candidate->differsBy),
+            match (true) {
+                $candidate->differsBy !== null => implode(', ', $candidate->differsBy),
+                $candidate->hasUnresolvedDatasetRow => self::UNRESOLVED_DATASET_ROW,
+                default => self::UNPARSED,
+            },
             $coveringTokens === [] ? '' : "\n    covering differs by: " . implode(', ', $coveringTokens),
             $candidate->coveringOnly() === [] ? '' : "\n    covering only: " . implode(', ', $candidate->coveringOnly()),
             $candidate->unionOnlyLines === [] ? '' : "\n    union only lines: " . implode(', ', $candidate->unionOnlyLines),
