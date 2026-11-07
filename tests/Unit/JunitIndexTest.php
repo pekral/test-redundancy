@@ -5,6 +5,7 @@ declare(strict_types = 1);
 use Pekral\TestRedundancy\Configuration;
 use Pekral\TestRedundancy\Coverage\CoverageReader;
 use Pekral\TestRedundancy\Coverage\JunitIndex;
+use Pekral\TestRedundancy\Coverage\PhpUnitClasses;
 
 /**
  * @param list<string> $searchRoots
@@ -202,6 +203,59 @@ it('reports the seconds of each test case by the key of the coverage report', fu
         'tests/FooTest.php :: it rows › two' => 0.25,
         'tests/FooTest.php :: it plain' => 1.0,
     ]);
+
+    removeDirectory($root);
+});
+
+it('maps the JUnit entry Pest writes for a PHPUnit class to the file and the method of the class (#182)', function (): void {
+    $root = temporaryDirectory();
+    mkdir($root . '/tests/Unit', recursive: true);
+    file_put_contents($root . '/tests/Unit/ProbeTest.php', <<<'PHP'
+        <?php
+        namespace Tests\Unit;
+
+        final class OtherTest {}
+
+        final class ProbeTest extends \PHPUnit\Framework\TestCase
+        {
+            public function testNormalizesCodes(): void {}
+
+            public function test_counts_rows(): void {}
+        }
+        PHP);
+    file_put_contents($root . '/tests/Unit/OtherTest.php', '<?php final class Unrelated {}');
+    mkdir($root . '/tests/Feature');
+    file_put_contents($root . '/tests/Feature/ProbeTest.php', '<?php namespace Tests\\Feature; final class ProbeTest {}');
+    $classes = new PhpUnitClasses([
+        $root . '/tests/Unit/OtherTest.php',
+        $root . '/tests/Feature/ProbeTest.php',
+        $root . '/tests/Unit/ProbeTest.php',
+    ]);
+    $file = (string) tempnam(sys_get_temp_dir(), 'junit');
+    file_put_contents($file, <<<'XML'
+        <testsuites>
+            <testcase name="Normalizes codes with data set #0" file="Probe (Tests\Unit\Probe)::Normalizes codes with data set #0"
+                class="Tests\Unit\ProbeTest" time="0.5"/>
+            <testcase name="Counts rows" file="Probe (Tests\Unit\Probe)::Counts rows" class="Tests\Unit\ProbeTest" time="0.25">
+                <failure type="Error">Counts rows
+        failed</failure>
+            </testcase>
+            <testcase name="Unknown" file="Unknown (Tests\Unit\Unknown)::Unknown" class="Tests\Unit\UnknownTest"/>
+        </testsuites>
+        XML);
+    $index = JunitIndex::fromFile($file, $root, [], $classes);
+    unlink($file);
+
+    expect(new CoverageReader(Configuration::load($root))->secondsByTest($index))->toBe([
+        'tests/Unit/ProbeTest.php :: testNormalizesCodes › 0' => 0.5,
+        'tests/Unit/ProbeTest.php :: test_counts_rows' => 0.25,
+        'Unknown (Tests\Unit\Unknown) :: Unknown' => 0.0,
+    ])->and(new CoverageReader(Configuration::load($root))->failedTests($index))->toBe([
+        'tests/Unit/ProbeTest.php :: test_counts_rows' => 'failed',
+    ])->and(CoverageReader::testKeyOf('Tests\Unit\ProbeTest::testNormalizesCodes#0', $index))
+        ->toBe('tests/Unit/ProbeTest.php :: testNormalizesCodes › 0')
+        ->and($classes->of('Tests\Unit\ProbeTest'))->toBe($classes->of('Tests\Unit\ProbeTest'))
+        ->and($classes->of('Tests\Unit\MissingTest'))->toBeNull();
 
     removeDirectory($root);
 });

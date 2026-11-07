@@ -33,7 +33,7 @@ final readonly class JunitIndex
     /**
      * @param list<string> $searchRoots
      */
-    public static function fromFile(string $junitFile, string $projectRoot, array $searchRoots): self
+    public static function fromFile(string $junitFile, string $projectRoot, array $searchRoots, ?PhpUnitClasses $classes = null): self
     {
         $fileByClass = [];
         $descriptionByEvaluable = [];
@@ -44,12 +44,11 @@ final readonly class JunitIndex
 
         foreach (self::testCasesOf($junitFile) as $testCase) {
             $class = (string) $testCase['class'];
-            $name = (string) $testCase['name'];
-            $file = explode('::', (string) $testCase['file'], 2)[0];
-            $description = (string) preg_replace('/ with data set .*$/s', '', (string) $testCase['name']);
+            [$file, $name] = self::identity($testCase, [$projectRoot, ...$searchRoots], $classes);
+            $description = (string) preg_replace('/ with data set .*$/s', '', $name);
 
             if ($file !== '') {
-                $fileByClass[$class] = ProjectPath::relative(self::locate($file, [$projectRoot, ...$searchRoots]), $projectRoot);
+                $fileByClass[$class] = ProjectPath::relative($file, $projectRoot);
             }
 
             $descriptionByEvaluable[$class . '::' . PestName::evaluable($description)] = $description;
@@ -64,7 +63,7 @@ final readonly class JunitIndex
                 continue;
             }
 
-            $failureByTestId[$class . '::' . $name] = self::failureMessage((string) $failure, $class, $name);
+            $failureByTestId[$class . '::' . $name] = self::failureMessage((string) $failure, $class, (string) $testCase['name']);
         }
 
         return new self($fileByClass, $descriptionByEvaluable, $testSeconds, $passedTestKeys, $failureByTestId, $secondsByTestId);
@@ -151,6 +150,33 @@ final readonly class JunitIndex
         }
 
         return $message;
+    }
+
+    /**
+     * Pest writes the JUnit entry of a PHPUnit class with a display name instead of the file and the method, such as
+     * file="Foo (Tests\\Foo)" and name="Adds with data set #0" for Tests\\FooTest::testAdds. Such an entry takes the file
+     * and the method name of the class it names.
+     *
+     * @param list<string> $roots
+     * @return array{0: string, 1: string}
+     */
+    private static function identity(\SimpleXMLElement $testCase, array $roots, ?PhpUnitClasses $classes): array
+    {
+        $name = (string) $testCase['name'];
+        $file = explode('::', (string) $testCase['file'], 2)[0];
+        $located = $file === '' ? '' : self::locate($file, $roots);
+        $declared = $located === '' || is_file($located) ? null : $classes?->of((string) $testCase['class']);
+
+        if ($declared === null) {
+            return [$located, $name];
+        }
+
+        [$description, $dataSet] = array_pad(explode(' with data set ', $name, 2), 2, value: null);
+        $description = (string) $description;
+
+        $method = $declared['methods'][PhpUnitClasses::normalized($description)] ?? $description;
+
+        return [$declared['file'], $method . ($dataSet === null ? '' : ' with data set ' . $dataSet)];
     }
 
     /**
