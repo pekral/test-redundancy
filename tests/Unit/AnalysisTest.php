@@ -6894,3 +6894,22 @@ it('leaves a combined row unresolved when a row of one dataset cannot be named (
         ->and($report->candidates[0]->differsBy)->toBeNull()
         ->and($report->candidates[0]->steps()[0])->toBe(Action::UNRESOLVED_DATASET_ROW_STEP);
 });
+
+it('deletes a test that duplicates a row of another test dataset (#176)', function (): void {
+    $report = analyzeTokenTest(
+        source: "<?php\nit('a', function (): void {\n    check('150/200');\n});\nit('b', function (string \$v): void {\n    check(\$v);\n})"
+            . "->with(['50/200', '179/200']);\nit('c', function (): void {\n    check('179/200');\n});\n",
+        linesByTest: [
+            'it a' => ['src/Store.php:5'],
+            'it b › (\'50/200\')' => ['src/Store.php:5'],
+            'it b › (\'179/200\')' => ['src/Store.php:5'],
+            'it c' => ['src/Store.php:5'],
+        ],
+    );
+
+    $candidates = array_values(array_filter($report->candidates, static fn (Candidate $candidate): bool => $candidate->testCase() === 'it c'));
+    $candidate = $candidates[0] ?? null;
+
+    expect($candidate?->action())->toBe(Action::Delete)
+        ->and($candidate?->coveredBy)->toContain('it b › (\'179/200\')');
+});
