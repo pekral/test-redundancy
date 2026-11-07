@@ -29,6 +29,8 @@ use PhpParser\NodeFinder;
 final class NodeContext
 {
 
+    private const string LIST_SEGMENT = '/list';
+
     /**
      * @param \PhpParser\Node|array<\PhpParser\Node> $nodes
      * @return array<int, true>
@@ -123,7 +125,19 @@ final class NodeContext
     {
         $key = TokenCollector::nameOf($arrayItem->key, $readProperties);
 
-        return $key === null ? [] : array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
+        if ($key === null) {
+            return [];
+        }
+
+        $segments = array_fill_keys(self::nodeIds($nodeFinder, $arrayItem->value), $key[1]);
+
+        foreach ($arrayItem->value instanceof Array_ ? $arrayItem->value->items : [] as $listItem) {
+            $segments = $listItem->key instanceof Expr
+                ? $segments
+                : array_replace($segments, array_fill_keys(self::nodeIds($nodeFinder, $listItem->value), $key[1] . self::LIST_SEGMENT));
+        }
+
+        return $segments;
     }
 
     public static function kindOf(Node $node): string
@@ -179,7 +193,7 @@ final class NodeContext
     /**
      * @return list<int>
      */
-    public static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument): array
+    public static function argumentValueIds(Expr $value, bool $isAssertion, bool $isArgument, bool $isUnderKey = false): array
     {
         $innerValues = $value instanceof Cast ? [$value->expr] : self::returnedValues($value);
 
@@ -193,7 +207,7 @@ final class NodeContext
         $passedItems = match (true) {
             $value instanceof Array_ => array_filter(
                 $value->items,
-                static fn (ArrayItem $item): bool => $item->key instanceof Expr || $isArgument,
+                static fn (ArrayItem $item): bool => $item->key instanceof Expr || $isArgument || $isUnderKey,
             ),
             $value instanceof CallLike && !$isAssertion => array_filter(
                 $value->getRawArgs(),
@@ -205,8 +219,12 @@ final class NodeContext
         return array_merge(self::valueIds($value), ...array_map(
             static fn (ArrayItem|Arg $item): array => match (true) {
                 $item instanceof Arg => self::argumentValueIds($item->value, $isAssertion, isArgument: true),
+                !$item->key instanceof Expr && $isUnderKey => self::argumentValueIds($item->value, $isAssertion, isArgument: false),
                 !$item->key instanceof Expr => self::valueIds($item->value),
-                default => [...self::valueIds($item->key), ...self::argumentValueIds($item->value, $isAssertion, isArgument: false)],
+                default => [
+                    ...self::valueIds($item->key),
+                    ...self::argumentValueIds($item->value, $isAssertion, isArgument: false, isUnderKey: true),
+                ],
             },
             array_values($passedItems),
         ));

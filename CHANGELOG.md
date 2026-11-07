@@ -6,6 +6,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- An item of a list under an array key now carries the call path of the array, followed by the key and a `list`
+  segment, such as `in:expect:function:build/call:toBe#0/value:'items'/list/value:'x'` for
+  `expect(build())->toBe(['items' => ['x']])` (#191). Before, such an item had only the key path,
+  `in:value:'items'/value:'x'`, so the same item in an argument and in an expected value had the same token. A test
+  that stores `['items' => ['x']]` and expects `['items' => ['y']]` then had an empty `differsBy` against a test with
+  the two values swapped, and the analysis proposed a false `delete`. Now the candidate is `merge-into-dataset` or
+  `review`, and `differsBy` and `coveringDiffersBy` name the item with the assertion or the call it belongs to. The
+  `list` segment keeps `store(['tags' => ['a']])` apart from `store(['tags' => 'a'])`. An item of a list under a key of
+  an array no call receives gets the segment too: `in:value:'tags'/list/value:'a'`.
+- An order token of a list or a map under a key of a call, such as
+  `in:function:transfer#0/value:'k'/keys:value:'from'>value:'to'`, no longer counts as data. Before, a test that
+  differed from its covering test only in that order was `merge-into-dataset`, although no row value expresses an order;
+  it is `review` now.
+- A candidate with an empty `differsBy` whose covering test passes an array key the candidate lacks to the same assertion
+  call is `review`, not `delete`. The covering test then expects a larger value from the same call, so the candidate is
+  another case, not a weaker copy. A method of the code under test whose name starts with `assert`, such as
+  `$validator->assertSameAudience($lists, $stored)`, is read as an assertion, so before this change a dataset row
+  that stored `['id' => 'seg']` was a `delete` candidate against a row that stored
+  `['id' => 'seg', 'query' => 'entire_list', 'type' => 'rfm']`. The steps name the keys with the
+  `MISSING_EXPECTATION_STEP`. A candidate that lacks the whole assertion of the covering test stays `delete`.
+- Effect on existing output: the tokens of such list items and orders change in `differsBy`, `coveringDiffersBy` and
+  `coveringOnly`, so the action of a candidate can change between 0.2.1 and this version. The coverage map and the
+  baseline store source lines only, so they stay valid.
+
 ## [0.2.1] - 2026-11-07
 
 ### Added

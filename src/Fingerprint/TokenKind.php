@@ -12,6 +12,22 @@ final class TokenKind
         return self::isKey($token) && !TokenCollector::isAssertionToken($token);
     }
 
+    /**
+     * @param list<string> $coveringOnlyTokens
+     */
+    public static function isInputOrKeyOfSharedAssertion(string $token, array $coveringOnlyTokens): bool
+    {
+        if (!TokenCollector::isAssertionToken($token)) {
+            return true;
+        }
+
+        $position = TokenCollector::argumentPosition($token, ofAssertion: true);
+
+        return $position !== null
+            && self::isKey($token)
+            && !in_array((string) preg_replace('~^in:|#\w+/$~', '', $position), $coveringOnlyTokens, strict: true);
+    }
+
     public static function isArgument(string $token): bool
     {
         return TokenCollector::argumentPosition($token, ofAssertion: false) !== null || NonLiteralArguments::isCallArgument($token);
@@ -29,7 +45,9 @@ final class TokenKind
 
     public static function isData(string $token): bool
     {
-        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1 && !NonLiteralArguments::isNameOrPosition($token);
+        return preg_match(TokenCollector::DATA_TOKEN_PATTERN, $token) === 1
+            && !NonLiteralArguments::isNameOrPosition($token)
+            && !OrderTokens::isToken($token);
     }
 
 }

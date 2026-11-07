@@ -895,10 +895,12 @@ test lacks.
   `in:function:store#0/operator:plus#1/value:2` (see *Argument names*). The literal part of an interpolated string
   keeps no call path in its own token either: `store("tag_{$name}")` has the token `value:'tag_'` and, at its place,
   `in:function:store#0/operator:interpolatedstring#0/value:'tag_'`. A list item keeps the call
-  path only as a direct item of an argument: `store([1])` has the token `in:function:store#0/value:1`, but
-  `store([[1]])` has `value:1` and `store(['tags' => ['a']])` has `in:value:'tags'/value:'a'`. So `store([[1]])` does
-  not get the token of `store([1])` or `store(1)`, and `store(['tags' => ['a']])` does not get the token of
-  `store(['tags' => 'a'])`. A list passed straight to a call keeps the token of its element: `store([1])` has the token
+  path as a direct item of an argument and as an item of a list under a key: `store([1])` has the token
+  `in:function:store#0/value:1`, and `store(['tags' => ['a']])` has `in:function:store#0/value:'tags'/list/value:'a'`,
+  where the `list` segment marks the list under the key. A list inside a list keeps no call path: `store([[1]])` has
+  `value:1`. So `store([[1]])` does not get the token of `store([1])` or `store(1)`, and `store(['tags' => ['a']])` does
+  not get the token of `store(['tags' => 'a'])`. An item of a list under a key of an array no call receives keeps the
+  key path with the `list` segment: `$options = ['tags' => ['a']]` has `in:value:'tags'/list/value:'a'`. A list passed straight to a call keeps the token of its element: `store([1])` has the token
   of `store(1)` and the token of the list (see *Lists*).
 - **Dataset rows.** A dataset row value is the value of the parameter at the same position of the test closure or
   method. A literal, constant, empty array, list or map in a row is counted where the test reads that

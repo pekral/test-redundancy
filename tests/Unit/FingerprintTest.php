@@ -327,10 +327,16 @@ it('tells a literal under one array key from the same literal under another key'
     'literal in a list under a key' => ['store([\'tags\' => [\'a\', \'b\']]);', [
         'function:store' => 1,
         'in:function:store#0/key:value:\'tags\'' => 1,
+        'in:function:store#0/value:\'tags\'/list/items:value:\'a\'>value:\'b\'' => 1,
+        'in:function:store#0/value:\'tags\'/list/value:\'a\'' => 1,
+        'in:function:store#0/value:\'tags\'/list/value:\'b\'' => 1,
         'in:function:store#0/value:\'tags\'/value:list-item' => 2,
-        'in:value:\'tags\'/items:value:\'a\'>value:\'b\'' => 1,
-        'in:value:\'tags\'/value:\'a\'' => 1,
-        'in:value:\'tags\'/value:\'b\'' => 1,
+    ],
+    ],
+    'literal in a list under a key of an array no call receives' => ['$options = [\'tags\' => [\'a\']];', [
+        'in:value:\'tags\'/list/value:\'a\'' => 1,
+        'in:value:\'tags\'/value:list-item' => 1,
+        'key:value:\'tags\'' => 1,
     ],
     ],
     'literal in a list without a key' => ['store([false, false]);', [
@@ -345,6 +351,14 @@ it('tells a literal under one array key from the same literal under another key'
         'in:function:store#0/key:value:\'user\'' => 1,
         'in:function:store#0/value:\'user\'/key:value:\'active\'' => 1,
         'in:function:store#0/value:\'user\'/value:\'active\'/value:true' => 1,
+    ],
+    ],
+    'map in a list under a key' => ['store([\'items\' => [[\'id\' => 1]]]);', [
+        'function:store' => 1,
+        'in:function:store#0/key:value:\'items\'' => 1,
+        'in:function:store#0/value:\'items\'/list/key:value:\'id\'' => 1,
+        'in:function:store#0/value:\'items\'/list/value:\'id\'/value:1' => 1,
+        'in:function:store#0/value:\'items\'/value:list-item' => 1,
     ],
     ],
     'negative number under a key' => ['store([\'balance\' => -5]);', [
