@@ -147,7 +147,7 @@ final readonly class CoverageRun
     }
 
     /**
-     * @param list<array{0: \Symfony\Component\Process\Process, 1: string, 2: string}> $runs
+     * @param list<array{0: \Symfony\Component\Process\Process, 1: string, 2: string, 3: list<string>}> $runs
      */
     private function collect(array $runs, bool $tolerateFailedTests): CoverageResult
     {
@@ -157,9 +157,14 @@ final readonly class CoverageRun
         $secondsByTest = [];
         $secondsByFile = [];
 
-        foreach ($runs as [$process, $coverageFile, $junitFile]) {
+        foreach ($runs as [$process, $coverageFile, $junitFile, $paths]) {
             $exitCode = $process->wait();
-            $junit = JunitIndex::fromFile($junitFile, $this->configuration->projectRoot, [$this->runner->rootDirectory()]);
+            $junit = JunitIndex::fromFile(
+                $junitFile,
+                $this->configuration->projectRoot,
+                [$this->runner->rootDirectory()],
+                new PhpUnitClasses(array_map(fn (string $path): string => Path::join($this->configuration->projectRoot, $path), $paths)),
+            );
             $groupFailedTests = $reader->failedTests($junit);
 
             if ($exitCode !== 0 && !($tolerateFailedTests && $groupFailedTests !== [] && filesize($coverageFile) > 0)) {
@@ -180,7 +185,7 @@ final readonly class CoverageRun
     /**
      * @param list<string> $paths
      * @param array<string, string> $environment
-     * @return array{0: \Symfony\Component\Process\Process, 1: string, 2: string}
+     * @return array{0: \Symfony\Component\Process\Process, 1: string, 2: string, 3: list<string>}
      */
     private function start(array $paths, array $environment): array
     {
@@ -198,7 +203,7 @@ final readonly class CoverageRun
         );
         $process->start();
 
-        return [$process, $coverageFile, $junitFile];
+        return [$process, $coverageFile, $junitFile, $paths];
     }
 
     /**

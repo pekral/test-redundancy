@@ -20,6 +20,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `('a') #2` and `('a') #3` for `->with(['a', 'a', 'b', 'a'])`, and gets a computed `differsBy` (#180). Before, every
   such row got the name without the number, the rows overwrote each other, and none matched a test of the coverage run.
   A repeated name of a row with a key, and a repeated name in a dataset combined with another one, stay unresolved.
+- A PHPUnit test class in a project that runs Pest is analysed (#182). Pest writes the JUnit entry of such a class
+  with a display name instead of the file and the method, such as `file="Probe (Tests\Unit\Probe)"` and
+  `name="Normalizes with data set #0"` for `Tests\Unit\ProbeTest::testNormalizes`, so its tests were keyed by that
+  display name, matched no test file and were never analysed. Such an entry now takes the file and the method of the
+  class it names: the analysis looks for the class among the test files of the run whose file name is the short class
+  name, and reads it with the PHP parser only.
 - A row of a PHPUnit data provider without a string key is named by the counter PHPUnit uses (`with data set #0`,
   `#1`, …) and gets a computed `differsBy` (#182). PHPUnit 10.5 and 13.4 both count every row without a string key from
   0, whatever integer key the row has. This holds for a provider that returns an array and for a generator of top-level
