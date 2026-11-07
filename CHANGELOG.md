@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-07
+
 ### Added
 
 - Every candidate has `seconds`, its time in the coverage run, and every file and the summary have `candidateSeconds`,
@@ -867,7 +869,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.1.10...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/pekral/test-redundancy/compare/0.2.0...0.2.1
+[0.2.0]: https://github.com/pekral/test-redundancy/compare/0.1.10...0.2.0
 [0.1.10]: https://github.com/pekral/test-redundancy/compare/0.1.9...0.1.10
 [0.1.9]: https://github.com/pekral/test-redundancy/compare/0.1.8...0.1.9
 [0.1.8]: https://github.com/pekral/test-redundancy/compare/0.1.7...0.1.8
