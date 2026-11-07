@@ -18,15 +18,16 @@ final class DatasetCombination
 
     /**
      * @param list<array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null>> $datasets
+     * @param callable(\PhpParser\Node\Expr): ?string $nameByValue
      * @return list<\PhpParser\Node\ArrayItem|null>
      */
-    public static function rows(array $datasets): array
+    public static function rows(array $datasets, callable $nameByValue): array
     {
         $combinations = [[[], []]];
 
         foreach ($datasets as $rows) {
             $next = [];
-            $rowLabels = self::uniqueLabels($rows);
+            $rowLabels = self::uniqueLabels($rows, $nameByValue);
 
             foreach ($combinations as [$labels, $items]) {
                 foreach (array_values($rows) as $position => $row) {
@@ -54,22 +55,26 @@ final class DatasetCombination
 
     /**
      * @param array<\PhpParser\Node\ArrayItem|\PhpParser\Node\Expr\Yield_|null> $rows
+     * @param callable(\PhpParser\Node\Expr): ?string $nameByValue
      * @return list<string|null>
      */
-    private static function uniqueLabels(array $rows): array
+    private static function uniqueLabels(array $rows, callable $nameByValue): array
     {
-        $labels = array_map(self::label(...), array_values($rows));
+        $labels = array_map(static fn (null|ArrayItem|Yield_ $row): ?string => self::label($row, $nameByValue), array_values($rows));
         $counts = array_count_values(array_filter($labels, is_string(...)));
 
         return array_map(static fn (?string $label): ?string => $label !== null && $counts[$label] === 1 ? $label : null, $labels);
     }
 
-    private static function label(null|ArrayItem|Yield_ $row): ?string
+    /**
+     * @param callable(\PhpParser\Node\Expr): ?string $nameByValue
+     */
+    private static function label(null|ArrayItem|Yield_ $row, callable $nameByValue): ?string
     {
         return match (true) {
             !$row?->value instanceof Expr => null,
             $row->key instanceof String_ => 'dataset "' . $row->key->value . '"',
-            !$row->key instanceof Expr => PestRowName::of($row->value),
+            !$row->key instanceof Expr => $nameByValue($row->value),
             default => null,
         };
     }

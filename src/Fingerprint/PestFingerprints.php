@@ -62,9 +62,9 @@ final readonly class PestFingerprints
     /**
      * @param array<\PhpParser\Node\Stmt> $statements
      */
-    public static function analyse(array $statements): FileFingerprints
+    public static function analyse(array $statements, ?ClassDeclarations $declarations = null): FileFingerprints
     {
-        $tests = self::tests($statements);
+        $tests = self::tests($statements, $declarations);
 
         return new FileFingerprints(self::fingerprints($tests), self::sharedDatasets($tests), self::datasetParameters($tests));
     }
@@ -185,7 +185,7 @@ final readonly class PestFingerprints
                 'parameters' => $datasetParameters,
                 'tokens' => TokenCollector::sum($tokens, $modifierTokens),
             ],
-            DatasetRows::fingerprints($testCase, $body, $parameters, $datasetRows, PestRowName::of(...)),
+            DatasetRows::fingerprints($testCase, $body, $parameters, $datasetRows, $this->datasets->rowName(...)),
         );
     }
 
@@ -317,11 +317,11 @@ final readonly class PestFingerprints
      * @param array<\PhpParser\Node\Stmt> $statements
      * @return array<string, Test>
      */
-    private static function tests(array $statements): array
+    private static function tests(array $statements, ?ClassDeclarations $declarations = null): array
     {
         $statements = self::withoutNamespaces($statements);
 
-        return new self(new FileDatasets(self::namedDatasets($statements), $statements))->walk($statements, '');
+        return new self(new FileDatasets(self::namedDatasets($statements), $statements, $declarations))->walk($statements, '');
     }
 
     /**

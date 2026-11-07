@@ -6951,3 +6951,102 @@ it('computes differsBy for a PHPUnit data provider row without a key (#182)', fu
         ->and($report->candidates[0]->testCase())->toBe('testRows › 0')
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:check#0/value:1']);
 });
+
+/**
+ * @param array<string, list<string>> $linesByTest
+ */
+function analyzeWithDeclarations(string $source, array $linesByTest): FileReport
+{
+    $project = temporaryDirectory();
+    mkdir($project . '/tests');
+    mkdir($project . '/src/Enums', recursive: true);
+    file_put_contents($project . '/composer.json', (string) json_encode(['autoload' => ['psr-4' => ['App\\' => 'src/']]]));
+    file_put_contents($project . '/src/Enums/IntegrationType.php', <<<'PHP'
+        <?php
+        namespace App\Enums;
+
+        enum IntegrationType: string
+        {
+            case Upgates = 'upgates';
+            case Shoper = 'shoper';
+            case Broken = "line\nbreak";
+            public const string DEFAULT = 'default';
+            public const string OTHER = 'other';
+        }
+        PHP);
+    file_put_contents($project . '/src/Enums/Level.php', "<?php\nnamespace App\\Enums;\n\nenum Level: int\n{\n    case Low = 1;\n    case High = 2;\n}\n");
+    file_put_contents($project . '/src/Enums/Mode.php', "<?php\nnamespace App\\Enums;\n\nenum Mode\n{\n    case Strict;\n    case Loose;\n}\n");
+    file_put_contents($project . '/tests/DeclarationTest.php', $source);
+    $coverage = [];
+
+    foreach ($linesByTest as $name => $lines) {
+        $coverage['tests/DeclarationTest.php :: ' . $name] = array_fill_keys($lines, value: true);
+    }
+
+    $report = new RedundancyAnalyzer(new FingerprintCache($project))->analyze(['tests/DeclarationTest.php' => $coverage], map: null)[0];
+    removeDirectory($project);
+
+    return $report;
+}
+
+it('resolves a dataset key of an enum declared in another file of the project (#187)', function (): void {
+    $report = analyzeWithDeclarations(
+        source: "<?php\nuse App\\Enums\\IntegrationType;\n\nit('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})"
+            . "->with([IntegrationType::Upgates->value => [1], IntegrationType::Shoper->value => [2]]);\n",
+        linesByTest: ['it a › upgates' => ['src/Store.php:5'], 'it a › shoper' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it a › upgates')
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:f#0/value:1']);
+});
+
+it('resolves a dataset key of a class constant declared in another file of the project (#187)', function (): void {
+    $report = analyzeWithDeclarations(
+        source: "<?php\nuse App\\Enums\\IntegrationType;\n\nit('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})"
+            . "->with([IntegrationType::DEFAULT => [1], IntegrationType::OTHER => [2]]);\n",
+        linesByTest: ['it a › default' => ['src/Store.php:5'], 'it a › other' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe(['in:function:f#0/value:1']);
+});
+
+it('leaves a dataset row unresolved when the enum value in it has a control character (#181)', function (): void {
+    $report = analyzeWithDeclarations(
+        source: "<?php\nuse App\\Enums\\IntegrationType;\n\nit('a', function (mixed \$v): void {\n    expect(f(\$v))->toBe(1);\n})"
+            . "->with([IntegrationType::Broken, IntegrationType::Shoper]);\n",
+        linesByTest: [
+            "it a › (App\\Enums\\IntegrationType Enum (Broken, 'line\nbreak'))" => ['src/Store.php:5'],
+            'it a › (App\\Enums\\IntegrationType Enum (Shoper, \'shoper\'))' => ['src/Store.php:5', 'src/Store.php:6'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBeNull();
+});
+
+it(
+    'names a dataset row that holds an enum declared in another file the way Pest prints it (#181)',
+    function (string $rows, string $row, string $coveringRow): void {
+        $report = analyzeWithDeclarations(
+            source: "<?php\nuse App\\Enums\\IntegrationType;\nuse App\\Enums\\Level;\nuse App\\Enums\\Mode;\n\nit('a', function (mixed \$v): void {\n"
+                . "    expect(f(\$v))->toBe(1);\n})->with({$rows});\n",
+            linesByTest: ["it a › {$row}" => ['src/Store.php:5'], "it a › {$coveringRow}" => ['src/Store.php:5', 'src/Store.php:6']],
+        );
+    
+        expect($report->candidates)->toHaveCount(1)
+            ->and($report->candidates[0]->testCase())->toBe("it a › {$row}")
+            ->and($report->candidates[0]->differsBy)->not->toBeNull();
+    },
+)->with([
+    'a class constant' => ['[IntegrationType::DEFAULT, IntegrationType::OTHER]', '(\'default\')', '(\'other\')'],
+    'backed by an int' => ['[Level::Low, Level::High]', '(App\\Enums\\Level Enum (Low, 1))', '(App\\Enums\\Level Enum (High, 2))'],
+    'backed by a string' => [
+        '[IntegrationType::Upgates, IntegrationType::Shoper]',
+        '(App\\Enums\\IntegrationType Enum (Upgates, \'upgates\'))',
+        '(App\\Enums\\IntegrationType Enum (Shoper, \'shoper\'))',
+    ],
+    'pure' => ['[Mode::Strict, Mode::Loose]', '(App\\Enums\\Mode Enum (Strict))', '(App\\Enums\\Mode Enum (Loose))'],
+    'the value of a case' => ['[IntegrationType::Upgates->value, IntegrationType::Shoper->value]', '(\'upgates\')', '(\'shoper\')'],
+]);

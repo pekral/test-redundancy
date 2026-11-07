@@ -12,6 +12,8 @@ final class FingerprintCache
     /** @var array<string, \Pekral\TestRedundancy\Fingerprint\FileFingerprints> */
     private array $byFile = [];
 
+    private ?ClassDeclarations $declarations = null;
+
     public function __construct(private readonly string $projectRoot)
     {
     }
@@ -253,7 +255,9 @@ final class FingerprintCache
             return null;
         }
 
-        return $this->byFile[$file] ??= ContractFingerprints::analyse($path);
+        $this->declarations ??= ClassDeclarations::forProject($this->projectRoot);
+
+        return $this->byFile[$file] ??= ContractFingerprints::analyse($path, $this->declarations);
     }
 
     /**

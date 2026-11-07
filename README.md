@@ -931,6 +931,12 @@ test lacks.
   [3], 7 => [4]]` gives `0`, `named`, `1` and `2`. This holds for a provider that returns an array, and for a generator
   whose statements are only `yield` expressions. A key the analysis cannot read, such as a class constant, stops the
   counter, and the rows after it stay unresolved.
+  A dataset key or a row value that is an enum case or a class constant of a class declared in another file of the
+  project is resolved through that declaration, as [What the analysis reads](#what-the-analysis-reads) describes. A
+  row that holds the case is named the way Pest prints it, with the full class name:
+  `(App\Enums\Level Enum (High, 2))` for a backed case and `(App\Enums\Mode Enum (Strict))` for a pure one. A row
+  that holds an object of a class other than `stdClass` stays unresolved, because Pest names it by the properties
+  the class declares (`(Report)` or `Report Object ()`).
 - **Local variables.** A literal, constant, empty array, list or map (as defined for dataset rows) that the test
   assigns once to a local variable in its own statements is counted where the test reads the variable:
   `$email = 'a@example.com'; notify($email);` has the same tokens as `notify('a@example.com')`,
@@ -957,6 +963,23 @@ test lacks.
    `nikic/php-parser`: Pest `it()` / `test()` with `->with()` datasets and chained modifiers such as `->throws()`, and
    PHPUnit `test*` / `#[Test]` / `@test` methods with `#[DataProvider]` / `@dataProvider` rows. Pest tests inside a
    namespace or `describe()` blocks, and shared `dataset('name', …)` rows of the same file, are parsed too.
+
+### What the analysis reads
+
+The fingerprint phase only parses PHP with `nikic/php-parser`. It never includes, autoloads or runs the analysed code,
+and it never calls `constant()`, `class_exists()` or reflection on a name from it. Besides the test file, it reads one
+kind of file: the declaration of a class whose enum case or constant a dataset key or a dataset row uses, such as
+`IntegrationType::Upgates->value => [...]` or `->with([Level::High])`.
+
+- The class name is resolved from the test file's `namespace` and `use` imports. `self`, `static`, `parent` and a
+  name built at runtime are not resolved.
+- The file comes only from the `psr-4` maps of `autoload` and `autoload-dev` in the project's own `composer.json`,
+  read as JSON. Every segment of the class name must be a plain identifier.
+- The file must resolve inside the project root, outside `vendor/`, and be at most 512 KiB. A symlink that leads out
+  of the project root is not read.
+- Only an enum case with a literal `string` or `int` value, a pure enum case, and a class constant with a literal
+  `string` or `int` value are read. A value that is an expression or refers to another constant is not followed.
+- Each file is parsed at most once per run. Any step that fails leaves the row unresolved, as before.
 
 ---
 

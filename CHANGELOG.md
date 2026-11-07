@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A dataset key that is an enum case value or a class constant of a class declared in another file of the project,
+  such as `IntegrationType::Upgates->value => [...]`, is resolved and the row gets a computed `differsBy` (#187).
+- A Pest row that holds an enum case of a class declared in another file of the project is named the way Pest prints
+  it, such as `(App\Enums\Level Enum (High, 2))` or `(App\Enums\Mode Enum (Strict))`, and gets a computed `differsBy`
+  (#181). A row that holds a class constant is named by its value. A row that holds an object of a class other than
+  `stdClass` stays unresolved: Pest names it by the properties the class declares.
+- Both read the declaration through the project's own `psr-4` maps only, inside the project root and outside
+  `vendor/`, with the PHP parser, one level deep; README *What the analysis reads* lists every rule.
+  `ContractFingerprints::analyse()`, `PestFingerprints::analyse()` and `PestRowName::of()` take an optional
+  `?ClassDeclarations` parameter; a caller that passes nothing gets the same result as before.
 - The text report prints for a `merge-into-dataset` candidate the covering row values that the JSON field
   `coveringDiffersBy` lists, such as `covering differs by: value:2` (#190). Before, the line came from the tokens that
   make a candidate `review`, so it was missing for every merge candidate. Every other action prints the same line as
