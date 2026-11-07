@@ -5,11 +5,14 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Fingerprint;
 
 use PhpParser\Node\Attribute;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Yield_;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
 
@@ -122,12 +125,26 @@ final class PhpUnitFingerprints
         $yields = $nodeFinder->findInstanceOf($provider->stmts ?? [], Yield_::class);
 
         if ($yields !== []) {
-            return array_values($yields);
+            return self::onlyTopLevelYields($provider, $yields) ? PhpUnitRowNames::named(array_values($yields)) : array_values($yields);
         }
 
         $return = $nodeFinder->findFirstInstanceOf($provider->stmts ?? [], Return_::class);
 
-        return $return?->expr instanceof Array_ ? array_values($return->expr->items) : [];
+        return $return?->expr instanceof Array_ ? PhpUnitRowNames::named(array_values($return->expr->items)) : [];
+    }
+
+    /**
+     * @param array<\PhpParser\Node\Expr\Yield_> $yields
+     */
+    private static function onlyTopLevelYields(ClassMethod $provider, array $yields): bool
+    {
+        $statements = array_map(
+            static fn (Stmt $statement): ?Expr => $statement instanceof Expression ? $statement->expr : null,
+            $provider->stmts ?? [],
+        );
+
+        return count($yields) === count($statements)
+            && array_all($yields, static fn (Yield_ $yield): bool => in_array($yield, $statements, strict: true));
     }
 
     private static function hasAttribute(ClassMethod $method, string $name): bool

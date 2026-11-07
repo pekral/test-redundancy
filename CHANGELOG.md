@@ -20,6 +20,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `('a') #2` and `('a') #3` for `->with(['a', 'a', 'b', 'a'])`, and gets a computed `differsBy` (#180). Before, every
   such row got the name without the number, the rows overwrote each other, and none matched a test of the coverage run.
   A repeated name of a row with a key, and a repeated name in a dataset combined with another one, stay unresolved.
+- A row of a PHPUnit data provider without a string key is named by the counter PHPUnit uses (`with data set #0`,
+  `#1`, …) and gets a computed `differsBy` (#182). PHPUnit 10.5 and 13.4 both count every row without a string key from
+  0, whatever integer key the row has. This holds for a provider that returns an array and for a generator of top-level
+  `yield` statements. A key the analysis cannot read stops the counter; the rows after it stay unresolved.
 - An item of a list under an array key now carries the call path of the array, followed by the key and a `list`
   segment, such as `in:expect:function:build/call:toBe#0/value:'items'/list/value:'x'` for
   `expect(build())->toBe(['items' => ['x']])` (#191). Before, such an item had only the key path,
