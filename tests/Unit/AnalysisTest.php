@@ -1117,6 +1117,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
         [
             'in:function:buildPipelineAction#0/value:\'properties\'/key:value:\'variants\'',
             'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\'',
+            'in:expect:function:buildPipelineAction/call:toEqual#0/value:\'properties\'/key:value:\'variants\'',
         ],
     ],
     'multicast pipeline without the parallel flag' => [
@@ -1432,7 +1433,7 @@ it('does not delete a test whose covering test passes its literal inside a neste
     'list under a key against a map' => [
         '[\'a\' => [1]]',
         '[\'a\' => 1]',
-        ['in:function:foo#0/value:\'a\'/value:list-item', 'in:value:\'a\'/value:1'],
+        ['in:function:foo#0/value:\'a\'/value:list-item', 'in:function:foo#0/value:\'a\'/list/value:1'],
     ],
 ]);
 
@@ -2703,8 +2704,8 @@ it('asks to merge a test whose expected empty list replaces the list in which it
         [
             'in:function:build#0/value:2',
             'in:expect:function:build/call:toBe#0/value:\'items\'/value:list-item',
-            'in:value:\'items\'/value:\'x\'',
-            'in:value:\'items\'/value:\'y\'',
+            'in:expect:function:build/call:toBe#0/value:\'items\'/list/value:\'x\'',
+            'in:expect:function:build/call:toBe#0/value:\'items\'/list/value:\'y\'',
         ],
     ],
 ]);
@@ -6777,4 +6778,70 @@ it('names the rejection and the covering test in the step of a keep candidate', 
             . 'and the covering tests "it b" assert no rejection: this test covers the error path, '
             . 'and the covering tests cover another path through the same lines. Keep this test.',
     ]);
+});
+
+it('does not delete a test whose list values under a key swap places with those of its covering test (#191)', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('stores x and reads y', function (): void {
+                store(['items' => ['x']]);
+                expect(get())->toBe(['items' => ['y']]);
+            });
+            it('stores y and reads x', function (): void {
+                store(['items' => ['y']]);
+                expect(get())->toBe(['items' => ['x']]);
+            });
+            PHP,
+        linesByTest: ['it stores x and reads y' => ['src/Store.php:5'], 'it stores y and reads x' => ['src/Store.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBe([
+            'in:function:store#0/value:\'items\'/list/value:\'x\'',
+            'in:expect:function:get/call:toBe#0/value:\'items\'/list/value:\'y\'',
+        ])
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
+});
+
+it('reviews, and does not merge, a test that differs only in the key order of a map under a key of a call', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('sends from first', function (): void {
+                transfer(['k' => ['from' => $a, 'to' => $b]]);
+            });
+            it('sends to first', function (): void {
+                transfer(['k' => ['to' => $b, 'from' => $a]]);
+            });
+            PHP,
+        linesByTest: ['it sends from first' => ['src/Transfer.php:5'], 'it sends to first' => ['src/Transfer.php:5']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->action())->toBe(Action::Review);
+});
+
+it('reviews, and does not delete, a test whose covering test passes more keys to the same assert-named call (#191)', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('rejects a stored segment', function (array $stored): void {
+                $this->validator->assertSameAudience(['segments' => [['id' => null, 'query' => 'entire_list']]], $stored);
+            })->with([
+                'other segment type' => [['segments' => [['id' => 'seg', 'query' => 'entire_list', 'type' => 'rfm']]]],
+                'saved segment without entire_list' => [['segments' => [['id' => 'seg']]]],
+            ])->throws(StaleSave::class);
+            PHP,
+        linesByTest: [
+            'it rejects a stored segment › other segment type' => ['src/Validator.php:5', 'src/Validator.php:6'],
+            'it rejects a stored segment › saved segment without entire_list' => ['src/Validator.php:5'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it rejects a stored segment › saved segment without entire_list')
+        ->and($report->candidates[0]->differsBy)->toBe([])
+        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->steps()[0])->toStartWith('The covering test "it rejects a stored segment › other segment type" expects');
 });

@@ -268,6 +268,7 @@ final readonly class Candidate implements JsonSerializable
         return [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
+            ...$this->coveringTokenSteps(Action::MISSING_EXPECTATION_STEP, $this->coveringExpectations()),
             ...$this->coveringTokenSteps(Action::EXPECTED_EXCEPTION_STEP, $this->coveringExpectedExceptions()),
             ...$this->coveringTokenSteps(
                 $this->assertsNothing ? Action::NO_ASSERTION_STEP : Action::MISSING_CALL_STEP,
@@ -298,7 +299,7 @@ final readonly class Candidate implements JsonSerializable
         return array_values(
             array_filter(
                 $this->assertsNothing ? $this->coveringTokens() : $this->coveringDifference ?? [],
-                fn (string $token): bool => !TokenCollector::isAssertionToken($token)
+                fn (string $token): bool => TokenKind::isInputOrKeyOfSharedAssertion($token, $this->coveringTokens())
                     && (NonLiteralArguments::identityPositionOf($token) === null || NonLiteralArguments::isCallArgument($token))
                     && ($this->assertsNothing || !TokenKind::isData($token) || TokenKind::isKey($token) || TokenKind::isArgument($token)),
             ),
