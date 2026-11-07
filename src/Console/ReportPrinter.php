@@ -9,6 +9,7 @@ use Pekral\TestRedundancy\Analysis\AgentReport;
 use Pekral\TestRedundancy\Analysis\Candidate;
 use Pekral\TestRedundancy\Analysis\FileReport;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 final readonly class ReportPrinter
@@ -49,7 +50,7 @@ final readonly class ReportPrinter
      */
     public function printJson(AgentReport $report, bool $pretty): void
     {
-        $this->io->writeln(Json::encode($report, $pretty));
+        $this->io->writeln(Json::encode($report, $pretty), OutputInterface::OUTPUT_RAW);
     }
 
     private function printReport(FileReport $report): void
