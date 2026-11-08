@@ -14,6 +14,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and values of the same arrays, is `merge-into-dataset` with whole arrays as row values. Every other such candidate is
   `keep`. README *Other combinations of input values* lists the rules.
 
+### Fixed
+
+- The analysis reads the rows of more datasets that a test file declares statically, so those rows get a computed
+  `differsBy` instead of `null`:
+  - a variable that the file writes once, such as `->with($providers)` for `$providers = [...]`;
+  - a local variable that a dataset closure or function assigns once before its rows, such as `$threshold = [...]`
+    followed by `return ['one' => [$threshold]]` or `yield 'one' => [$threshold]`;
+  - `yield from` a literal array or a function of the same file, and `return` of such a function;
+  - a spread of a function or a variable of the same file inside a dataset array, such as `[...rows(), 'two' => [2]]`;
+  - a named dataset that a `describe()` block declares. A name that two blocks declare stays unresolved.
+- A function or a variable that reads itself, directly or through another one, no longer recurses without end.
+
 ## [0.2.3] - 2026-11-08
 
 ### Changed

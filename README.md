@@ -952,6 +952,13 @@ test lacks.
   [3], 7 => [4]]` gives `0`, `named`, `1` and `2`. This holds for a provider that returns an array, and for a generator
   whose statements are only `yield` expressions. A key the analysis cannot read, such as a class constant, stops the
   counter, and the rows after it stay unresolved.
+  The analysis reads the rows of a dataset that the test file declares: a literal array, a named dataset of the file or
+  of a `describe()` block (a name that two blocks declare stays unresolved), a variable that the file writes once (a write in a loop counts too),
+  a function of the file called without arguments, and a closure or a function whose statements are `yield`,
+  `yield from` or one `return`, after local variables that it assigns once. Such a local variable is replaced by its
+  value in the rows, also inside another local variable, but not inside a `function () use (…)` closure. A spread
+  `...rows()` or `...$rows` inside a dataset array adds the rows of that function or variable. A dataset built by a
+  loop, a condition, a call with arguments or a call of another class stays unresolved.
   A dataset key or a row value that is an enum case or a class constant of a class declared in another file of the
   project is resolved through that declaration, as [What the analysis reads](#what-the-analysis-reads) describes. A
   row that holds the case is named the way Pest prints it, with the full class name:
