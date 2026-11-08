@@ -86,7 +86,7 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
         candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']),
         Action::Keep,
     ],
-    'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
+    'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::Keep],
     'key in a value of a call that only the covering test sets' => [
         candidate('it works', ['it also works'], ['in:function:store#0/value:\'a\'/value:1'], ['in:function:store#0/value:\'b\'/key:value:\'c\'']),
         Action::Keep,
@@ -100,6 +100,7 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
         candidate('it works', ['it also works'], ['value:1'], ['in:function:store#0/key:value:\'b\'']),
         Action::Keep,
     ],
+    'literal input of a row of another test' => [candidate('it works › empty', ['it also works'], ['value:\'\'']), Action::Keep],
     'literal under a key in both tests' => [
         candidate('it works', ['it also works'], ['in:value:\'a/b\'/value:false'], ['in:value:\'c\'/value:\'x\'/const:Foo::BAR']),
         Action::MergeIntoDataset,
@@ -111,14 +112,14 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
         Action::Review,
     ],
     'one test of the same file' => [candidate('it works', ['it also works'], ['value:1', 'const:Foo::BAR']), Action::MergeIntoDataset],
-    'row of another test' => [candidate('it works › empty', ['it also works'], ['value:\'\'']), Action::Review],
-    'sibling row' => [candidate('it works › empty', ['it works › blank'], ['value:\'\'']), Action::ReviewDatasetRow],
+    'row of another test' => [candidate('it works › empty', ['it also works'], ['in:call:toBe#0/value:\'\'']), Action::Review],
+    'sibling row' => [candidate('it works › empty', ['it works › blank'], ['value:\'\'']), Action::Keep],
     'sibling row and another test' => [
         candidate('it works › a', ['it works › b', 'it also works'], ['value:1'], ['value:2', 'call:toBeTrue']),
         Action::ReviewDatasetRow,
     ],
-    'test of another file' => [candidate('it works', ['tests/BarTest.php :: it works'], ['value:1']), Action::Review],
-    'two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1']), Action::Review],
+    'test of another file' => [candidate('it works', ['tests/BarTest.php :: it works'], ['value:1']), Action::Keep],
+    'two covering tests' => [candidate('it works', ['it a', 'it b'], ['value:1']), Action::Keep],
     'unparsed' => [candidate('it works', ['it also works'], differsBy: null), Action::Review],
 ]);
 
@@ -279,6 +280,61 @@ it('keeps a dataset row that lacks an array key nested in an argument', function
         ->and($candidate->steps())->toBe([sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it drains › parallel"', $key)]);
 });
 
+it('keeps a test that passes other literal input values than its covering tests, because it is another combination of input values', function (
+    Candidate $candidate,
+    string $coveringTests,
+): void {
+    expect($candidate->action())->toBe(Action::Keep)
+        ->and($candidate->steps())->toBe([
+            'This test passes the input values in differsBy, which the covering tests ' . $coveringTests . ' do not pass: '
+                . 'this test simulates another combination of input values, which is a case of its own. Keep this test.',
+        ]);
+})->with([
+    'a dataset row with another value under the same key as its sibling row' => [
+        candidate(
+            'it updates › email',
+            ['it updates › phone'],
+            ['in:function:update#0/value:\'email\'/value:\'a@b.cz\''],
+            ['in:function:update#0/value:\'email\'/value:\'c@d.cz\''],
+        ),
+        '"it updates › phone"',
+    ],
+    'a test that a test of another file covers' => [
+        candidate('it works', ['tests/BarTest.php :: it works'], ['in:function:store#0/value:1']),
+        '"tests/BarTest.php :: it works"',
+    ],
+    'a test that two tests cover' => [candidate('it works', ['it a', 'it b'], ['value:1']), '"it a", "it b"'],
+]);
+
+it('keeps, and does not offer to delete, a dataset row that sets the same key to another value than its sibling row', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('updates a contact', function (array $data): void {
+                expect(update($data))->toBeTrue();
+            })->with([
+                'one name' => [['name' => 'Jana', 'surname' => 'Nová']],
+                'another name' => [['name' => 'Petr', 'surname' => 'Starý']],
+            ]);
+            PHP,
+        linesByTest: [
+            'it updates a contact › one name' => ['src/Contact.php:5'],
+            'it updates a contact › another name' => ['src/Contact.php:5', 'src/Contact.php:6'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it updates a contact › one name')
+        ->and($report->candidates[0]->action())->toBe(Action::Keep)
+        ->and(implode(' ', $report->candidates[0]->steps()))->not->toContain('Delete');
+});
+
+it('reviews a test that passes other literal input values when its covering test passes a call the test lacks', function (): void {
+    $candidate = candidate('it works', ['tests/BarTest.php :: it works'], ['value:1'], ['call:forget']);
+
+    expect($candidate->action())->toBe(Action::Review);
+});
+
 it('names the lines only the union of the covering tests reaches in the report and the steps', function (): void {
     $candidate = candidate('it works', ['it a', 'it b'], [], unionOnlyLines: ['src/Foo.php:12', 'src/Foo.php:15']);
     $json = decodedJson((string) json_encode($candidate));
@@ -299,11 +355,23 @@ it('names every covering test, or the sibling row, in the first step', function 
     expect($candidate->steps()[0])->toBe($firstStep);
 })->with([
     'delete' => [candidate('it works', ['it a', 'it b'], []), 'Confirm that "it a", "it b" together assert the same input and result.'],
-    'sibling row' => [candidate('it works › empty', ['it a', 'it works › blank'], ['value:\'\'']), 'Compare this row with "it works › blank".'],
+    'sibling row' => [candidate(
+        'it works › empty',
+        ['it a', 'it works › blank'],
+        ['in:call:toBe#0/value:\'\''],
+    ), 'Compare this row with "it works › blank".',
+    ],
 ]);
 
 it('serializes a candidate and a file report for an agent', function (): void {
-    $candidate = new Candidate('tests/FooTest.php :: it works › empty', ['it works › blank'], ['value:\'\''], [], [], assertsNothing: false);
+    $candidate = new Candidate(
+        'tests/FooTest.php :: it works › empty',
+        ['it works › blank'],
+        ['in:call:toBe#0/value:\'\''],
+        [],
+        [],
+        assertsNothing: false,
+    );
     $json = decodedJson((string) json_encode(new AgentReport([
         new FileReport('tests/FooTest.php', 2, 5, [$candidate], []),
         new FileReport('tests/BarTest.php', 1, 3, [], []),
@@ -339,7 +407,7 @@ it('serializes a candidate and a file report for an agent', function (): void {
                     'coveredBy' => ['it works › blank'],
                     'coveringDiffersBy' => [],
                     'coveringOnly' => [],
-                    'differsBy' => ['value:\'\''],
+                    'differsBy' => ['in:call:toBe#0/value:\'\''],
                     'seconds' => null,
                     'unionOnlyLines' => [],
                 ],
@@ -913,7 +981,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
         'can tags be stored › empty tags',
         'can tags be stored › allowed overlimit tag prefix without suffix',
         ['in:call:canTagsBeStored#1/value:[]'],
-        Action::ReviewDatasetRow,
+        Action::Keep,
     ],
     'nested empty tags in a dataset row' => [
         <<<'PHP'
@@ -929,7 +997,7 @@ it('keeps a test that adds only an empty array to its covering test', function (
         'it registers no tags › tags is an empty array',
         'it registers no tags › tags contains only blank values',
         ['in:function:register#0/value:\'tags\'/value:[]'],
-        Action::ReviewDatasetRow,
+        Action::Keep,
     ],
     'standalone test with empty custom fields' => [
         <<<'PHP'
@@ -995,7 +1063,7 @@ it('keeps a dataset row whose empty array the covering row has only under an unr
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/OptionsTest.php :: it stores options › empty a')
         ->and($reports[0]->candidates[0]->differsBy)->toBe(['in:function:store#0/value:\'a\'/value:[]'])
-        ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+        ->and($reports[0]->candidates[0]->action())->toBe(Action::Keep);
 });
 
 it('still deletes a dataset row whose literal sits under the same key as in the covering row', function (): void {
@@ -1482,7 +1550,7 @@ it('does not delete a dataset row whose sibling row passes its value inside a ne
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it foos › flat')
         ->and($report->candidates[0]->differsBy)->toBe($differsBy)
-        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 })->with([
     'list in a list in a list' => ['1', '[[[1]]]', ['in:function:foo#0/value:1']],
     'list under a key' => ['[\'a\' => 1]', '[\'a\' => [1]]', ['in:function:foo#0/value:\'a\'/value:1']],
@@ -1659,7 +1727,7 @@ it('still deletes a test whose covering test passes a value it lacks only to an 
     ],
 ]);
 
-it('keeps a dataset row whose literals a sibling row has at swapped positions', function (string $source, array $differsBy): void {
+it('keeps a dataset row whose literals a sibling row has at swapped positions', function (string $source, array $differsBy, Action $action): void {
     $project = temporaryDirectory();
     mkdir($project . '/tests');
     file_put_contents($project . '/tests/NotifyTest.php', $source);
@@ -1673,7 +1741,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
     expect($reports[0]->candidates)->toHaveCount(1)
         ->and($reports[0]->candidates[0]->testKey)->toBe('tests/NotifyTest.php :: it notifies › first')
         ->and($reports[0]->candidates[0]->differsBy)->toBe($differsBy)
-        ->and($reports[0]->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+        ->and($reports[0]->candidates[0]->action())->toBe($action);
 })->with([
     'swapped addresses passed as arguments' => [
         <<<'PHP'
@@ -1688,6 +1756,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             ]);
             PHP,
         ['in:function:notify#0/value:\'owner@example.com\'', 'in:function:notify#1/value:null'],
+        Action::Keep,
     ],
     'swapped addresses passed under keys' => [
         <<<'PHP'
@@ -1702,6 +1771,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             ]);
             PHP,
         ['in:function:notify#0/value:\'sub_notify\'/value:\'owner@example.com\'', 'in:function:notify#0/value:\'unsub_notify\'/value:null'],
+        Action::Keep,
     ],
     'swapped booleans' => [
         <<<'PHP'
@@ -1714,6 +1784,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             ]);
             PHP,
         ['in:function:notify#0/value:false', 'in:expect:function:notify/call:toBe#0/value:true'],
+        Action::ReviewDatasetRow,
     ],
     'swapped values the rows pair with the same literal subjects' => [
         <<<'PHP'
@@ -1727,6 +1798,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             ]);
             PHP,
         ['in:expect:value:\'5\'/call:toBe#0/value:5', 'in:expect:value:\'6\'/call:toBe#0/value:6'],
+        Action::ReviewDatasetRow,
     ],
     'swapped values the test reads without the parameter name' => [
         <<<'PHP'
@@ -1739,6 +1811,7 @@ it('keeps a dataset row whose literals a sibling row has at swapped positions', 
             ]);
             PHP,
         ['value:1'],
+        Action::Keep,
     ],
 ]);
 
@@ -1828,7 +1901,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn ($n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f([1, 2]))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'another list length for a parameter without a type the covering closure puts in an expected list' => [
         <<<'PHP'
@@ -1872,7 +1945,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int|string $id) => expect(find($id))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(find(1.5))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'keyed array for a parameter of type int' => [
         <<<'PHP'
@@ -1880,7 +1953,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $a) => expect(f($a))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f(['a' => 1]))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'list item int for a parameter of type int the covering closure puts in a list' => [
         <<<'PHP'
@@ -1912,7 +1985,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $n) => expect(f([$n, 5]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f([1, 6]))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'list item string for a parameter of type int the covering closure puts in a list' => [
         <<<'PHP'
@@ -1920,7 +1993,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f(['x']))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'list item string for a parameter of type string the covering closure puts in an expected list' => [
         <<<'PHP'
@@ -1976,7 +2049,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(find(null))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'null for a parameter of type callable' => [
         <<<'PHP'
@@ -1984,7 +2057,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (callable $f) => expect(apply($f))->toBeTrue())->with(['row' => ['strlen']]);
             it('covers', fn () => expect(apply(null))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'null for a parameter of type int' => [
         <<<'PHP'
@@ -1992,7 +2065,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $reminderCode) => expect(type($reminderCode))->toBe('reminder'))->with(['row' => [1]]);
             it('covers', fn () => expect(type(null))->toBe('reminder'));
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'scalar for a parameter of type array' => [
         <<<'PHP'
@@ -2000,7 +2073,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(find(5))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'shorter expected list for a parameter without a type the covering closure expects' => [
         <<<'PHP'
@@ -2024,7 +2097,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (Status $status) => expect(label($status))->toBeTrue())->with(['row' => [Status::ACTIVE]]);
             it('covers', fn () => expect(label('inactive'))->toBeTrue());
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'string for a parameter of type iterable' => [
         <<<'PHP'
@@ -2032,7 +2105,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (iterable $items) => expect(sum($items))->toBe(3))->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(sum('abc'))->toBe(3));
             PHP,
-        Action::Review,
+        Action::Keep,
     ],
     'string with a slash for a parameter of type string' => [
         <<<'PHP'
@@ -2052,7 +2125,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
     ],
 ]);
 
-it('reviews, and does not merge, a test whose value the data provider test hard-codes in its body', function (): void {
+it('keeps, and does not merge, a test whose value the data provider test hard-codes in its body', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -2070,7 +2143,7 @@ it('reviews, and does not merge, a test whose value the data provider test hard-
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('testAddsRounded')
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:add#2/value:true'])
-        ->and($report->candidates[0]->action())->toBe(Action::Review);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 });
 
 it('asks for a review of a test whose expected value lacks an element, a key or an argument its covering test expects', function (
@@ -3653,7 +3726,7 @@ it('lists no order token for a key that a sibling row lacks, because the key is 
 
     expect($report->candidates[0]->testCase())->toBe('it stores › three')
         ->and($report->candidates[0]->differsBy)->not->toContain('in:function:store#0/keys:value:\'a\'>value:\'c\'')
-        ->and($report->candidates[0]->action())->toBe(Action::ReviewDatasetRow);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 });
 
 it('lists the order token of a key whose pair the covering test has in another order', function (): void {
@@ -4119,7 +4192,7 @@ it('names the tests that use the dataset in the steps of every other action for 
         ],
     ],
     'data that a sibling row lacks' => [
-        sharedRow(['it first › two'], ['value:1']),
+        sharedRow(['it first › two'], ['in:call:toBe#0/value:1']),
         Action::ReviewDatasetRow,
         [
             SHARED_ROW_STEP,

@@ -70,6 +70,7 @@ final readonly class Candidate implements JsonSerializable
                 && $this->coveringDatasetTakesDiffersBy()
                 && $this->omittedByCovering === [] => Action::MergeIntoDataset,
             $this->rejectionsTheCoveringTestsLack !== [] => Action::Keep,
+            InputCombination::isOtherLiteralInput($this->differsBy, $this->coveringDifference, $this->omittedByCovering) => Action::Keep,
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
             $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
             default => Action::Review,
@@ -129,7 +130,7 @@ final readonly class Candidate implements JsonSerializable
         $coveringInput = implode(', ', $this->coveringTokensForReview());
 
         return match (true) {
-            $action === Action::Keep && $this->rejectionsTheCoveringTestsLack === [] => [
+            $action === Action::Keep && $this->otherInput() instanceof InputCombination => [
                 sprintf(Action::OTHER_INPUT_KEEP_STEP, Action::quoted($this->coveredBy), $coveringInput),
             ],
             $action === Action::Keep => Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack),

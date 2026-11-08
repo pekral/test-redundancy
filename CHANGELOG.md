@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A candidate whose `differsBy` holds only literal input values, such as another value under the same key, against a
+  covering test that passes only literal input values in their place, passes another combination of input values. It
+  is `keep` with a step that says so, instead of `review` or `review-dataset-row` with a step that offers to delete it.
+  A candidate that differs only in data from one test of the same file stays `merge-into-dataset`. A value in an
+  assertion, a call, a closure, a cast or an omitted argument keeps the candidate `review`. README *Other combinations
+  of input values* lists the rules.
+
 ## [0.2.4] - 2026-11-08
 
 ### Changed

@@ -97,6 +97,9 @@ enum Action: string
     public const string OTHER_INPUT_KEEP_STEP = 'The covering test %s passes the input in coveringDiffersBy (%s), and this test does not: '
         . 'this test simulates another combination of input values, which is a case of its own. Keep this test.';
 
+    public const string OTHER_LITERAL_INPUT_KEEP_STEP = 'This test passes the input values in differsBy, which the covering tests %s '
+        . 'do not pass: this test simulates another combination of input values, which is a case of its own. Keep this test.';
+
     public const string OTHER_INPUT_MERGE_STEP = 'The covering test %s sets the array keys and values %s, and this test does not: '
         . 'the two tests simulate two combinations of input values, and each is a case of its own. '
         . 'Turn them into one test with a dataset and one row for each combination: '
@@ -120,7 +123,10 @@ enum Action: string
         ?SharedDataset $coveringSharedDataset = null,
     ): array {
         if ($this === self::Keep) {
-            return [sprintf(self::KEEP_STEP, $coveringTests, implode(', ', $coveringDiffersBy))];
+            return [$coveringDiffersBy === []
+                ? sprintf(self::OTHER_LITERAL_INPUT_KEEP_STEP, $coveringTests)
+                : sprintf(self::KEEP_STEP, $coveringTests, implode(', ', $coveringDiffersBy)),
+            ];
         }
 
         return [
