@@ -94,6 +94,14 @@ enum Action: string
         . 'for example when a call throws, a record exists, or an output buffer is open; '
         . 'keep this test when it does, and delete it only when it does not.';
 
+    public const string OTHER_INPUT_KEEP_STEP = 'The covering test %s passes the input in coveringDiffersBy (%s), and this test does not: '
+        . 'this test simulates another combination of input values, which is a case of its own. Keep this test.';
+
+    public const string OTHER_INPUT_MERGE_STEP = 'The covering test %s sets the array keys and values %s, and this test does not: '
+        . 'the two tests simulate two combinations of input values, and each is a case of its own. '
+        . 'Turn them into one test with a dataset and one row for each combination: '
+        . 'pass each array that differs as a whole row value, so that the row of this test keeps its own keys and lacks the others.';
+
     public const string KEEP_STEP = 'This test asserts the rejection in %2$s, such as an error status, a validation error '
         . 'or an exception, and the covering tests %1$s assert no rejection: this test covers the error path, '
         . 'and the covering tests cover another path through the same lines. Keep this test.';

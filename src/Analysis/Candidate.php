@@ -63,6 +63,7 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->sharedDataset instanceof SharedDataset
                 ? Action::Review
                 : Action::Delete,
+            $this->otherInput() instanceof InputCombination => $this->unifiesIntoOneDataset() ? Action::MergeIntoDataset : Action::Keep,
             $this->differsBy === [] => Action::Review,
             $this->differsOnlyInDataFromOneTestOfTheSameFile()
                 && $this->coveringTokensForReview() === []
@@ -124,9 +125,21 @@ final readonly class Candidate implements JsonSerializable
      */
     public function steps(): array
     {
-        return $this->action() === Action::Keep
-            ? Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack)
-            : $this->stepsToDecide();
+        $action = $this->action();
+        $coveringInput = implode(', ', $this->coveringTokensForReview());
+
+        return match (true) {
+            $action === Action::Keep && $this->rejectionsTheCoveringTestsLack === [] => [
+                sprintf(Action::OTHER_INPUT_KEEP_STEP, Action::quoted($this->coveredBy), $coveringInput),
+            ],
+            $action === Action::Keep => Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack),
+            $action === Action::MergeIntoDataset && $this->otherInput() instanceof InputCombination => [
+                sprintf(Action::OTHER_INPUT_MERGE_STEP, Action::quoted($this->coveredBy), $coveringInput),
+                'Delete this test.',
+                Action::VERIFY_STEP,
+            ],
+            default => $this->stepsToDecide(),
+        };
     }
 
     /**
@@ -330,6 +343,23 @@ final readonly class Candidate implements JsonSerializable
         return !$this->coveringDatasetParameters instanceof DatasetParameters
             || (array_all($this->differsBy ?? [], $this->coveringDatasetParameters->takes(...))
                 && !array_any($this->coveringDifference ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
+    }
+
+    private function unifiesIntoOneDataset(): bool
+    {
+        return !$this->isDatasetRow()
+            && !$this->sharedDataset instanceof SharedDataset
+            && $this->isCoveredByOneTestOfTheSameFile()
+            && TestKey::datasetOf($this->coveredBy[0]) === null
+            && $this->omittedByCovering === []
+            && $this->otherInput()?->differsOnlyInKeysOfTheArraysIn($this->differsBy ?? []) === true;
+    }
+
+    private function otherInput(): ?InputCombination
+    {
+        $input = new InputCombination($this->coveringTokensForReview(), $this->coveringKeys(), $this->coveringArguments());
+
+        return ($this->addsNoValueOrCall() || $this->differsOnlyInDataFromOneTestOfTheSameFile()) && $input->isOtherInput() ? $input : null;
     }
 
     private function isCoveredByOneTestOfTheSameFile(): bool
