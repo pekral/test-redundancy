@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-08
+
 ### Changed
 
 - A candidate whose `differsBy` holds only literal input values, such as another value under the same key, against a
@@ -13,7 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   is `keep` with a step that says so, instead of `review` or `review-dataset-row` with a step that offers to delete it.
   A candidate that differs only in data from one test of the same file stays `merge-into-dataset`. A value in an
   assertion, a call, a closure, a cast or an omitted argument keeps the candidate `review`. README *Other combinations
-  of input values* lists the rules.
+  of input values* lists the rules (#219).
 
 ## [0.2.4] - 2026-11-08
 
@@ -985,7 +987,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.4...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.5...HEAD
+[0.2.5]: https://github.com/pekral/test-redundancy/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/pekral/test-redundancy/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/pekral/test-redundancy/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/pekral/test-redundancy/compare/0.2.1...0.2.2
