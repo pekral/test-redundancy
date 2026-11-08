@@ -11,8 +11,6 @@ use Pekral\TestRedundancy\Fingerprint\TokenKind;
 final readonly class InputCombination
 {
 
-    private const string KEY_PATTERN = '~^((?:in:.*/)?)key:(.+)$~';
-
     /**
      * @param list<string> $coveringOnly the tokens only the covering test has, as coveringTokensForReview lists them
      * @param list<string> $coveringKeys
@@ -29,54 +27,21 @@ final readonly class InputCombination
             && array_all($this->coveringOnly, self::isLiteral(...));
     }
 
-    /**
-     * @param list<string> $differsBy
-     */
-    public function differsOnlyInKeysOfTheArraysIn(array $differsBy): bool
+    public static function isOtherLiteralInput(Candidate $candidate): bool
     {
-        $keys = $this->keyPaths();
-
-        return $differsBy !== []
-            && $keys !== []
-            && array_all($this->coveringOnly, static fn (string $token): bool => array_any(
-                $keys,
-                static fn (array $key): bool => str_starts_with($token, $key[0] . 'key:')
-                    || str_starts_with($token, $key[0] . $key[1] . '/'),
-            ))
-            && array_all($differsBy, static fn (string $token): bool => array_any(
-                $keys,
-                static fn (array $key): bool => $key[0] !== '' && str_starts_with($token, $key[0]),
-            ));
+        return $candidate->differsBy !== null
+            && $candidate->differsBy !== []
+            && self::holdsOnlyLiteralInput($candidate->differsBy)
+            && self::holdsOnlyLiteralInput($candidate->coveringDifference)
+            && $candidate->omittedByCovering === [];
     }
 
     /**
-     * @param list<string>|null $differsBy
-     * @param list<string>|null $coveringDifference
-     * @param list<string> $omittedByCovering
+     * @param list<string>|null $tokens
      */
-    public static function isOtherLiteralInput(?array $differsBy, ?array $coveringDifference, array $omittedByCovering): bool
+    public static function holdsOnlyLiteralInput(?array $tokens): bool
     {
-        return $differsBy !== null
-            && $differsBy !== []
-            && array_all($differsBy, self::isLiteralInput(...))
-            && array_all($coveringDifference ?? [], self::isLiteralInput(...))
-            && $omittedByCovering === [];
-    }
-
-    /**
-     * @return list<array{string, string}>
-     */
-    private function keyPaths(): array
-    {
-        $paths = [];
-
-        foreach ($this->coveringKeys as $key) {
-            if (preg_match(self::KEY_PATTERN, $key, $matches) === 1) {
-                $paths[] = [$matches[1], $matches[2]];
-            }
-        }
-
-        return $paths;
+        return array_all($tokens ?? [], self::isLiteralInput(...));
     }
 
     private static function isLiteralInput(string $token): bool

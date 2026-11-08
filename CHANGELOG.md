@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A test that passes another combination of literal input values than one test of the same file is `merge-into-dataset`
+  instead of `keep`, also when the covering test is a row of a dataset that no other test uses, when the two tests
+  differ in values and not only in array keys, and when one test passes fewer arguments. The step says to unify the two
+  tests into one test with a dataset and one row for each combination. A covering test that makes an assertion the
+  candidate lacks keeps the candidate `review`. A dataset row and a test that more than one test or a test of another
+  file covers stay `keep`. README *Other combinations of input values* lists the rules.
+
 ## [0.2.5] - 2026-11-08
 
 ### Changed

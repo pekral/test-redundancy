@@ -176,7 +176,7 @@ proof that a test is useless. The `action` of each candidate says how to judge i
 | `action` | Meaning | What to do |
 | --- | --- | --- |
 | `delete` | The candidate adds nothing new. | Delete it when a test under `coveredBy` asserts the same input and the same result. |
-| `merge-into-dataset` | It differs only in data from one test of the same file, or passes the same arrays as that test with other keys. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. For arrays with other keys, pass each array as a whole row value. |
+| `merge-into-dataset` | It differs only in data from one test of the same file, or passes another combination of literal input values than that test. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. For another combination of input values, pass each argument or array that differs as a whole row value. |
 | `review-dataset-row` | A row of the same dataset runs the same lines and differs from the sibling row in more than literal input values, such as an expected value. | Compare it with the sibling row. Delete it when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input. |
 | `review` | It asserts something the covering tests do not, differs in more than data, is a row of a named dataset another test uses, has a dataset row the analysis cannot resolve, or could not be parsed. | Judge it yourself. When in doubt, keep it. |
 | `keep` | It asserts a rejection — an error status, a validation error or an exception — and no covering test asserts any rejection, or it passes another combination of input values than the covering test. | Keep it. It covers the error path, or an input of its own. |
@@ -284,30 +284,34 @@ constant, such as `Response::HTTP_NOT_FOUND`, is not recognized: the analysis lo
 
 ### Other combinations of input values
 
-A test simulates an input, such as the values a user sends. When the covering test passes an array key or an argument
-value that the candidate does not pass, and nothing else that the candidate lacks, the candidate passes another
-combination of input values. Such a candidate is never `delete` and never `review`:
+A test simulates an input, such as the values a user sends. Two tests that pass other literal input values to the same
+code simulate two combinations of input values, and each is a case of its own. The analysis never offers to delete
+such a test. It offers to unify the two tests into one test with a dataset, or to keep the test. A candidate passes
+another combination of input values when one of these holds:
 
-- A dataset row is `keep`. It is already a row of a dataset, so the combination has its own case.
-- A test that is not a dataset row is `merge-into-dataset` when one plain test of the same file covers it, the covering
-  test only sets array keys and their values that the candidate lacks, and every value in `differsBy` is in one of the
-  same arrays. The step says to turn the two tests into one test with a dataset and one row for each combination, with
-  each array that differs as a whole row value.
-- Every other such candidate is `keep`.
+- the covering test passes an array key or an argument value that the candidate does not pass, and nothing else that
+  the candidate lacks;
+- every token in `differsBy` is a literal input value of the candidate, such as another value under the same key, and
+  the covering test passes only literal input values in their place.
 
-The same holds the other way round. When every token in `differsBy` is a literal input value of the candidate, such
-as another value under the same key, and the covering test passes only literal input values in their place, the
-candidate is `keep` too. It is `merge-into-dataset` instead when it differs only in data from one test of the same
-file, see [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete). For example, the row
-`'one name' => [['name' => 'Jana']]` is `keep` against the row `'another name' => [['name' => 'Petr']]` of the same
-dataset: each row is a value a user can send. A value in an assertion, such as an expected result, is not an input
-value, so a candidate that differs in one stays `review` or `review-dataset-row`.
+Such a candidate is:
+
+- `merge-into-dataset` when it is not a dataset row, one test of the same file covers it, and that test differs from it
+  only in literal input values. The covering test can be a plain test or a row of a dataset that no other test uses.
+  The step says to turn the two tests into one test with a dataset and one row for each combination, with each
+  argument or array that differs as a whole row value. When one test passes fewer arguments, each row passes its
+  arguments as a list that the test spreads into the call. When the covering test is a dataset row, the candidate
+  becomes a new row of that dataset.
+- `keep` when it is a dataset row, because the combination has its own case already, and when more than one test or a
+  test of another file covers it, because there is no one dataset to unify it with.
 
 Only literal keys and values count. A variable, a property, a call, a closure, a cast or a spread that only the
-covering test passes keeps the candidate `review`, and so does a call, a `new` expression or an assertion that only the
-covering test has. For example, the row `'delete nameday' => [['nameday' => '03-22'], …]` is `keep` against the row
+covering test passes keeps the candidate `review`, and so does an assertion, an expected value, a call or a `new`
+expression that only one of the tests has, and an argument the covering test omits. For example, the row
+`'delete nameday' => [['nameday' => '03-22'], …]` is `keep` against the row
 `'delete both' => [['nameday' => '03-22', 'birthday' => '1990-01-15'], …]` of the same dataset: deleting one field
-alone is another input than deleting both.
+alone is another input than deleting both. The test `update(['name' => 'Jana'])` is `merge-into-dataset` against the
+test `update(['name' => 'Petr'])` of the same file.
 
 ### Failed tests
 
