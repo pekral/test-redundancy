@@ -38,7 +38,7 @@ is built for people.
 | | Version |
 | --- | --- |
 | PHP | `^8.4` |
-| `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14` — the one your PHPUnit or Pest installs |
+| `phpunit/php-code-coverage` | `^10.1`, `^11`, `^12`, `^13` or `^14.5.1` — the one your PHPUnit or Pest installs |
 | Coverage driver | `pcov` (the tool limits `pcov.directory` to the `source` directories) or `xdebug` |
 | Test runner | `vendor/bin/pest` or `vendor/bin/phpunit` |
 
