@@ -9,6 +9,7 @@ use Pekral\TestRedundancy\Analysis\FileReport;
 use Pekral\TestRedundancy\Analysis\RedundancyAnalyzer;
 use Pekral\TestRedundancy\Analysis\StaleMap;
 use Pekral\TestRedundancy\Coverage\CoverageMap;
+use Pekral\TestRedundancy\Fingerprint\ContractFingerprints;
 use Pekral\TestRedundancy\Fingerprint\FingerprintCache;
 use Pekral\TestRedundancy\Fingerprint\RejectionAssertion;
 use Pekral\TestRedundancy\Fingerprint\SharedDataset;
@@ -7146,6 +7147,12 @@ it(
     },
 )->with([
     'a class constant' => ['[IntegrationType::DEFAULT, IntegrationType::OTHER]', '(\'default\')', '(\'other\')'],
+    'a class name' => ['[IntegrationType::class, Mode::class]', '(\'App\\Enums\\IntegrationType\')', '(\'App\\Enums\\Mode\')'],
+    'a long class name' => [
+        '[\\App\\Exceptions\\Very\\Long\\Namespace\\ShouldNotHappen::class, Mode::class]',
+        '(\'App\\Exceptions\\Very\\Long\\Name…Happen\')',
+        '(\'App\\Enums\\Mode\')',
+    ],
     'backed by an int' => ['[Level::Low, Level::High]', '(App\\Enums\\Level Enum (Low, 1))', '(App\\Enums\\Level Enum (High, 2))'],
     'backed by a string' => [
         '[IntegrationType::Upgates, IntegrationType::Shoper]',
@@ -7153,8 +7160,36 @@ it(
         '(App\\Enums\\IntegrationType Enum (Shoper, \'shoper\'))',
     ],
     'pure' => ['[Mode::Strict, Mode::Loose]', '(App\\Enums\\Mode Enum (Strict))', '(App\\Enums\\Mode Enum (Loose))'],
+    'the cases of an enum' => ['Level::cases()', '(App\\Enums\\Level Enum (Low, 1))', '(App\\Enums\\Level Enum (High, 2))'],
     'the value of a case' => ['[IntegrationType::Upgates->value, IntegrationType::Shoper->value]', '(\'upgates\')', '(\'shoper\')'],
 ]);
+
+it('leaves the rows of a call or a class name unresolved when the analysis cannot read them', function (
+    string $rows,
+    string $row,
+    string $coveringRow,
+): void {
+    $report = analyzeWithDeclarations(
+        source: "<?php\nuse App\\Enums\\Level;\n\nit('a', function (mixed \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with({$rows});\n",
+        linesByTest: ["it a › {$row}" => ['src/Store.php:5'], "it a › {$coveringRow}" => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->differsBy)->toBeNull();
+})->with([
+    'a class name relative to the class' => ['[self::class, static::class]', '(\'Tests\\Foo\')', '(\'Tests\\Bar\')'],
+    'another static call of an enum' => ['Level::values()', '(1)', '(2)'],
+    'the cases of a class the project does not declare' => ['Missing::cases()', '(App\\Enums\\Missing Enum (One))', '(App\\Enums\\Missing Enum (Two))'],
+    'the cases of an enum the analysis cannot name' => ['static::cases()', '(App\\Enums\\Level Enum (Low, 1))', '(App\\Enums\\Level Enum (High, 2))'],
+    'the cases of an enum with an argument' => ['Level::cases(1)', '(App\\Enums\\Level Enum (Low, 1))', '(App\\Enums\\Level Enum (High, 2))'],
+]);
+
+it('leaves a row with a class name unresolved without the declarations of the project', function (): void {
+    $file = temporaryDirectory() . '/ClassNameTest.php';
+    file_put_contents($file, "<?php\nit('a', function (string \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with([Foo::class]);\n");
+
+    expect(array_keys(ContractFingerprints::analyse($file)->fingerprints))->toBe(['it a']);
+});
 
 it('keeps the dataset rows that each set one key when a sibling row sets both keys', function (): void {
     $report = analyzeTokenTest(

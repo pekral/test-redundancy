@@ -81,6 +81,10 @@ final class PestRowName
 
     private static function classConstant(ClassConstFetch $fetch, ?ClassDeclarations $declarations): ?string
     {
+        if ($fetch->name instanceof Identifier && $fetch->name->toLowerString() === 'class') {
+            return self::className($fetch, $declarations);
+        }
+
         $case = $declarations?->enumCase($fetch);
 
         if ($case === null) {
@@ -93,6 +97,13 @@ final class PestRowName
         return $value === null || $class === null || !$fetch->name instanceof Identifier
             ? null
             : $class . ' Enum (' . $fetch->name->toString() . ($value === '' ? '' : ', ' . $value) . ')';
+    }
+
+    private static function className(ClassConstFetch $fetch, ?ClassDeclarations $declarations): ?string
+    {
+        $class = $declarations instanceof ClassDeclarations ? ClassDeclarations::className($fetch) : null;
+
+        return $class === null ? null : self::string($class);
     }
 
     private static function scalar(null|int|string $value): ?string

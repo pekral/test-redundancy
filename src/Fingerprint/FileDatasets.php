@@ -15,6 +15,7 @@ use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Expr\Yield_;
 use PhpParser\Node\FunctionLike;
@@ -113,6 +114,7 @@ final readonly class FileDatasets
             $dataset instanceof FuncCall => $this->functionRows($dataset, $resolving),
             $dataset instanceof Variable && is_string($dataset->name) => $this->variableRows($dataset->name, $resolving),
             $dataset instanceof Closure, $dataset instanceof ArrowFunction => $this->literalRows($dataset, $resolving),
+            $dataset instanceof StaticCall => $this->enumCaseRows($dataset),
             default => [],
         };
     }
@@ -144,6 +146,24 @@ final readonly class FileDatasets
         $function = $name === null || in_array($name . '()', $resolving, strict: true) ? null : $this->functions[$name] ?? null;
 
         return !$function instanceof Function_ ? [] : $this->literalRows($function, [...$resolving, $name . '()']);
+    }
+
+    /**
+     * The rows of `Enum::cases()`: one row with each case, in the order the enum declares them.
+     *
+     * @return list<\PhpParser\Node\ArrayItem>
+     */
+    private function enumCaseRows(StaticCall $call): array
+    {
+        $isCases = $call->class instanceof Name && $call->name instanceof Identifier
+            && $call->name->toLowerString() === 'cases' && $call->args === [];
+        $class = $call->class;
+        $cases = $isCases && $class instanceof Name ? $this->declarations?->enumCaseNames($class) : null;
+
+        return array_map(
+            static fn (string $case): ArrayItem => new ArrayItem(new ClassConstFetch($class, new Identifier($case))),
+            $cases ?? [],
+        );
     }
 
     /**

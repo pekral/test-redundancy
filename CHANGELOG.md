@@ -25,6 +25,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - a spread of a function or a variable of the same file inside a dataset array, such as `[...rows(), 'two' => [2]]`;
   - a named dataset that a `describe()` block declares. A name that two blocks declare stays unresolved.
 - A function or a variable that reads itself, directly or through another one, no longer recurses without end.
+- A dataset row that holds a class name, such as `->with([ShouldNotHappen::class])`, is named the way Pest prints it,
+  `('App\Exceptions\ShouldNotHappen')`, with the name resolved from the `namespace` and `use` imports of the test
+  file and shortened like every other long string.
+- `->with(Level::cases())` for an enum that the project declares gets one row for each case, in the order of the
+  declaration, named the way Pest prints an enum case.
 
 ## [0.2.3] - 2026-11-08
 

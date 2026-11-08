@@ -79,11 +79,33 @@ final class ClassDeclarations
         return $constant?->value instanceof String_ || $constant?->value instanceof Int_ ? $constant->value->value : null;
     }
 
+    /**
+     * The names of the cases an enum declares, in the order of the declaration.
+     *
+     * @return list<string>|null
+     */
+    public function enumCaseNames(Name $class): ?array
+    {
+        $declaration = $this->declarationOfClass(self::resolvedName($class));
+
+        return $declaration instanceof Enum_
+            ? array_values(array_map(
+                static fn (EnumCase $case): string => $case->name->toString(),
+                array_filter($declaration->stmts, static fn (Stmt $statement): bool => $statement instanceof EnumCase),
+            ))
+            : null;
+    }
+
     public static function className(ClassConstFetch $fetch): ?string
     {
-        $resolved = $fetch->class instanceof Name ? $fetch->class->getAttribute('resolvedName') : null;
+        return $fetch->class instanceof Name ? self::resolvedName($fetch->class) : null;
+    }
 
-        return $resolved instanceof Name && !$fetch->class->isSpecialClassName() ? $resolved->toString() : null;
+    public static function resolvedName(Name $class): ?string
+    {
+        $resolved = $class->getAttribute('resolvedName');
+
+        return $resolved instanceof Name && !$class->isSpecialClassName() ? $resolved->toString() : null;
     }
 
     private function declaredIn(string $path, string $class): ?ClassLike
@@ -119,8 +141,11 @@ final class ClassDeclarations
 
     private function declarationOf(ClassConstFetch $fetch): ?ClassLike
     {
-        $class = self::className($fetch);
+        return $this->declarationOfClass(self::className($fetch));
+    }
 
+    private function declarationOfClass(?string $class): ?ClassLike
+    {
         if ($class === null) {
             return null;
         }
