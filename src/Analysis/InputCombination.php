@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Pekral\TestRedundancy\Analysis;
 
 use Pekral\TestRedundancy\Fingerprint\NonLiteralArguments;
+use Pekral\TestRedundancy\Fingerprint\TokenCollector;
 use Pekral\TestRedundancy\Fingerprint\TokenKind;
 
 final readonly class InputCombination
@@ -25,7 +26,7 @@ final readonly class InputCombination
     {
         return $this->coveringOnly !== []
             && array_diff($this->coveringOnly, $this->coveringKeys, $this->coveringArguments) === []
-            && array_all($this->coveringOnly, $this->isLiteral(...));
+            && array_all($this->coveringOnly, self::isLiteral(...));
     }
 
     /**
@@ -49,6 +50,20 @@ final readonly class InputCombination
     }
 
     /**
+     * @param list<string>|null $differsBy
+     * @param list<string>|null $coveringDifference
+     * @param list<string> $omittedByCovering
+     */
+    public static function isOtherLiteralInput(?array $differsBy, ?array $coveringDifference, array $omittedByCovering): bool
+    {
+        return $differsBy !== null
+            && $differsBy !== []
+            && array_all($differsBy, self::isLiteralInput(...))
+            && array_all($coveringDifference ?? [], self::isLiteralInput(...))
+            && $omittedByCovering === [];
+    }
+
+    /**
      * @return list<array{string, string}>
      */
     private function keyPaths(): array
@@ -64,7 +79,12 @@ final readonly class InputCombination
         return $paths;
     }
 
-    private function isLiteral(string $token): bool
+    private static function isLiteralInput(string $token): bool
+    {
+        return self::isLiteral($token) && !TokenCollector::isAssertionToken($token);
+    }
+
+    private static function isLiteral(string $token): bool
     {
         return TokenKind::isData($token) && !NonLiteralArguments::isToken($token) && !str_contains($token, 'cast:');
     }
