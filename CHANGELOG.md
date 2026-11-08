@@ -6,30 +6,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-08
+
 ### Changed
 
 - A candidate whose covering test passes only literal array keys or argument values that the candidate lacks passes
   another combination of input values, and is never `delete` or `review` with a step that offers to delete it. A
   dataset row is `keep`. A test that one plain test of the same file covers, and that differs from it only in the keys
   and values of the same arrays, is `merge-into-dataset` with whole arrays as row values. Every other such candidate is
-  `keep`. README *Other combinations of input values* lists the rules.
+  `keep`. README *Other combinations of input values* lists the rules (#212).
 
 ### Fixed
 
 - The analysis reads the rows of more datasets that a test file declares statically, so those rows get a computed
-  `differsBy` instead of `null`:
+  `differsBy` instead of `null` (#213):
   - a variable that the file writes once, such as `->with($providers)` for `$providers = [...]`;
   - a local variable that a dataset closure or function assigns once before its rows, such as `$threshold = [...]`
     followed by `return ['one' => [$threshold]]` or `yield 'one' => [$threshold]`;
   - `yield from` a literal array or a function of the same file, and `return` of such a function;
   - a spread of a function or a variable of the same file inside a dataset array, such as `[...rows(), 'two' => [2]]`;
   - a named dataset that a `describe()` block declares. A name that two blocks declare stays unresolved.
-- A function or a variable that reads itself, directly or through another one, no longer recurses without end.
+- A function or a variable that reads itself, directly or through another one, no longer recurses without end (#213).
 - A dataset row that holds a class name, such as `->with([ShouldNotHappen::class])`, is named the way Pest prints it,
   `('App\Exceptions\ShouldNotHappen')`, with the name resolved from the `namespace` and `use` imports of the test
-  file and shortened like every other long string.
+  file and shortened like every other long string (#214).
 - `->with(Level::cases())` for an enum that the project declares gets one row for each case, in the order of the
-  declaration, named the way Pest prints an enum case.
+  declaration, named the way Pest prints an enum case (#214).
 
 ## [0.2.3] - 2026-11-08
 
@@ -974,7 +976,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.3...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.4...HEAD
+[0.2.4]: https://github.com/pekral/test-redundancy/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/pekral/test-redundancy/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/pekral/test-redundancy/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/pekral/test-redundancy/compare/0.2.0...0.2.1
