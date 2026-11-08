@@ -63,16 +63,13 @@ final readonly class Candidate implements JsonSerializable
             $this->addsNoValueOrCall() && $this->coveringTokensForReview() === [] => $this->sharedDataset instanceof SharedDataset
                 ? Action::Review
                 : Action::Delete,
-            $this->otherInput() instanceof InputCombination => $this->unifiesIntoOneDataset() ? Action::MergeIntoDataset : Action::Keep,
+            $this->otherInput() instanceof InputCombination => $this->otherInputAction(),
             $this->differsBy === [] => Action::Review,
-            $this->differsOnlyInDataFromOneTestOfTheSameFile()
-                && $this->coveringTokensForReview() === []
-                && $this->coveringDatasetTakesDiffersBy()
-                && $this->omittedByCovering === [] => Action::MergeIntoDataset,
+            $this->mergesByDataOnly() => Action::MergeIntoDataset,
             $this->rejectionsTheCoveringTestsLack !== [] => Action::Keep,
-            InputCombination::isOtherLiteralInput($this->differsBy, $this->coveringDifference, $this->omittedByCovering) => Action::Keep,
+            InputCombination::isOtherLiteralInput($this) => $this->otherInputAction(),
             $this->nonDataTokens($this->differsBy) !== [] => Action::Review,
-            $this->isDatasetRow() && $this->siblingRow() !== null => Action::ReviewDatasetRow,
+            $this->isDatasetRow() && TestKey::siblingRow($this->testCase(), $this->coveredBy) !== null => Action::ReviewDatasetRow,
             default => Action::Review,
         };
     }
@@ -134,8 +131,8 @@ final readonly class Candidate implements JsonSerializable
                 sprintf(Action::OTHER_INPUT_KEEP_STEP, Action::quoted($this->coveredBy), $coveringInput),
             ],
             $action === Action::Keep => Action::Keep->steps(Action::quoted($this->coveredBy), $this->rejectionsTheCoveringTestsLack),
-            $action === Action::MergeIntoDataset && $this->otherInput() instanceof InputCombination => [
-                sprintf(Action::OTHER_INPUT_MERGE_STEP, Action::quoted($this->coveredBy), $coveringInput),
+            $action === Action::MergeIntoDataset && !$this->mergesByDataOnly() => [
+                sprintf(Action::OTHER_INPUT_MERGE_STEP, Action::quoted($this->coveredBy)),
                 'Delete this test.',
                 Action::VERIFY_STEP,
             ],
@@ -148,7 +145,9 @@ final readonly class Candidate implements JsonSerializable
      */
     public function coveringDiffersBy(): array
     {
-        return $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens());
+        return $this->mergesByDataOnly()
+            ? $this->action()->coveringDiffersBy($this->coveringTokensForReview(), $this->coveringTokens())
+            : $this->coveringTokensForReview();
     }
 
     /**
@@ -178,7 +177,9 @@ final readonly class Candidate implements JsonSerializable
             return [...$sharedSteps, sprintf(Action::CONFIRM_STEP, Action::quoted($this->coveredBy)), Action::VERIFY_STEP];
         }
 
-        $coveringTests = $this->action() === Action::ReviewDatasetRow ? [(string) $this->siblingRow()] : $this->coveredBy;
+        $coveringTests = $this->action() === Action::ReviewDatasetRow
+            ? [(string) TestKey::siblingRow($this->testCase(), $this->coveredBy)]
+            : $this->coveredBy;
         $steps = [
             ...$this->missingKeySteps(),
             ...$this->missingArgumentSteps(),
@@ -346,14 +347,22 @@ final readonly class Candidate implements JsonSerializable
                 && !array_any($this->coveringDifference ?? [], $this->coveringDatasetParameters->hardCodesInBodyList(...)));
     }
 
-    private function unifiesIntoOneDataset(): bool
+    private function mergesByDataOnly(): bool
+    {
+        return $this->differsOnlyInDataFromOneTestOfTheSameFile()
+            && $this->coveringTokensForReview() === []
+            && $this->coveringDatasetTakesDiffersBy()
+            && $this->omittedByCovering === [];
+    }
+
+    private function otherInputAction(): Action
     {
         return !$this->isDatasetRow()
             && !$this->sharedDataset instanceof SharedDataset
+            && !$this->coveringSharedDataset instanceof SharedDataset
+            && InputCombination::holdsOnlyLiteralInput($this->coveringDifference)
             && $this->isCoveredByOneTestOfTheSameFile()
-            && TestKey::datasetOf($this->coveredBy[0]) === null
-            && $this->omittedByCovering === []
-            && $this->otherInput()?->differsOnlyInKeysOfTheArraysIn($this->differsBy ?? []) === true;
+            && $this->omittedByCovering === [] ? Action::MergeIntoDataset : Action::Keep;
     }
 
     private function otherInput(): ?InputCombination
@@ -366,19 +375,6 @@ final readonly class Candidate implements JsonSerializable
     private function isCoveredByOneTestOfTheSameFile(): bool
     {
         return count($this->coveredBy) === 1 && !str_contains($this->coveredBy[0], ' :: ');
-    }
-
-    private function siblingRow(): ?string
-    {
-        $test = TestKey::withoutDatasetRow($this->testCase());
-
-        foreach ($this->coveredBy as $coveringTest) {
-            if (str_starts_with($coveringTest, $test . TestKey::DATASET_SEPARATOR)) {
-                return $coveringTest;
-            }
-        }
-
-        return null;
     }
 
 }

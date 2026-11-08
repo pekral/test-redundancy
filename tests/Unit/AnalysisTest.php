@@ -84,12 +84,12 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'call in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget']), Action::Review],
     'data in both tests and a key only in the covering test' => [
         candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']),
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::Keep],
     'key in a value of a call that only the covering test sets' => [
         candidate('it works', ['it also works'], ['in:function:store#0/value:\'a\'/value:1'], ['in:function:store#0/value:\'b\'/key:value:\'c\'']),
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'key next to a key differsBy lists' => [
@@ -98,7 +98,7 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     ],
     'key of a call and a value without a path in differsBy' => [
         candidate('it works', ['it also works'], ['value:1'], ['in:function:store#0/key:value:\'b\'']),
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'literal input of a row of another test' => [candidate('it works › empty', ['it also works'], ['value:\'\'']), Action::Keep],
     'literal under a key in both tests' => [
@@ -334,6 +334,48 @@ it('reviews a test that passes other literal input values when its covering test
 
     expect($candidate->action())->toBe(Action::Review);
 });
+
+it('merges a test that passes another combination of input values than one test of the same file into one dataset', function (
+    string $source,
+    Action $action,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['it updates one name' => ['src/Contact.php:5'], 'it updates another name' => ['src/Contact.php:5', 'src/Contact.php:6']],
+    );
+
+    expect($report->candidates)->toHaveCount(1)
+        ->and($report->candidates[0]->testCase())->toBe('it updates one name')
+        ->and($report->candidates[0]->action())->toBe($action);
+})->with([
+    'an assertion only the covering test makes' => [
+        <<<'PHP'
+            <?php
+            it('updates one name', fn () => expect(update(['name' => 'Jana']))->toBeTrue());
+            it('updates another name', function (): void {
+                expect(update(['name' => 'Petr']))->toBeTrue();
+                expect(saved())->toBe('Petr');
+            });
+            PHP,
+        Action::Review,
+    ],
+    'another value and a key only the covering test sets' => [
+        <<<'PHP'
+            <?php
+            it('updates one name', fn () => expect(update(['name' => 'Jana']))->toBeTrue());
+            it('updates another name', fn () => expect(update(['name' => 'Petr', 'surname' => 'Novák']))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+    'another value under the same key' => [
+        <<<'PHP'
+            <?php
+            it('updates one name', fn () => expect(update(['name' => 'Jana']))->toBeTrue());
+            it('updates another name', fn () => expect(update(['name' => 'Petr']))->toBeTrue());
+            PHP,
+        Action::MergeIntoDataset,
+    ],
+]);
 
 it('names the lines only the union of the covering tests reaches in the report and the steps', function (): void {
     $candidate = candidate('it works', ['it a', 'it b'], [], unionOnlyLines: ['src/Foo.php:12', 'src/Foo.php:15']);
@@ -1502,7 +1544,7 @@ it('does not delete a test whose covering test passes its literal inside a neste
     ],
 ]);
 
-it('keeps a test whose covering test sets its array key only inside a list', function (): void {
+it('merges a test whose covering test sets its array key only inside a list', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -1523,7 +1565,7 @@ it('keeps a test whose covering test sets its array key only inside a list', fun
         ->and($report->candidates[0]->testCase())->toBe('it passes the literal')
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/key:value:\'a\'', 'in:function:foo#0/value:\'a\'/value:1'])
         ->and($report->candidates[0]->coveringTokensForReview())->toBe(['key:value:\'a\''])
-        ->and($report->candidates[0]->action())->toBe(Action::Keep);
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
 it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (
@@ -1901,7 +1943,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn ($n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f([1, 2]))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'another list length for a parameter without a type the covering closure puts in an expected list' => [
         <<<'PHP'
@@ -1945,7 +1987,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int|string $id) => expect(find($id))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(find(1.5))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'keyed array for a parameter of type int' => [
         <<<'PHP'
@@ -1953,7 +1995,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $a) => expect(f($a))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f(['a' => 1]))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'list item int for a parameter of type int the covering closure puts in a list' => [
         <<<'PHP'
@@ -1985,7 +2027,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $n) => expect(f([$n, 5]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f([1, 6]))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'list item string for a parameter of type int the covering closure puts in a list' => [
         <<<'PHP'
@@ -1993,7 +2035,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $n) => expect(f([$n]))->toBeTrue())->with(['row' => [1]]);
             it('covers', fn () => expect(f(['x']))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'list item string for a parameter of type string the covering closure puts in an expected list' => [
         <<<'PHP'
@@ -2049,7 +2091,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(find(null))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'null for a parameter of type callable' => [
         <<<'PHP'
@@ -2057,7 +2099,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (callable $f) => expect(apply($f))->toBeTrue())->with(['row' => ['strlen']]);
             it('covers', fn () => expect(apply(null))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'null for a parameter of type int' => [
         <<<'PHP'
@@ -2065,7 +2107,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (int $reminderCode) => expect(type($reminderCode))->toBe('reminder'))->with(['row' => [1]]);
             it('covers', fn () => expect(type(null))->toBe('reminder'));
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'scalar for a parameter of type array' => [
         <<<'PHP'
@@ -2073,7 +2115,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (array $ids) => expect(find($ids))->toBeTrue())->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(find(5))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'shorter expected list for a parameter without a type the covering closure expects' => [
         <<<'PHP'
@@ -2097,7 +2139,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (Status $status) => expect(label($status))->toBeTrue())->with(['row' => [Status::ACTIVE]]);
             it('covers', fn () => expect(label('inactive'))->toBeTrue());
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'string for a parameter of type iterable' => [
         <<<'PHP'
@@ -2105,7 +2147,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
             it('runs', fn (iterable $items) => expect(sum($items))->toBe(3))->with(['row' => [[1, 2]]]);
             it('covers', fn () => expect(sum('abc'))->toBe(3));
             PHP,
-        Action::Keep,
+        Action::MergeIntoDataset,
     ],
     'string with a slash for a parameter of type string' => [
         <<<'PHP'
@@ -2125,7 +2167,7 @@ it('merges a test into a covering dataset only when each value in differsBy reac
     ],
 ]);
 
-it('keeps, and does not merge, a test whose value the data provider test hard-codes in its body', function (): void {
+it('merges a test whose value the data provider test hard-codes in its body into that data provider', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -2143,7 +2185,7 @@ it('keeps, and does not merge, a test whose value the data provider test hard-co
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('testAddsRounded')
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:add#2/value:true'])
-        ->and($report->candidates[0]->action())->toBe(Action::Keep);
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
 it('asks for a review of a test whose expected value lacks an element, a key or an argument its covering test expects', function (
@@ -3392,7 +3434,7 @@ it('still deletes a test without an assertion whose covering test only asserts m
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
 });
 
-it('keeps a test that omits an array key its covering dataset row sets through a parameter', function (): void {
+it('merges a test that omits an array key its covering dataset row sets through a parameter into that dataset', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -3431,17 +3473,15 @@ it('keeps a test that omits an array key its covering dataset row sets through a
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it finds pipelines with domain in email')
         ->and($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->action())->toBe(Action::Keep)
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset)
         ->and($report->candidates[0]->coveringTokensForReview())->toBe([
             $hiddenKey,
             'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
         ])
         ->and($report->candidates[0]->steps())->toBe([
-            sprintf(
-                Action::OTHER_INPUT_KEEP_STEP,
-                $coveringTest,
-                $hiddenKey . ', in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
-            ),
+            sprintf(Action::OTHER_INPUT_MERGE_STEP, $coveringTest),
+            'Delete this test.',
+            Action::VERIFY_STEP,
         ]);
 });
 
@@ -3480,17 +3520,13 @@ it('merges a test that differs only in data from a covering test that sets an ar
         ])
         ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
         ->and(valueAt($json, 'steps'))->toBe([
-            sprintf(
-                Action::OTHER_INPUT_MERGE_STEP,
-                '"it rejects a percentual type with a minimum spend without a currency"',
-                'in:call:post#1/key:value:\'default_min_spend\'',
-            ),
+            sprintf(Action::OTHER_INPUT_MERGE_STEP, '"it rejects a percentual type with a minimum spend without a currency"'),
             'Delete this test.',
             Action::VERIFY_STEP,
         ]);
 });
 
-it('keeps a test that differs only in data from a covering test that passes an argument it lacks', function (): void {
+it('merges a test that differs only in data from a covering test that passes an argument it lacks', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -3511,14 +3547,16 @@ it('keeps a test that differs only in data from a covering test that passes an a
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it stores three')
         ->and(valueAt($json, 'differsBy'))->toBe(['in:function:store#0/value:3'])
-        ->and(valueAt($json, 'action'))->toBe('keep')
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:function:store#1/value:2'])
         ->and(valueAt($json, 'steps'))->toBe([
-            sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it stores one with two"', 'in:function:store#1/value:2'),
+            sprintf(Action::OTHER_INPUT_MERGE_STEP, '"it stores one with two"'),
+            'Delete this test.',
+            Action::VERIFY_STEP,
         ]);
 });
 
-it('keeps a test that differs only in data from a covering test that passes an argument it lacks to a nested call', function (
+it('merges a test that differs only in data from a covering test that passes an argument it lacks to a nested call', function (
     string $source,
     string $missingArgument,
 ): void {
@@ -3530,9 +3568,13 @@ it('keeps a test that differs only in data from a covering test that passes an a
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it stores the short input')
-        ->and(valueAt($json, 'action'))->toBe('keep')
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe([$missingArgument])
-        ->and(valueAt($json, 'steps'))->toBe([sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it stores the long input"', $missingArgument)]);
+        ->and(valueAt($json, 'steps'))->toBe([
+            sprintf(Action::OTHER_INPUT_MERGE_STEP, '"it stores the long input"'),
+            'Delete this test.',
+            Action::VERIFY_STEP,
+        ]);
 })->with([
     'call inside an array passed to a call' => [
         <<<'PHP'
@@ -4133,7 +4175,7 @@ it('lists no order token for an arranging call that the covering test lacks, bec
         ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
-it('keeps a test whose covering test passes an argument whose string has the prefix of an order token in it', function (string $path): void {
+it('merges a test whose covering test passes an argument whose string has the prefix of an order token in it', function (string $path): void {
     $report = analyzeTokenTest(
         source: <<<PHP
             <?php
@@ -4145,7 +4187,7 @@ it('keeps a test whose covering test passes an argument whose string has the pre
 
     expect($report->candidates[0]->testCase())->toBe('it fetches all')
         ->and($report->candidates[0]->coveringDifference)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
-        ->and($report->candidates[0]->action())->toBe(Action::Keep);
+        ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 })->with([
     'calls' => ['/v1/calls:list'],
     'items' => ['/v1/items:batchGet'],

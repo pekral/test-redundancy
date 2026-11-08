@@ -43,6 +43,22 @@ final class TestKey
         return trim((string) preg_replace('/^"?dataset\s*/', '', $label), '"');
     }
 
+    /**
+     * @param list<string> $coveredBy
+     */
+    public static function siblingRow(string $testCase, array $coveredBy): ?string
+    {
+        $test = self::withoutDatasetRow($testCase);
+
+        foreach ($coveredBy as $coveringTest) {
+            if (str_starts_with($coveringTest, $test . self::DATASET_SEPARATOR)) {
+                return $coveringTest;
+            }
+        }
+
+        return null;
+    }
+
     public static function isDatasetRow(string $testKey): bool
     {
         return str_contains(self::testCase($testKey), self::DATASET_SEPARATOR);
