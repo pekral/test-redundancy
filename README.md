@@ -959,6 +959,9 @@ test lacks.
   value in the rows, also inside another local variable, but not inside a `function () use (…)` closure. A spread
   `...rows()` or `...$rows` inside a dataset array adds the rows of that function or variable. A dataset built by a
   loop, a condition, a call with arguments or a call of another class stays unresolved.
+  A row that holds a class name, such as `ShouldNotHappen::class`, is named by the full class name as a string, as
+  Pest prints it; `self::class` and `static::class` stay unresolved. `->with(Level::cases())` for an enum that the
+  project declares gives one row for each case, in the order of the declaration.
   A dataset key or a row value that is an enum case or a class constant of a class declared in another file of the
   project is resolved through that declaration, as [What the analysis reads](#what-the-analysis-reads) describes. A
   row that holds the case is named the way Pest prints it, with the full class name:
