@@ -15,7 +15,6 @@ use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\NodeFinder;
@@ -150,8 +149,8 @@ final readonly class PestFingerprints
      */
     private function expression(Node $expression, string $prefix): array
     {
-        $describe = $expression instanceof FuncCall ? self::functionCall($expression, ['describe']) : null;
-        $body = $expression instanceof FuncCall ? self::argument($expression, 1) : null;
+        $describe = $expression instanceof FuncCall ? $this->functionCall($expression, ['describe']) : null;
+        $body = $expression instanceof FuncCall ? $this->argument($expression, 1) : null;
 
         if ($describe !== null && $body instanceof Closure) {
             return $this->walk($body->stmts, $prefix . '`' . $describe . '`' . self::DESCRIBE_SEPARATOR);
@@ -166,14 +165,14 @@ final readonly class PestFingerprints
     private function test(Node $expression, string $prefix): array
     {
         [$call, $datasetRows, $modifierTokens, $dataset, $datasets] = $this->unwrapChain($expression);
-        $description = $call === null ? null : self::functionCall($call, self::TEST_FUNCTIONS);
+        $description = $call === null ? null : $this->functionCall($call, self::TEST_FUNCTIONS);
 
         if ($call === null || $description === null) {
             return [];
         }
 
         $testCase = $prefix . ($call->name instanceof Name && $call->name->toLowerString() === 'it' ? 'it ' : '') . $description;
-        $test = self::argument($call, 1);
+        $test = $this->argument($call, 1);
         $body = !$test instanceof Node ? [] : [$test];
         $parameters = $test instanceof FunctionLike ? $test->getParams() : [];
         $datasetParameters = $datasetRows === [] ? null : DatasetRows::parameters($body, $parameters);
@@ -274,6 +273,23 @@ final readonly class PestFingerprints
     }
 
     /**
+     * @param list<string> $functions
+     */
+    private function functionCall(FuncCall $call, array $functions): ?string
+    {
+        $firstArgument = $this->argument($call, 0);
+
+        return self::isCallOf($call, $functions) && $firstArgument instanceof String_ ? $firstArgument->value : null;
+    }
+
+    private function argument(FuncCall|MethodCall $call, int $position): ?Node
+    {
+        $argument = $call->args[$position] ?? null;
+
+        return $argument instanceof Arg ? $argument->value : null;
+    }
+
+    /**
      * @param array<string, Test> $tests
      * @return array<string, array<string, int>>
      */
@@ -321,7 +337,7 @@ final readonly class PestFingerprints
     {
         $statements = self::withoutNamespaces($statements);
 
-        return new self(new FileDatasets(self::namedDatasets($statements), $statements, $declarations))->walk($statements, '');
+        return new self(new FileDatasets(NamedDatasets::of($statements), $statements, $declarations))->walk($statements, '');
     }
 
     /**
@@ -356,37 +372,6 @@ final readonly class PestFingerprints
         return $flattened;
     }
 
-    /**
-     * @param array<\PhpParser\Node\Stmt> $statements
-     * @return array<string, \PhpParser\Node>
-     */
-    private static function namedDatasets(array $statements): array
-    {
-        $datasets = [];
-
-        foreach ($statements as $statement) {
-            [$name, $dataset] = self::datasetDefinition($statement);
-
-            if ($name !== null && $dataset !== null) {
-                $datasets[$name] = $dataset;
-            }
-        }
-
-        return $datasets;
-    }
-
-    /**
-     * @return array{0: string|null, 1: \PhpParser\Node|null}
-     */
-    private static function datasetDefinition(Stmt $statement): array
-    {
-        $call = $statement instanceof Expression && $statement->expr instanceof FuncCall ? $statement->expr : null;
-        $name = !$call instanceof FuncCall ? null : self::functionCall($call, ['dataset']);
-        $dataset = !$call instanceof FuncCall ? null : self::argument($call, 1);
-
-        return $name !== null && $dataset instanceof Node ? [$name, $dataset] : [null, null];
-    }
-
     private static function repeatsTest(Node $node): bool
     {
         if (!$node instanceof MethodCall
@@ -419,23 +404,6 @@ final readonly class PestFingerprints
     private static function isCallOf(FuncCall $call, array $functions): bool
     {
         return $call->name instanceof Name && in_array($call->name->toLowerString(), $functions, strict: true);
-    }
-
-    /**
-     * @param list<string> $functions
-     */
-    private static function functionCall(FuncCall $call, array $functions): ?string
-    {
-        $firstArgument = self::argument($call, 0);
-
-        return self::isCallOf($call, $functions) && $firstArgument instanceof String_ ? $firstArgument->value : null;
-    }
-
-    private static function argument(FuncCall|MethodCall $call, int $position): ?Node
-    {
-        $argument = $call->args[$position] ?? null;
-
-        return $argument instanceof Arg ? $argument->value : null;
     }
 
 }

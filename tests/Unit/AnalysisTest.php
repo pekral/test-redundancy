@@ -6595,27 +6595,148 @@ it('names why a row of a dataset the analysis cannot resolve has no differsBy (#
         '\'types\'',
         'one',
     ],
-    'function that returns its own call' => ["function numbers(): array\n{\n    return numbers();\n}", 'numbers()', 'one'],
-    'function with more than a return of a literal array' => [
-        "function numbers(): array\n{\n    \$rows = ['one' => [1]];\n\n    return \$rows;\n}",
+    'functions that return each other' => [
+        "function numbers(): array\n{\n    return others();\n}\nfunction others(): array\n{\n    return numbers();\n}",
         'numbers()',
         'one',
     ],
+    'function that assigns a variable twice' => [
+        "function numbers(): array\n{\n    \$rows = ['one' => [1]];\n    \$rows = ['one' => [2]];\n\n    return \$rows;\n}",
+        'numbers()',
+        'one',
+    ],
+    'function that returns its own call' => ["function numbers(): array\n{\n    return numbers();\n}", 'numbers()', 'one'],
+    'generator that appends to a local variable' => [
+        '',
+        "function (): Generator {\n    \$one = [1];\n    \$one[] = 2;\n\n    yield 'one' => \$one;\n}",
+        'one',
+    ],
+    'generator that returns after a yield' => ['', "function (): Generator {\n    yield 'one' => [1];\n\n    return ['two' => [2]];\n}", 'one'],
     'generator with a condition' => ['', "function (): Generator {\n    if (true) {\n        yield 'one' => [1];\n    }\n}", 'one'],
     'generator with a loop' => ['', "function (): Generator {\n    foreach (['one'] as \$key) {\n        yield \$key => [1];\n    }\n}", 'one'],
-    'generator with yield from' => ['', "function (): Generator {\n    yield from ['one' => [1]];\n}", 'one'],
     'one row keyed by an enum declared in another file' => [
         'dataset(\'types\', [\'one\' => [1], Type::TWO->value => [2]]);',
         '\'types\'',
         'two',
     ],
-    'variable' => ['$rows = [\'one\' => [1]];', '$rows', 'one'],
+    'variable assigned twice' => ['$rows = [\'one\' => [1]];' . "\n" . '$rows = [\'one\' => [2]];', '$rows', 'one'],
+    'variables that hold each other' => ["\$rows = \$others;\n\$others = \$rows;", '$rows', 'one'],
+    'variable that a loop of the file writes' => [
+        '$rows = [\'one\' => [1]];' . "\n" . 'foreach ([2] as $n) {' . "\n" . '    $rows[\'one\'] = [$n];' . "\n" . '}',
+        '$rows',
+        'one',
+    ],
+]);
+
+it('computes differsBy for a row that a dataset declares through a variable, a function or a describe() block', function (
+    string $declarations,
+    string $dataset,
+    string $row,
+    string $differsBy,
+): void {
+    $report = analyzeTokenTest(
+        source: "<?php\n{$declarations}\n"
+            . "it('a', function (int \$v): void {\n    expect(f(\$v))->toBe(1);\n})->with({$dataset});\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with({$dataset});\n",
+        linesByTest: ["it a › {$row}" => ['src/Store.php:5'], "it b › {$row}" => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy)->toContain($differsBy);
+})->with([
+    'closure that keeps a closure untouched' => [
+        '',
+        "function (): array {\n    \$one = 7;\n\n    return ['one' => [\$one, function () use (\$one): int {\n"
+            . "        return \$one;\n    }]];\n}",
+        'one',
+        'in:function:f#0/value:7',
+    ],
+    'function with a local variable' => [
+        "function numbers(): array\n{\n    \$one = 3;\n\n    return ['one' => [\$one]];\n}",
+        'numbers()',
+        'one',
+        'in:function:f#0/value:3',
+    ],
+    'generator with a local variable that holds another one' => [
+        '',
+        "function (): Generator {\n    \$base = 4;\n    \$one = \$base;\n\n    yield 'one' => [\$one];\n}",
+        'one',
+        'in:function:f#0/value:4',
+    ],
+    'generator with yield from a function' => [
+        "function numbers(): Generator\n{\n    yield 'one' => [5];\n}",
+        "function (): Generator {\n    yield from numbers();\n}",
+        'one',
+        'in:function:f#0/value:5',
+    ],
+    'generator with yield from a literal array' => ['', "function (): Generator {\n    yield from ['one' => [1]];\n}", 'one', 'in:function:f#0/value:1'],
+    'spread of a function' => [
+        "function numbers(): array\n{\n    return ['one' => [6]];\n}",
+        '[...numbers(), \'two\' => [2]]',
+        'one',
+        'in:function:f#0/value:6',
+    ],
+    'variable of the file' => ['$rows = [\'one\' => [1]];', '$rows', 'one', 'in:function:f#0/value:1'],
+    'variable of the file that holds another one' => ['$first = [\'one\' => [1]];' . "\n" . '$rows = $first;', '$rows', 'one', 'in:function:f#0/value:1'],
+]);
+
+it('reads a named dataset that a describe() block declares, and not a name that two describe() blocks declare', function (
+    string $source,
+    bool $resolved,
+): void {
+    $report = analyzeTokenTest(
+        source: $source,
+        linesByTest: ['`one` → it a › one' => ['src/Store.php:5'], '`two` → it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
+    );
+
+    expect($report->candidates[0]->differsBy === null)->toBe(!$resolved);
+})->with([
+    'a name one describe() block declares' => [
+        <<<'PHP'
+            <?php
+            describe('one', function (): void {
+                dataset('numbers', ['one' => [1]]);
+
+                it('a', function (int $v): void {
+                    expect(f($v))->toBe(1);
+                })->with('numbers');
+            });
+            describe('two', function (): void {
+                dataset('others', ['one' => [1]]);
+
+                it('b', function (int $v): void {
+                    expect(g($v))->toBe(1);
+                })->with('others');
+            });
+            PHP,
+        true,
+    ],
+    'a name two describe() blocks declare' => [
+        <<<'PHP'
+            <?php
+            describe('one', function (): void {
+                dataset('numbers', ['one' => [1]]);
+
+                it('a', function (int $v): void {
+                    expect(f($v))->toBe(1);
+                })->with('numbers');
+            });
+            describe('two', function (): void {
+                dataset('numbers', ['one' => [2]]);
+
+                it('b', function (int $v): void {
+                    expect(g($v))->toBe(1);
+                })->with('numbers');
+            });
+            PHP,
+        false,
+    ],
 ]);
 
 it('names why a test covered by a row of a dataset the analysis cannot resolve has no differsBy (#172)', function (): void {
     $report = analyzeTokenTest(
-        source: "<?php\n\$rows = ['one' => [1]];\nit('a', function (): void {\n    expect(f(1))->toBe(1);\n});\n"
-            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(\$rows);\n",
+        source: "<?php\nit('a', function (): void {\n    expect(f(1))->toBe(1);\n});\n"
+            . "it('b', function (int \$v): void {\n    expect(g(\$v))->toBe(1);\n})->with(function (): Generator {\n"
+            . "    foreach (['one'] as \$key) {\n        yield \$key => [1];\n    }\n});\n",
         linesByTest: ['it a' => ['src/Store.php:5'], 'it b › one' => ['src/Store.php:5', 'src/Store.php:6']],
     );
 
