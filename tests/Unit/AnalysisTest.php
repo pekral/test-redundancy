@@ -83,21 +83,21 @@ it('picks the action that fits a candidate', function (Candidate $candidate, Act
     'call in the covering test' => [candidate('it works', ['it also works'], ['value:1'], ['value:2', 'call:forget']), Action::Review],
     'data in both tests and a key only in the covering test' => [
         candidate('it works', ['it also works'], ['value:1'], ['value:2', 'key:const:Foo::BAR']),
-        Action::Review,
+        Action::Keep,
     ],
     'key in a sibling row' => [candidate('it works › a', ['it works › b'], ['key:value:\'a\'']), Action::ReviewDatasetRow],
     'key in a value of a call that only the covering test sets' => [
         candidate('it works', ['it also works'], ['in:function:store#0/value:\'a\'/value:1'], ['in:function:store#0/value:\'b\'/key:value:\'c\'']),
-        Action::Review,
+        Action::Keep,
     ],
     'key in one test of the same file' => [candidate('it works', ['it also works'], ['key:value:\'a\'', 'key:const:Foo::BAR']), Action::MergeIntoDataset],
     'key next to a key differsBy lists' => [
         candidate('it works', ['it also works'], ['in:function:store#0/key:value:\'a\''], ['in:function:store#0/key:value:\'b\'']),
-        Action::Review,
+        Action::MergeIntoDataset,
     ],
     'key of a call and a value without a path in differsBy' => [
         candidate('it works', ['it also works'], ['value:1'], ['in:function:store#0/key:value:\'b\'']),
-        Action::Review,
+        Action::Keep,
     ],
     'literal under a key in both tests' => [
         candidate('it works', ['it also works'], ['in:value:\'a/b\'/value:false'], ['in:value:\'c\'/value:\'x\'/const:Foo::BAR']),
@@ -260,25 +260,22 @@ it('names the covering-side tokens in the review steps', function (): void {
         ->and($steps[3])->toBe(Action::VERIFY_STEP);
 });
 
-it('asks whether the code under test reads the array key only the covering test sets', function (): void {
-    $steps = candidate('it drains › multicast', ['it drains › parallel'], [], ['key:value:\'parallel\'', 'value:1'])->steps();
+it('keeps a dataset row that lacks an array key only its covering row sets, because it is another combination of input values', function (): void {
+    $candidate = candidate('it drains › multicast', ['it drains › parallel'], [], ['key:value:\'parallel\'', 'value:1']);
 
-    expect($steps)->toBe([
-        'The covering test "it drains › parallel" sets the array keys in coveringDiffersBy (key:value:\'parallel\'), and this test does not: '
-            . 'without such a key, the input has another shape. '
-            . 'Check whether the code under test reads one of these keys, for example in an isset() check, a required rule or a short-circuit condition; '
-            . 'keep this test when it does, and delete it only when the code never reads them.',
-        Action::VERIFY_STEP,
-    ]);
+    expect($candidate->action())->toBe(Action::Keep)
+        ->and($candidate->steps())->toBe([
+            'The covering test "it drains › parallel" passes the input in coveringDiffersBy (key:value:\'parallel\'), and this test does not: '
+                . 'this test simulates another combination of input values, which is a case of its own. Keep this test.',
+        ]);
 });
 
-it('asks only about the array key, not a missing argument value, when the key is nested in an argument', function (): void {
+it('keeps a dataset row that lacks an array key nested in an argument', function (): void {
     $key = 'in:function:drain#0/value:\'options\'/key:value:\'parallel\'';
+    $candidate = candidate('it drains › multicast', ['it drains › parallel'], [], [$key]);
 
-    expect(candidate('it drains › multicast', ['it drains › parallel'], [], [$key])->steps())->toBe([
-        sprintf(Action::MISSING_KEY_STEP, '"it drains › parallel"', $key),
-        Action::VERIFY_STEP,
-    ]);
+    expect($candidate->action())->toBe(Action::Keep)
+        ->and($candidate->steps())->toBe([sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it drains › parallel"', $key)]);
 });
 
 it('names the lines only the union of the covering tests reaches in the report and the steps', function (): void {
@@ -1071,10 +1068,11 @@ it('still deletes a dataset row whose closure its covering row has with other fo
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
 });
 
-it('asks for a review of a dataset row that omits an array key its covering row sets', function (
+it('decides on a dataset row that omits an array key its covering row sets', function (
     FileReport $report,
     string $test,
     array $coveringDiffersBy,
+    string $action,
 ): void {
     $json = decodedJson((string) json_encode($report->candidates[0]));
 
@@ -1082,7 +1080,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
         ->and(valueAt($json, 'test'))->toBe($test)
         ->and(valueAt($json, 'differsBy'))->toBe([])
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe($coveringDiffersBy)
-        ->and(valueAt($json, 'action'))->toBe('review');
+        ->and(valueAt($json, 'action'))->toBe($action);
 })->with([
     'mail action without variants' => [
         fn (): FileReport => analyzeTokenTest(
@@ -1119,6 +1117,7 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             'in:function:buildPipelineAction#0/value:\'properties\'/value:\'variants\'/value:\'not_an_array\'',
             'in:expect:function:buildPipelineAction/call:toEqual#0/value:\'properties\'/key:value:\'variants\'',
         ],
+        'review',
     ],
     'multicast pipeline without the parallel flag' => [
         fn (): FileReport => analyzeTokenTest(
@@ -1141,10 +1140,11 @@ it('asks for a review of a dataset row that omits an array key its covering row 
             'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/key:value:\'parallel\'',
             'in:function:canDrainThroughRecurringQueue#0/function:pipeline#0/value:\'parallel\'/value:1',
         ],
+        'keep',
     ],
 ]);
 
-it('asks for a review of a test that passes the code under test a list without an element its covering test passes', function (): void {
+it('keeps a test that passes the code under test a list without an element its covering test passes', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -1183,7 +1183,7 @@ it('asks for a review of a test that passes the code under test a list without a
 
     expect($candidates)->toHaveCount(2)
         ->and(valueAt($candidates, 'it forces the email column even when it is omitted from the subscriber columns'))->toBe([
-            'action' => 'review',
+            'action' => 'keep',
             'coveredBy' => ['it loads the subscriber relation with the requested columns'],
             'coveringDiffersBy' => ['in:call:getByListIdAndLastId#4/value:list-item', 'in:call:getByListIdAndLastId#4/value:\'email\''],
             'coveringOnly' => [
@@ -1198,14 +1198,10 @@ it('asks for a review of a test that passes the code under test a list without a
             'differsBy' => [],
             'seconds' => null,
             'steps' => [
-                'The covering test "it loads the subscriber relation with the requested columns" passes the values in coveringDiffersBy '
-                    . '(in:call:getByListIdAndLastId#4/value:list-item, in:call:getByListIdAndLastId#4/value:\'email\') '
-                    . 'to a call that is not an assertion, and this test does not: '
-                    . 'without such a value, the code under test gets another input. '
-                    . 'Check whether the code under test behaves differently without one of these values, '
-                    . 'for example when it adds a missing value itself or falls back to a default; '
-                    . 'keep this test when it does, and delete it only when it does not.',
-                Action::VERIFY_STEP,
+                'The covering test "it loads the subscriber relation with the requested columns" passes the input in coveringDiffersBy '
+                    . '(in:call:getByListIdAndLastId#4/value:list-item, in:call:getByListIdAndLastId#4/value:\'email\'), '
+                    . 'and this test does not: this test simulates another combination of input values, which is a case of its own. '
+                    . 'Keep this test.',
             ],
             'test' => 'it forces the email column even when it is omitted from the subscriber columns',
             'unionOnlyLines' => [],
@@ -1214,7 +1210,7 @@ it('asks for a review of a test that passes the code under test a list without a
         ->and(valueAt($candidates, 'it does not duplicate the email column when it is already requested.action'))->toBe('delete');
 });
 
-it('asks for a review of a test that passes a list through a local variable or a dataset row without an element its covering test passes', function (
+it('keeps a test that passes a list through a local variable or a dataset row without an element its covering test passes', function (
     FileReport $report,
     string $test,
     string $covering,
@@ -1227,7 +1223,7 @@ it('asks for a review of a test that passes a list through a local variable or a
             'in:call:getByListIdAndLastId#4/value:list-item',
             'in:call:getByListIdAndLastId#4/value:\'email\'',
         ])
-        ->and($report->candidates[0]->action())->toBe(Action::Review);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 })->with([
     'list in a dataset row' => [
         fn (): FileReport => analyzeTokenTest(
@@ -1437,7 +1433,7 @@ it('does not delete a test whose covering test passes its literal inside a neste
     ],
 ]);
 
-it('asks for a review of a test whose covering test sets its array key only inside a list', function (): void {
+it('keeps a test whose covering test sets its array key only inside a list', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -1458,7 +1454,7 @@ it('asks for a review of a test whose covering test sets its array key only insi
         ->and($report->candidates[0]->testCase())->toBe('it passes the literal')
         ->and($report->candidates[0]->differsBy)->toBe(['in:function:foo#0/key:value:\'a\'', 'in:function:foo#0/value:\'a\'/value:1'])
         ->and($report->candidates[0]->coveringTokensForReview())->toBe(['key:value:\'a\''])
-        ->and($report->candidates[0]->action())->toBe(Action::Review);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 });
 
 it('does not delete a dataset row whose sibling row passes its value inside a nested list', function (
@@ -1492,7 +1488,7 @@ it('does not delete a dataset row whose sibling row passes its value inside a ne
     'map in a list' => ['[\'a\' => 1]', '[[\'a\' => 1]]', ['in:function:foo#0/key:value:\'a\'', 'in:function:foo#0/value:\'a\'/value:1']],
 ]);
 
-it('does not list the literal a flat row and a sibling row with a nested list both pass', function (): void {
+it('keeps, and does not list the literal of, a flat row whose sibling row also passes a nested list', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -1513,7 +1509,7 @@ it('does not list the literal a flat row and a sibling row with a nested list bo
         ->and($report->candidates[0]->testCase())->toBe('it registers › flat')
         ->and($report->candidates[0]->differsBy)->toBe([])
         ->and($report->candidates[0]->coveringDifference)->toContain('in:function:register#0/key:value:\'tags\'')
-        ->and($report->candidates[0]->action())->toBe(Action::Review);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 });
 
 it('still deletes a test whose covering test passes a value it lacks only to an assertion', function (
@@ -3322,7 +3318,7 @@ it('still deletes a test without an assertion whose covering test only asserts m
         ->and($report->candidates[0]->action())->toBe(Action::Delete);
 });
 
-it('asks for a review of a test that omits an array key its covering dataset row sets through a parameter', function (): void {
+it('keeps a test that omits an array key its covering dataset row sets through a parameter', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -3361,19 +3357,21 @@ it('asks for a review of a test that omits an array key its covering dataset row
     expect($report->candidates)->toHaveCount(1)
         ->and($report->candidates[0]->testCase())->toBe('it finds pipelines with domain in email')
         ->and($report->candidates[0]->differsBy)->toBe([])
-        ->and($report->candidates[0]->action())->toBe(Action::Review)
+        ->and($report->candidates[0]->action())->toBe(Action::Keep)
         ->and($report->candidates[0]->coveringTokensForReview())->toBe([
             $hiddenKey,
             'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
         ])
         ->and($report->candidates[0]->steps())->toBe([
-            sprintf(Action::MISSING_KEY_STEP, $coveringTest, $hiddenKey),
-            sprintf(Action::MISSING_ARGUMENT_STEP, $coveringTest, 'in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false'),
-            Action::VERIFY_STEP,
+            sprintf(
+                Action::OTHER_INPUT_KEEP_STEP,
+                $coveringTest,
+                $hiddenKey . ', in:call:createAction#1/function:collect#0/value:\'hidden\'/value:false',
+            ),
         ]);
 });
 
-it('asks for a review of a test that differs only in data from a covering test that sets an array key it lacks', function (): void {
+it('merges a test that differs only in data from a covering test that sets an array key it lacks into one dataset', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -3406,21 +3404,19 @@ it('asks for a review of a test that differs only in data from a covering test t
             'in:call:post#1/value:\'default_type\'/value:\'fixed\'',
             'in:call:post#1/value:\'default_value\'/value:100',
         ])
-        ->and(valueAt($json, 'action'))->toBe('review')
-        ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:call:post#1/key:value:\'default_min_spend\''])
+        ->and(valueAt($json, 'action'))->toBe('merge-into-dataset')
         ->and(valueAt($json, 'steps'))->toBe([
             sprintf(
-                Action::MISSING_KEY_STEP,
+                Action::OTHER_INPUT_MERGE_STEP,
                 '"it rejects a percentual type with a minimum spend without a currency"',
                 'in:call:post#1/key:value:\'default_min_spend\'',
             ),
-            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
-            'Delete this test only when it does not; otherwise keep it.',
+            'Delete this test.',
             Action::VERIFY_STEP,
         ]);
 });
 
-it('asks for a review of a test that differs only in data from a covering test that passes an argument it lacks', function (): void {
+it('keeps a test that differs only in data from a covering test that passes an argument it lacks', function (): void {
     $report = analyzeTokenTest(
         source: <<<'PHP'
             <?php
@@ -3441,17 +3437,14 @@ it('asks for a review of a test that differs only in data from a covering test t
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it stores three')
         ->and(valueAt($json, 'differsBy'))->toBe(['in:function:store#0/value:3'])
-        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'action'))->toBe('keep')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe(['in:function:store#1/value:2'])
         ->and(valueAt($json, 'steps'))->toBe([
-            sprintf(Action::MISSING_ARGUMENT_STEP, '"it stores one with two"', 'in:function:store#1/value:2'),
-            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
-            'Delete this test only when it does not; otherwise keep it.',
-            Action::VERIFY_STEP,
+            sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it stores one with two"', 'in:function:store#1/value:2'),
         ]);
 });
 
-it('asks for a review of a test that differs only in data from a covering test that passes an argument it lacks to a nested call', function (
+it('keeps a test that differs only in data from a covering test that passes an argument it lacks to a nested call', function (
     string $source,
     string $missingArgument,
 ): void {
@@ -3463,14 +3456,9 @@ it('asks for a review of a test that differs only in data from a covering test t
 
     expect($report->candidates)->toHaveCount(1)
         ->and(valueAt($json, 'test'))->toBe('it stores the short input')
-        ->and(valueAt($json, 'action'))->toBe('review')
+        ->and(valueAt($json, 'action'))->toBe('keep')
         ->and(valueAt($json, 'coveringDiffersBy'))->toBe([$missingArgument])
-        ->and(valueAt($json, 'steps'))->toBe([
-            sprintf(Action::MISSING_ARGUMENT_STEP, '"it stores the long input"', $missingArgument),
-            'Check whether differsBy holds an assertion the covering tests lack: another result, input class, ordering or rejection.',
-            'Delete this test only when it does not; otherwise keep it.',
-            Action::VERIFY_STEP,
-        ]);
+        ->and(valueAt($json, 'steps'))->toBe([sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it stores the long input"', $missingArgument)]);
 })->with([
     'call inside an array passed to a call' => [
         <<<'PHP'
@@ -4071,7 +4059,7 @@ it('lists no order token for an arranging call that the covering test lacks, bec
         ->and($report->candidates[0]->action())->toBe(Action::MergeIntoDataset);
 });
 
-it('lists a covering argument whose string has the prefix of an order token in it', function (string $path): void {
+it('keeps a test whose covering test passes an argument whose string has the prefix of an order token in it', function (string $path): void {
     $report = analyzeTokenTest(
         source: <<<PHP
             <?php
@@ -4083,7 +4071,7 @@ it('lists a covering argument whose string has the prefix of an order token in i
 
     expect($report->candidates[0]->testCase())->toBe('it fetches all')
         ->and($report->candidates[0]->coveringDifference)->toBe(['in:function:fetchAll#1/value:\'' . $path . '\''])
-        ->and($report->candidates[0]->action())->toBe(Action::Review);
+        ->and($report->candidates[0]->action())->toBe(Action::Keep);
 })->with([
     'calls' => ['/v1/calls:list'],
     'items' => ['/v1/items:batchGet'],
@@ -4115,12 +4103,8 @@ it('names the tests that use the dataset in the steps of every other action for 
 })->with([
     'a covering test that sets a key the row lacks' => [
         sharedRow(['it first › two'], [], coveringDifference: ['in:function:store#0/key:value:\'b\'']),
-        Action::Review,
-        [
-            SHARED_ROW_STEP,
-            sprintf(Action::MISSING_KEY_STEP, '"it first › two"', 'in:function:store#0/key:value:\'b\''),
-            Action::VERIFY_STEP,
-        ],
+        Action::Keep,
+        [sprintf(Action::OTHER_INPUT_KEEP_STEP, '"it first › two"', 'in:function:store#0/key:value:\'b\'')],
     ],
     'a row that could not be parsed' => [
         sharedRow(['it first › two'], differsBy: null),
@@ -7050,3 +7034,31 @@ it(
     'pure' => ['[Mode::Strict, Mode::Loose]', '(App\\Enums\\Mode Enum (Strict))', '(App\\Enums\\Mode Enum (Loose))'],
     'the value of a case' => ['[IntegrationType::Upgates->value, IntegrationType::Shoper->value]', '(\'upgates\')', '(\'shoper\')'],
 ]);
+
+it('keeps the dataset rows that each set one key when a sibling row sets both keys', function (): void {
+    $report = analyzeTokenTest(
+        source: <<<'PHP'
+            <?php
+            it('clears a field', function (array $initialData, array $requestData, array $expectedData): void {
+                expect(update($initialData, $requestData))->toBe($expectedData);
+            })->with([
+                'delete nameday' => [['nameday' => '03-22'], ['nameday' => null], ['nameday' => null]],
+                'delete birthday' => [['birthday' => '1990-01-15'], ['birthday' => null], ['birthday' => null]],
+                'delete both' => [
+                    ['nameday' => '03-22', 'birthday' => '1990-01-15'],
+                    ['nameday' => null, 'birthday' => null],
+                    ['nameday' => null, 'birthday' => null],
+                ],
+            ]);
+            PHP,
+        linesByTest: [
+            'it clears a field › delete nameday' => ['src/Facade.php:10'],
+            'it clears a field › delete birthday' => ['src/Facade.php:10'],
+            'it clears a field › delete both' => ['src/Facade.php:10', 'src/Facade.php:11'],
+        ],
+    );
+
+    expect($report->candidates)->toHaveCount(2)
+        ->and(array_map(static fn (Candidate $candidate): string => $candidate->action()->value, $report->candidates))->toBe(['keep', 'keep'])
+        ->and($report->candidates[0]->steps()[0])->toContain('this test simulates another combination of input values');
+});

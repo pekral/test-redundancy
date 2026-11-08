@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A candidate whose covering test passes only literal array keys or argument values that the candidate lacks passes
+  another combination of input values, and is never `delete` or `review` with a step that offers to delete it. A
+  dataset row is `keep`. A test that one plain test of the same file covers, and that differs from it only in the keys
+  and values of the same arrays, is `merge-into-dataset` with whole arrays as row values. Every other such candidate is
+  `keep`. README *Other combinations of input values* lists the rules.
+
 ## [0.2.3] - 2026-11-08
 
 ### Changed

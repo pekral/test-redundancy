@@ -176,10 +176,10 @@ proof that a test is useless. The `action` of each candidate says how to judge i
 | `action` | Meaning | What to do |
 | --- | --- | --- |
 | `delete` | The candidate adds nothing new. | Delete it when a test under `coveredBy` asserts the same input and the same result. |
-| `merge-into-dataset` | It differs only in data from one test of the same file. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. |
+| `merge-into-dataset` | It differs only in data from one test of the same file, or passes the same arrays as that test with other keys. | Add a row with the values in `differsBy` to the dataset of that test (or turn it into a dataset test), then delete it. For arrays with other keys, pass each array as a whole row value. |
 | `review-dataset-row` | A row of the same dataset runs the same lines. | Compare it with the sibling row. Delete it when its input is the same class; keep it for an empty, boundary, invalid or other-tenant input. |
 | `review` | It asserts something the covering tests do not, differs in more than data, is a row of a named dataset another test uses, has a dataset row the analysis cannot resolve, or could not be parsed. | Judge it yourself. When in doubt, keep it. |
-| `keep` | It asserts a rejection — an error status, a validation error or an exception — and no covering test asserts any rejection. | Keep it. It covers the error path, and the covering tests cover another path through the same lines. |
+| `keep` | It asserts a rejection — an error status, a validation error or an exception — and no covering test asserts any rejection, or it passes another combination of input values than the covering test. | Keep it. It covers the error path, or an input of its own. |
 
 Keep a test that asserts a different result, a different input class (empty, boundary, another tenant, invalid), an
 ordering, or a rejection.
@@ -253,7 +253,7 @@ This is the report for the Pest fixture in [`tests/Fixtures/pest`](tests/Fixture
 | `seconds`, `candidateSeconds` | The time of the candidate in the coverage run, in seconds, and the sum over the candidates of the file and of the report (`summary.candidateSeconds`). `seconds` is `null` when the run did not measure the test, such as a test the `--across` analysis took from the coverage map. The time includes the coverage overhead, so compare it between candidates, not with a normal test run. |
 | `unionOnlyLines` | The source lines of the candidate that the covering test with `differsBy: []` does not run, because only the union of the `coveredBy` tests reaches them. The action is then `review`, and the steps say so. Empty for every other candidate. |
 | `steps` | What to do with the candidate, naming every covering test, or the sibling dataset row. The last step always runs `verify`. A `merge-into-dataset` candidate whose covering test is a row of a dataset test gets the step `Add a row with the values in differsBy to the dataset of "<test>".`, because that test already has a dataset; when that dataset is a named dataset (`dataset('name', …)`) that other tests of the same file also use with `->with('name')` at any position of their chain or as any argument of a `->with()`, the step names the dataset and those tests instead, because the new row is added to each of them (a name passed through a variable, a constant or a spread argument, a test the analysis does not parse, and a test inside a `describe()` block bound with `describe(…)->with('name')`, are not detected, so the step stays the plain one); a plain covering test gets `Turn "<test>" into one test with a dataset and add a row with the values in differsBy.` |
-| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, has a dataset row the analysis cannot resolve, or could not be parsed; `keep` — asserts a rejection that no covering test asserts, see [Tests of an error path](#tests-of-an-error-path). [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
+| `action` | `delete` — nothing new; `merge-into-dataset` — differs only in data from one test of the same file; `review-dataset-row` — a row of the same dataset runs the same lines; `review` — asserts something the covering tests do not, differs from one test of the same file in more than data, is a row of a named dataset that another test uses, has a dataset row the analysis cannot resolve, or could not be parsed; `keep` — asserts a rejection that no covering test asserts, see [Tests of an error path](#tests-of-an-error-path), or passes another combination of input values, see [Other combinations of input values](#other-combinations-of-input-values). [When a candidate is `review`, not `delete`](#when-a-candidate-is-review-not-delete) lists the rules for `delete` and `merge-into-dataset`. |
 | `testsWithoutSourceLines` | Tests that run no line under `source`. They are never candidates; check what they test, or the `source` setting. |
 | `failedTests` | The test cases that failed in the coverage run, each as `{"test": …, "message": …}` with the failure message. The analysis leaves them out: a failed test case is never a candidate and never a covering test, and it is not counted in `testCases`. See [Failed tests](#failed-tests). |
 | `summary.failedTests` | The number of failed test cases in the report. |
@@ -281,6 +281,25 @@ A candidate that differs from one test of the same file only in data stays `merg
 an error status: the new row keeps the case. When a covering test asserts a rejection too, even another one, the
 candidate stays `review`, because the two tests can check two inputs of the same error path. A status passed as a
 constant, such as `Response::HTTP_NOT_FOUND`, is not recognized: the analysis loads no class.
+
+### Other combinations of input values
+
+A test simulates an input, such as the values a user sends. When the covering test passes an array key or an argument
+value that the candidate does not pass, and nothing else that the candidate lacks, the candidate passes another
+combination of input values. Such a candidate is never `delete` and never `review`:
+
+- A dataset row is `keep`. It is already a row of a dataset, so the combination has its own case.
+- A test that is not a dataset row is `merge-into-dataset` when one plain test of the same file covers it, the covering
+  test only sets array keys and their values that the candidate lacks, and every value in `differsBy` is in one of the
+  same arrays. The step says to turn the two tests into one test with a dataset and one row for each combination, with
+  each array that differs as a whole row value.
+- Every other such candidate is `keep`.
+
+Only literal keys and values count. A variable, a property, a call, a closure, a cast or a spread that only the
+covering test passes keeps the candidate `review`, and so does a call, a `new` expression or an assertion that only the
+covering test has. For example, the row `'delete nameday' => [['nameday' => '03-22'], …]` is `keep` against the row
+`'delete both' => [['nameday' => '03-22', 'birthday' => '1990-01-15'], …]` of the same dataset: deleting one field
+alone is another input than deleting both.
 
 ### Failed tests
 
@@ -384,11 +403,13 @@ difference. Read them when a verdict surprises you.
   `coveredBy` tests reaches some lines, they are listed in `unionOnlyLines` and the action is `review`.
 - **No missing array key.** The covering test sets no array key, or sets no key more times, that the candidate lacks.
   A missing key is another input shape, so the `key:` tokens are listed in `coveringDiffersBy` and the action is
-  `review`. A key passed only to an assertion, such as a key of the array `toEqual` expects, does not count, whether
+  `keep` or `merge-into-dataset` (see [Other combinations of input values](#other-combinations-of-input-values)), or
+  `review` when the covering test also has a call or an assertion that the candidate lacks. A key passed only to an assertion, such as a key of the array `toEqual` expects, does not count, whether
   it is a top-level key of that array or a key nested in it.
 - **No missing argument value.** The covering test passes no value, or passes no value more times, to a call that is
   not an assertion, such as an argument of the code under test (`in:call:getByListIdAndLastId#4/value:'email'`). A
-  missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `review`. A
+  missing argument value is another input, so the value is listed in `coveringDiffersBy` and the action is `keep` for a
+  literal value (see [Other combinations of input values](#other-combinations-of-input-values)), or `review`. A
   value passed only to an assertion, such as a Pest expectation (`toBe`) or a PHPUnit `assert*` or `expect*` call, does
   not count. A value that is not a literal counts too: a variable, a property or a call result in an argument position
   that the candidate does not fill carries the token `in:<call>#<position>/non-literal`, such as
@@ -424,8 +445,8 @@ only in data from one test of the same file. When that test has a call, function
 candidate lacks, or has it more times than the candidate does, the two tests cannot be rows of one test: the tokens are
 listed in `coveringDiffersBy` and the action is `review`. When that test sets an array key that the candidate lacks,
 such as `in:call:post#1/key:value:'default_min_spend'`, a row with the values in `differsBy` would still set the key,
-so the case without the key would be lost: the `key:` tokens are listed in `coveringDiffersBy`, the action is `review`,
-and the steps ask whether the code under test reads one of these keys. A key nested in a value that `differsBy`
+so the case without the key would be lost: the action is `merge-into-dataset` with whole arrays as row values, or
+`keep`, see [Other combinations of input values](#other-combinations-of-input-values). A key nested in a value that `differsBy`
 already lists does not count, because a row replaces the whole value. For example, the key `'color'` in
 `store(['custom_fields' => ['color' => 'red']])` is nested in the value that `differsBy` lists as
 `in:function:store#0/value:'custom_fields'/value:[]` for `store(['custom_fields' => []])`, so that candidate stays
@@ -436,8 +457,8 @@ case of the candidate would be lost: the name tokens (see *Argument names*) are 
 action is `review`. A name token or a `non-literal` token is never data, also when its path crosses the key of an
 array, such as `in:function:foo#0/value:'k'/function:bar#0/variable:x` for `foo(['k' => bar($x)])`. When that test passes an argument at a position where `differsBy` lists no value, such as
 `in:function:store#1/value:2` for `store(1, 2)` against `store(3)`, a row with the values in `differsBy` would still
-pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy`, the
-action is `review`, and the steps ask whether the code under test behaves differently without one of these values.
+pass the argument, so the case without it would be lost: the argument tokens are listed in `coveringDiffersBy` and the
+action is `keep` for a literal argument, or `review`.
 The reverse holds too. When the candidate passes a named or a positional argument that the covering test omits, such
 as `in:new:PredictedData#newCustomersForecastCount/value:24` for `new PredictedData(date: $date, newCustomersForecastCount: 24)`
 against `new PredictedData(date: $date)`, the covering test relies on the default of the argument, and a row passes
