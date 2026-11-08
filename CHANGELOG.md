@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-08
+
+### Changed
+
+- The minimum versions of the runtime dependencies are raised (#210): `nikic/php-parser` `^5.9`,
+  `phpunit/php-code-coverage` `^14.5.1` on the 14 line, `symfony/console`, `symfony/filesystem` and `symfony/finder`
+  `^8.1.11` on the 8 line, and `symfony/process` `^8.1.10` on the 8 line. The 10–13 lines of
+  `phpunit/php-code-coverage` and the 6.4 and 7 lines of the Symfony components keep their minimums. A project that
+  locks an older version on a raised line runs `composer update` for that package before it installs 0.2.3.
+
 ## [0.2.2] - 2026-11-07
 
 ### Fixed
@@ -939,7 +949,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.2...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.3...HEAD
+[0.2.3]: https://github.com/pekral/test-redundancy/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/pekral/test-redundancy/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/pekral/test-redundancy/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/pekral/test-redundancy/compare/0.1.10...0.2.0
