@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-08
+
 ### Changed
 
 - A test that passes another combination of literal input values than one test of the same file is `merge-into-dataset`
@@ -13,7 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   differ in values and not only in array keys, and when one test passes fewer arguments. The step says to unify the two
   tests into one test with a dataset and one row for each combination. A covering test that makes an assertion the
   candidate lacks keeps the candidate `review`. A dataset row and a test that more than one test or a test of another
-  file covers stay `keep`. README *Other combinations of input values* lists the rules.
+  file covers stay `keep`. README *Other combinations of input values* lists the rules (#221).
 
 ## [0.2.5] - 2026-11-08
 
@@ -996,7 +998,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Parallel workers get the coverage settings through `--passthru-php` and the project configuration through
   `--configuration`; before, a worker that guessed another `pcov.directory` recorded no coverage.
 
-[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.5...HEAD
+[Unreleased]: https://github.com/pekral/test-redundancy/compare/0.2.6...HEAD
+[0.2.6]: https://github.com/pekral/test-redundancy/compare/0.2.5...0.2.6
 [0.2.5]: https://github.com/pekral/test-redundancy/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/pekral/test-redundancy/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/pekral/test-redundancy/compare/0.2.2...0.2.3
