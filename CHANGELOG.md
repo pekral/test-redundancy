@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The `phpunit/php-code-coverage` 14 line requires version 14.5.2 or newer.
+- The `composer test:coverage` script runs without a PHP memory limit. Before, the run failed at the default limit of
+  128 MB while Pest read its coverage report.
+
 ## [0.2.6] - 2026-11-08
 
 ### Changed
