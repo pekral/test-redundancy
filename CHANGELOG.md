@@ -11,6 +11,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The README is shortened to the install path and a first run. Commands and options, configuration, the report fields
   and the analysis rules moved unchanged to `docs/usage.md`, `docs/report.md`, `docs/reference.md` and
   `docs/development.md`.
+- `docs/` is excluded from the Composer dist archive, so the reference pages stay out of installed packages (#225).
 
 ## [0.2.6] - 2026-11-08
 
