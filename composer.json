@@ -103,7 +103,7 @@
         "rector-check": "vendor/bin/rector process --dry-run",
         "rector-fix": "vendor/bin/rector process",
         "security-audit": "composer audit",
-        "test": "vendor/bin/pest --no-coverage",
-        "test:coverage": "php -dmemory_limit=1G -dpcov.enabled=1 -dpcov.directory=. -dxdebug.mode=off -dpcov.exclude=\"~(vendor|tests)~\" vendor/bin/pest --coverage --min=100"
+        "test": "vendor/bin/pest --no-coverage --parallel",
+        "test:coverage": "php -dmemory_limit=1G -dpcov.enabled=1 -dpcov.directory=. -dxdebug.mode=off -dpcov.exclude=\"~(vendor|tests)~\" vendor/bin/pest --parallel --coverage --min=100"
     }
 }
